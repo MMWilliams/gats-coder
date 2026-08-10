@@ -6,36 +6,12 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 
 ---
 
-## Blocking (do these first)
-
-- [ ] **Put `gats-coder` under git.** It is not a repository. No history, no
-      branches, no backup — and `ledger run` cannot operate on its own source
-      because the agent requires a git repo. Everything below is riskier until
-      this is done.
-- [ ] **Live-backend smoke test.** `run` and `chat` have never been exercised
-      against the real `claude` CLI — only `FakeBackend`. The logic is proven;
-      the integration is not. Do this *before* the site goes live, because the
-      product page tells people to run those two commands.
-      ```
-      ledger init && ledger run "fix the failing test" --backend claude
-      ledger chat --ask "what does planner.py do?"
-      ```
-- [ ] **Deploy the Kyberos changes.** 9 modified files + `public/ledger/` +
-      `src/landing/Ledger.jsx` are uncommitted on `main`. Nothing is pushed.
-      Deploying publishes a download link under kyberos.ai.
-
 ## Release chores (whenever the version changes)
 
-Bumping the version touches four places. Missing one silently breaks install:
-
-1. `gats-coder/pyproject.toml` → `version`
-2. `python -m pip wheel . --no-deps -w dist`
-3. copy the wheel to `kyberos/public/ledger/`, update `latest.json`
-   (`version`, `wheel`, `sha256` — get it from `Get-FileHash -Algorithm SHA256`)
-4. `kyberos/src/landing/Ledger.jsx` → the `WHEEL` constant
-
-- [ ] Automate the above into a `release.ps1` / `Makefile` target. Four manual
-      steps with a checksum in the middle is a mistake waiting to happen.
+- Run `.\release.ps1` from the repo root — reads the version from
+  `pyproject.toml`, builds the wheel, copies it to `kyberos/public/ledger/`,
+  rewrites `latest.json` (sha256 included) and the `WHEEL` constant in
+  `Ledger.jsx`. Then commit + push both repos.
 - [ ] Decide on PyPI. Publishing `ledger-agent` would replace the version-pinned
       URL with a plain `pip install ledger-agent` and delete this whole section.
 
@@ -67,6 +43,25 @@ Bumping the version touches four places. Missing one silently breaks install:
       AAMAS full paper: **Oct 8, 2026**.
 
 ---
+
+## Done (2026-08-10, second pass)
+
+- [x] **gats-coder is under git** — `main`, generated artifacts ignored.
+- [x] **Live-backend smoke test PASSED.** `ledger run "fix the failing test"
+      --backend claude` on a scratch repo: goal reached, plan
+      `RunSuite → RunSuite → AuthorPatch:a → ApplyPatch:a → RunSuite`,
+      0 incidents, 0 LLM planning calls, journal chain intact, `status` +
+      `verify-chain` clean. `chat --ask` answered repo-aware.
+- [x] **Two Windows backend fixes** found by the smoke test (`ledger/llm.py`):
+      prompt now goes to `claude` via **stdin** (the npm `.cmd` shim truncates
+      argv at the first newline — multi-line prompts silently arrived as one
+      line) and output is decoded as UTF-8 (locale codepage mojibaked em-dashes).
+- [x] **`release.ps1`** — automates the four-step release chore end to end.
+- [x] **v0.2.1 cut with the fixes** — wheel + `latest.json` + `Ledger.jsx`
+      updated via `release.ps1`; clean-venv install passes `ledger demo`
+      100/100. (The 0.2.0 wheel's `run`/`chat` were broken on Windows.)
+- [x] **Kyberos deployed** — landing pages + `/ledger` product page +
+      `public/ledger/` committed and pushed; kyberos.ai serves the wheel.
 
 ## Done (2026-08-10)
 
