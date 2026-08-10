@@ -1,0 +1,150 @@
+<!-- BOOK
+title: Three Ways to Dream
+subtitle: Transformers, Diffusion, and JEPA - Three Architectures, One Question
+author: Maureese Williams (with Claude)
+lang: en
+-->
+
+<section data-title="Prologue: The Prediction Business">
+<h1>Prologue: The Prediction Business</h1>
+
+<p>Every architecture that matters in modern AI is in the same line of work: prediction. Cover part of the world with your thumb, ask the machine what&#8217;s under it, grade the answer, repeat a few trillion times. That&#8217;s the whole industry. The gigawatts, the GPUs, the trillion-dollar valuations &#8212; all of it is an elaborate apparatus for playing peek-a-boo with reality at scale.</p>
+
+<p>What separates the three great architectural families of the moment is not <em>whether</em> they predict but <em>where</em> &#8212; and, more revealingly, what each one does with the awkward fact that the future is uncertain. Ask a transformer, a diffusion model, and a JEPA to think about a glass sliding off a table and you get three personalities:</p>
+
+<p>The <strong>transformer</strong> narrates it, one token at a time: &#8220;The... glass... falls... and... shatters.&#8221; It commits to each word before choosing the next, like an improv performer whose only rule is that the show must go on. Uncertainty is handled locally &#8212; at every step there&#8217;s a probability over what comes next, a die is rolled, and the story continues as if the die had never existed.</p>
+
+<p>The <strong>diffusion model</strong> hallucinates the entire aftermath at once, badly, then refines it &#8212; a photograph of shattered glass slowly developing out of static, composition first, glitter of the shards last. Uncertainty isn&#8217;t resolved word by word; it&#8217;s resolved <em>coarse to fine</em>, spread across a schedule of decreasing fog.</p>
+
+<p>The <strong>JEPA</strong> looks at both of them like a disappointed physics teacher and says: why are you drawing shards? Nobody can predict where each shard goes, and &#8212; here&#8217;s the heresy &#8212; <em>nobody needs to</em>. It predicts the abstract state of affairs: glass falls, glass breaks, floor now hazardous. Uncertainty about irrelevant detail isn&#8217;t modeled. It&#8217;s <em>fired</em>.</p>
+
+<p>Three ways to dream: as a story, as a photograph, as a thought. This essay is a field guide to all three &#8212; how each works, why each won its territory, what each costs, and why the borders between them are quietly dissolving.</p>
+</section>
+
+<section data-title="The Transformer: Autocomplete as a Worldview">
+<h1>The Transformer: Autocomplete as a Worldview</h1>
+
+<p>The transformer&#8217;s founding bet, from the 2017 paper with the most confidently named title in the field (&#8220;Attention Is All You Need&#8221;), is that sequence understanding doesn&#8217;t require reading in order. It requires <em>everyone hearing everyone</em>.</p>
+
+<p>Picture each token as an employee at an all-hands meeting. Every employee broadcasts three things: a <strong>query</strong> (&#8220;here&#8217;s what I&#8217;m looking for&#8221;), a <strong>key</strong> (&#8220;here&#8217;s what I&#8217;m about&#8221;), and a <strong>value</strong> (&#8220;here&#8217;s what I&#8217;ll contribute if you call on me&#8221;). Attention is the matchmaking: every query is scored against every key, the scores go through a softmax &#8212; turning them into a budget of attention that must sum to one, the meeting&#8217;s scarcest resource &#8212; and each token walks away with a weighted blend of everyone&#8217;s values. Do this in several parallel &#8220;heads,&#8221; each attending to a different kind of relationship (one head tracking syntax, another tracking who &#8220;she&#8221; refers to), stack a few dozen layers of it with a residual stream running through like a conveyor belt that each layer reads from and writes back onto, and you have the machine that ate the field.</p>
+
+<p>The pronoun example is the classic for a reason: in &#8220;the trophy didn&#8217;t fit in the suitcase because it was too big,&#8221; resolving &#8220;it&#8221; requires <em>trophy</em> and <em>big</em> to find each other across the sentence, instantly, regardless of distance. Recurrent networks passed messages down a bucket brigade and hoped nothing spilled. Attention just lets the two words make eye contact.</p>
+
+<p>Generation is where the worldview shows. A language model factorizes the probability of a whole text into a chain of next-token predictions: the probability of a sentence is the probability of the first word, times the probability of the second given the first, and so on &#8212; a strict left-to-right accounting, like paying for a novel one syllable at a time. Training is gloriously parallel (every position predicts its successor simultaneously, the whole corpus at once); inference is stubbornly serial (one token, then the next, with a growing memory of keys and values cached along the way). The model never plans the sentence. It <em>becomes</em> the sentence, incrementally, with no undo key &#8212; improv theater with a trillion parameters and absolute commitment to the bit.</p>
+</section>
+
+<section data-title="Why the Transformer Won (and What It Pays)">
+<h1>Why the Transformer Won (and What It Pays)</h1>
+
+<p>The transformer won on logistics, the way most revolutions do. No recurrence means no waiting: training parallelizes across every token of every document, which means the architecture could <em>drink from the entire internet</em> at whatever rate you could buy GPUs. Then came the scaling laws &#8212; the almost embarrassing discovery that loss falls as a smooth, predictable power law in compute, data, and parameters. For the first time, intelligence had something resembling a price sheet. Executives could finally read a chart, and the chart said: pay more, get smarter. The rest is macroeconomics.</p>
+
+<p>But the worldview has taxes, and they&#8217;re structural.</p>
+
+<p><strong>The quadratic meeting.</strong> Everyone-hears-everyone is O(n&#178;): double the context and you quadruple the eavesdropping. A million-token meeting is a million-token meeting; the field&#8217;s entire cottage industry of attention variants is an attempt to let some employees skip it.</p>
+
+<p><strong>The tokenizer&#8217;s glasses.</strong> The model sees the world pre-chopped into subword chunks it didn&#8217;t choose &#8212; which is why counting the r&#8217;s in &#8220;strawberry&#8221; once humiliated systems that could pass the bar exam. It&#8217;s not stupidity; it&#8217;s wearing someone else&#8217;s prescription.</p>
+
+<p><strong>Confident interpolation.</strong> Sampling from a smooth conditional distribution means the model can always produce <em>something</em> plausible-shaped, including when the honest answer is &#8220;I have no idea.&#8221; A hallucination isn&#8217;t a malfunction &#8212; it&#8217;s the architecture doing exactly what it was built to do, in a place where it shouldn&#8217;t. The improv performer never breaks character, even in a deposition.</p>
+
+<p><strong>No native eraser.</strong> Left-to-right commitment means early mistakes are load-bearing. The model can&#8217;t revise token twelve at token four hundred; it can only build an increasingly elaborate apology around it. (Sound like anyone you&#8217;ve worked with?)</p>
+
+<p>None of this dethroned the transformer &#8212; language really is sequential-ish, and the machinery is spectacular at it. But images aren&#8217;t sentences. Which is where the second dreamer comes in.</p>
+</section>
+
+<section data-title="Diffusion: Sculpting with Static">
+<h1>Diffusion: Sculpting with Static</h1>
+
+<p>Michelangelo allegedly said the statue was already in the marble; he just removed everything that wasn&#8217;t David. Diffusion models take this literally, with one modification: the marble is Gaussian noise, and every possible statue is in there.</p>
+
+<p>The scheme has two halves, only one of which involves learning. The <strong>forward process</strong> is pure vandalism: take a real image and add a little noise, then a little more, over hundreds of steps, until nothing remains but static. This requires no intelligence &#8212; entropy is self-service. The <strong>reverse process</strong> is the product: a network that looks at a noisy image, is told how noisy it is, and predicts the noise so it can be subtracted &#8212; one small step back up the entropy hill. Chain a few dozen to a few hundred of these steps from pure static and an image condenses out of nothing, the way a photograph used to bloom in a darkroom tray, if the tray started with television snow.</p>
+
+<p>Training is almost insultingly simple: pick a random image, a random noise level, noise the image, ask the network what noise was added, penalize the squared error. That&#8217;s it. No adversary, no knife-fight between generator and discriminator, none of the GAN era&#8217;s mode-collapse melodrama where the network learns to draw one very good face forever. Diffusion training is stable the way accounting is stable &#8212; and the field, exhausted from a decade of adversarial couples therapy, noticed.</p>
+
+<p>The elegant reframing (from the score-matching lineage) is that the network is learning the <em>gradient of the data distribution</em> &#8212; at every noise level, a compass that points uphill toward &#8220;more like real data.&#8221; Generation is just following compasses through fog that keeps thinning: the earliest, foggiest steps decide composition &#8212; where the mountains go, that there&#8217;s a dog at all &#8212; and the final, clearest steps paint whiskers. Coarse to fine, globally, all pixels negotiating simultaneously. No pixel is token number one. No pixel has to commit first. For a two-dimensional field of color with no natural reading order, this is not a feature; it is the correct metaphysics.</p>
+</section>
+
+<section data-title="Diffusion's Knobs, Tricks, and Taxes">
+<h1>Diffusion&#8217;s Knobs, Tricks, and Taxes</h1>
+
+<p>Three engineering moves turned diffusion from a beautiful idea into the machine that draws the internet&#8217;s pictures.</p>
+
+<p><strong>The obedience knob.</strong> Classifier-free guidance trains the denoiser both with and without the text prompt, then, at generation time, exaggerates the difference between them &#8212; literally extrapolating past the conditional prediction, away from the unconditional one. It is a dial labeled &#8220;how much do you care what I asked for,&#8221; and like all such dials it has a failure mode: crank it too far and you get the deep-fried, oversaturated look of a model trying much too hard to please. There is a lesson about management in there somewhere.</p>
+
+<p><strong>The latent shortcut.</strong> Pixels are mostly redundant &#8212; megapixels of sky that are just... sky. Latent diffusion (the &#8220;Stable&#8221; in Stable Diffusion) first squeezes the image through an autoencoder into a compact latent space, and runs the entire noise-and-denoise ballet <em>there</em>, at a fraction of the cost. File this move away: <em>don&#8217;t model pixels, model a compressed representation of pixels</em>. It is the first quiet concession toward the third dreamer&#8217;s worldview.</p>
+
+<p><strong>The transformer inside.</strong> The denoising network itself is, in modern systems, a transformer (the DiT lineage) &#8212; patches of noisy latent attending to each other and to the prompt. This is the architecture behind the video generators that turned &#8220;text-to-Hollywood-b-roll&#8221; into a product category. The dreamers, it turns out, subcontract to each other.</p>
+
+<p>The taxes: <strong>inference is a pilgrimage</strong>, not a lookup &#8212; where a language model does one forward pass per token, diffusion does dozens per image, and the distillation industry (fewer steps, consistency models, one-step students of thousand-step teachers) exists precisely to shorten the walk. And diffusion doesn&#8217;t hand you tidy conditional probabilities the way autoregression does; asking it &#8220;how likely was that image&#8221; involves math with the mood of a tax audit. It&#8217;s a painter, not a bookmaker.</p>
+</section>
+
+<section data-title="JEPA: The Refusal to Draw Grass">
+<h1>JEPA: The Refusal to Draw Grass</h1>
+
+<p>The third architecture begins with a critique, delivered with characteristic Yann LeCun subtlety, of the other two: <em>generative models are wasting most of their capacity</em>. If you train a model to predict a video of a lawn, pixel by pixel, you are asking it to commit compute and parameters to the future position of every blade of grass &#8212; a quantity that is unpredictable, irrelevant, and infinite in its variations. The world is full of detail whose exact configuration doesn&#8217;t matter and can&#8217;t be known. A model forced to render it anyway is a physics student forced to spend the exam shading.</p>
+
+<p>The Joint-Embedding Predictive Architecture is the alternative: predict in <em>representation space</em>. Encode what you can see. Encode what you&#8217;re trying to anticipate. Then train a predictor to get from the first embedding to the second &#8212; and compute the loss <em>up there</em>, between abstract vectors, never down in pixel-land. The encoder is thereby free &#8212; encouraged, even &#8212; to discard the unpredictable. Blade-of-grass configurations, sensor noise, the exact trajectory of every shard of the falling glass: none of it needs to survive the encoding, because none of it helps prediction. Abstraction stops being lossy compression to apologize for and becomes the entire point. You do not dream in pixels. Neither should it.</p>
+
+<p>There is a trapdoor in this scheme, and it&#8217;s worth respecting: <strong>collapse</strong>. If the encoder maps everything &#8212; every image, every video, your cat, the void &#8212; to the same constant vector, then prediction becomes trivially perfect and perfectly useless. The student has discovered that if all answers are &#8220;7,&#8221; all its predictions of its own answers are flawless. Preventing collapse is the craft of the whole joint-embedding family: keep a slow-moving target encoder (an exponential moving average of the student, so the goalposts drift rather than teleport), or regularize the embeddings to maintain variance and decorrelation, so the representation is contractually obligated to keep containing information. The energy-based framing says it cleanly: compatible pairs should get low energy, but somebody has to make sure energy isn&#8217;t low <em>everywhere</em>.</p>
+
+<p>In practice: I-JEPA masks blocks of an image and predicts the <em>representations</em> of hidden blocks from a visible context block &#8212; no pixel reconstruction, no hand-tuned augmentation rituals &#8212; and learns semantic features with startling training efficiency. V-JEPA does it in time, masking spatiotemporal chunks of video, and its successors are used as <em>world models</em>: a robot arm consults the latent predictor &#8212; &#8220;if I do this, what does the world-state become?&#8221; &#8212; and plans against imagined futures without rendering a single frame. Prediction as thought, not as cinema.</p>
+</section>
+
+<section data-title="JEPA's Bet, and the Skeptics' Ledger">
+<h1>JEPA&#8217;s Bet, and the Skeptics&#8217; Ledger</h1>
+
+<p>Be fair to the skeptics, because their objections are real.</p>
+
+<p><strong>It doesn&#8217;t generate.</strong> A JEPA can&#8217;t show you the picture; there is no picture, only a vector that <em>means</em> the picture. For products whose entire job is making images, this is disqualifying. Nobody frames an embedding.</p>
+
+<p><strong>It&#8217;s awkward to grade.</strong> A language model&#8217;s loss is public and merciless; a generative image model can be eyeballed by anyone with eyes. A representation has to be evaluated by proxy &#8212; frozen probes, downstream tasks, planning performance &#8212; and proxies invite arguments. The lineage question (&#8220;isn&#8217;t this BYOL with a predictor and better press?&#8221;) is the family reunion nobody enjoys but everybody attends.</p>
+
+<p><strong>The bet is long-dated.</strong> JEPA&#8217;s wager is not about next quarter&#8217;s benchmark. It&#8217;s that the road to machines that <em>understand and plan</em> &#8212; that possess the common-sense physics a housecat has and a chatbot fakes &#8212; runs through predictive world models in latent space, not through ever-larger machines for rendering the world&#8217;s surfaces. A cat doesn&#8217;t predict pixels when it commits to a jump; it predicts <em>consequences at the resolution that matters</em>, which is why the cat lands and the video model gives the gymnast three legs mid-flip.</p>
+
+<p>And the bet has teeth precisely where the other two architectures are weakest: agents. A planner needs cheap, abstract, queryable predictions &#8212; thousands of &#8220;what if&#8221; rollouts per decision. Rolling out a diffusion video model per candidate action is buying a feature film to check the weather. Rolling out latent predictions is a thought. Anyone who has built an agent that plans over a compact world model instead of paying a language model to improvise every decision &#8212; and the author has recently built exactly that &#8212; will feel the shape of this argument in their bones.</p>
+</section>
+
+<section data-title="Family Portrait: One Question, Three Answers">
+<h1>Family Portrait: One Question, Three Answers</h1>
+
+<p>Line the three up and ask each the same question &#8212; <em>where do you predict, and what do you do with uncertainty?</em> &#8212; and the whole taxonomy falls out.</p>
+
+<p><strong>Where prediction lives.</strong> The transformer predicts in <em>token space</em>: discrete symbols, one at a time, in an order somebody chose. Diffusion predicts in <em>data space</em> (or a compressed stand-in for it): every pixel at once, refined over a schedule. JEPA predicts in <em>latent space</em>: abstractions, where the unpredictable has already been shown the door.</p>
+
+<p><strong>How uncertainty is handled.</strong> The transformer localizes it &#8212; a full probability distribution over the very next symbol, resolved by a dice roll, repeated. Diffusion <em>schedules</em> it &#8212; ambiguity lives in the noise level, and gets resolved coarse-to-fine, big decisions in the fog, details in the clear. JEPA <em>fires</em> most of it &#8212; irrelevant uncertainty is abstracted away by the encoder, and what genuinely can&#8217;t be known can be carried by an explicit latent variable rather than painted a thousand different ways.</p>
+
+<p><strong>What each is for.</strong> Language and code &#8212; worlds that really are sequences of discrete commitments &#8212; belong to the transformer. Continuous perceptual media with no reading order &#8212; images, audio, video &#8212; belong to diffusion. Representations, world models, and the planning loops of embodied agents are JEPA&#8217;s home turf, or at least its homestead claim.</p>
+
+<p><strong>Where each pays.</strong> The transformer pays in context (the quadratic meeting) and in confident nonsense at the distribution&#8217;s edge. Diffusion pays at inference, in sampling steps. JEPA pays in evaluability, in collapse-prevention machinery, and in the patience required to hold a position that doesn&#8217;t demo well.</p>
+
+<p>One family, honestly: three children of the same insight &#8212; learn by predicting what&#8217;s hidden &#8212; who disagreed about what&#8217;s worth predicting, and each turned out to be right about a different third of the world.</p>
+</section>
+
+<section data-title="The Dissolving Borders">
+<h1>The Dissolving Borders</h1>
+
+<p>The clean taxonomy above is already smearing, which is how you know the field is healthy.</p>
+
+<p>The transformer is inside everything now &#8212; it is diffusion&#8217;s denoiser (DiT), JEPA&#8217;s encoder (a vision transformer, patches attending to patches), the universal substrate on which the other two worldviews run. &#8220;Transformer&#8221; has quietly stopped naming a rival paradigm and started naming the CPU.</p>
+
+<p>Diffusion, meanwhile, is crossing into text &#8212; language models that generate by iterative denoising over whole passages instead of left-to-right commitment, trading the improv performer&#8217;s tyranny of token order for parallel drafts that sharpen. Early, fast, and philosophically delicious: the photograph paradigm making a play for the story paradigm&#8217;s home turf.</p>
+
+<p>And everyone is converging on JEPA&#8217;s central heresy, mostly without citing it. Latent diffusion already moved generation out of pixel space. Video generators are increasingly judged not on shard-level fidelity but on whether their <em>physics</em> holds &#8212; which is a world-model criterion wearing a cinematography costume. Agent builders are learning, invoice by invoice, that planning needs abstract predictive models rather than generative improvisation at every step. The three ways to dream are becoming one pipeline with three stages: represent the world compactly (JEPA&#8217;s move), reason over it in structured steps (the transformer&#8217;s move), and render the result for human eyes only when a human actually needs to look (diffusion&#8217;s move).</p>
+
+<p>Dream as a thought. Speak it as a story. Print it as a photograph &#8212; but only on request.</p>
+</section>
+
+<section data-title="Epilogue: The Pragmatist's Guide">
+<h1>Epilogue: The Pragmatist&#8217;s Guide</h1>
+
+<p>If you build things, the taxonomy compresses to a pocket card.</p>
+
+<p>Is your data a sequence of discrete commitments &#8212; words, code, API calls, chess moves? You want the improv performer. Pay the context tax, put a verifier behind it (never let it grade its own homework), and enjoy the best-understood scaling story in the history of computing.</p>
+
+<p>Is your output a continuous perceptual object &#8212; an image, a soundtrack, a video, a protein conformation? You want the sculptor. Pay the sampling tax, keep a hand on the obedience knob, and generate in latent space like a civilized person.</p>
+
+<p>Is your problem <em>understanding</em> or <em>acting</em> &#8212; representations for downstream tasks, a world model for a robot, cheap imagined futures for a planner that must ask &#8220;what if&#8221; ten thousand times before lunch? You want the physics teacher. Pay the evaluation tax, respect the collapse trapdoor, and accept that your demo will be a table of numbers instead of a picture of an astronaut riding a horse.</p>
+
+<p>And if the question is which one <em>wins</em> &#8212; the honest answer is that it&#8217;s the wrong question, asked annually anyway, at conferences, loudly. Stories, photographs, and thoughts have coexisted in the other intelligence &#8212; the one reading this &#8212; for rather a long while. The interesting frontier was never which dreamer dethrones the others. It&#8217;s the waking machine that learns to use all three: think in abstractions, narrate when asked, and draw only what someone actually needs to see.</p>
+
+<p>Which, come to think of it, is just a description of somebody good at their job.</p>
+</section>

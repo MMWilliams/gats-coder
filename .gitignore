@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+build/
+dist/
+*.egg-info/
+demo_out/
+.claude/activity.json
+
+# generated book/essay builds (sources: build_book.py, *_master.html)
+essay/*.pdf
+essay/*.epub
+essay/_pdf_render*.html

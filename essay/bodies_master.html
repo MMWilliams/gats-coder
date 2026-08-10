@@ -1,0 +1,176 @@
+<!-- BOOK
+title: Bodies of Work
+subtitle: A Field Guide to Robots That Refuse to Be Typecast
+author: Maureese Williams
+lang: en
+-->
+
+<section data-title="Prologue: The One-Robot-One-Brain Problem">
+<h1>Prologue: The One-Robot-One-Brain Problem</h1>
+
+<p>For most of legged-robotics history, we trained policies the way a 1940s Hollywood studio treated character actors: one body, one role, forever. You built a quadruped, you trained a controller for that quadruped, and if you so much as changed a shin length you started over from scratch. The policy had the transferability of a house key &#8212; beautifully cut for exactly one lock, useless for any other.</p>
+
+<p>This is, on reflection, an absurd way to build intelligence. Nobody re-learns how to walk when they buy new shoes. A toddler who has fallen off enough furniture develops something suspiciously like a general prior over bodies &#8212; which is why the same kid can, within a single year, master a scooter, a tricycle, and the profound art of the supermarket-cart hang. Biology ships a locomotion controller that laughs at morphological detail. Our robots needed a fresh PhD student for every new ankle.</p>
+
+<p>The last two years fixed this. Badly at first, then suddenly rather well. This essay walks from the foundational hacks to the 2026 frontier, and its load-bearing claim fits in one sentence: <strong>generalizable policies come from training on many bodies, in an architecture that can read a body&#8217;s blueprint, distilled from experts who each mastered one body first.</strong> Everything below is commentary on that sentence.</p>
+
+<p>We begin where the field began: by lying to the policy about physics, for its own good.</p>
+</section>
+
+<section data-title="Part I - Foundations: Teaching a Policy That the World Is a Liar">
+<h1>Part I &#8212; Foundations: Teaching a Policy That the World Is a Liar</h1>
+
+<p><strong>1.1 Domain Randomization, or: Raising a Robot in a Funhouse</strong></p>
+
+<p>Before we could generalize across bodies, we had to generalize across worlds. The sim-to-real gap &#8212; the treacherous canyon between your beautiful physics simulator and the deeply uncooperative real floor &#8212; was the original boss fight.</p>
+
+<p>The foundational trick, domain randomization, is gloriously dumb in the best way. Can&#8217;t model reality precisely? Then model reality <em>badly, on purpose, ten thousand different ways</em>. Randomize friction, mass, motor strength, sensor latency, and the timing and force of a gremlin who shoves the robot mid-stride. The policy, having grown up in a house where the floor&#8217;s grip and its own leg weight changed every morning, concludes that reality is fundamentally untrustworthy and develops the robotic equivalent of unshakeable sea legs. Drop it on a real floor and the real floor is just one more Tuesday.</p>
+
+<p>The analogy that never fails: DR is the overprotective-parent strategy inverted. Instead of sheltering the child from all variance, you crank the variance to eleven so that nothing out there can surprise them. Nietzsche for robots &#8212; that which does not tip you over makes your gait more robust.</p>
+
+<p>Read the fine print, though: robustness is purchased with performance. A policy that trusts nothing moves like a person crossing black ice &#8212; wide stance, short strides, every joint braced for betrayal &#8212; because in its childhood, betrayal ran on a schedule. Bracing for every possible body is not the same as knowing the body you&#8217;re in. Keep that tension in mind; Part V is largely the story of the field buying its performance back.</p>
+
+<p><strong>1.2 Morphology Randomization: GenLoco and the First Cracks</strong></p>
+
+<p>DR handles physics. But the deeper question &#8212; can one policy drive <em>different robots</em> &#8212; needed randomizing the robot itself. Early cross-embodiment work like GenLoco did procedural morphology randomization: sample link lengths, masses, and proportions across a whole family of quadrupeds and train one controller over the lot. It worked, and it was the first real evidence that a single set of weights could span a family of morphologies rather than a single individual.</p>
+
+<p>But GenLoco and its cousins had a ceiling baked into the architecture: fixed degrees of freedom. You could stretch and squash the robot, but you couldn&#8217;t change how many joints it had. It was body-morphing, not body-swapping &#8212; a caricaturist who can make you taller or rounder but cannot draw you with a third leg. To cross that line, the field had to stop feeding the policy a fixed-length vector and start feeding it a <em>description of an anatomy</em>.</p>
+</section>
+
+<section data-title="Part II - Architecture: How Do You Even Talk to a Body You've Never Met?">
+<h1>Part II &#8212; Architecture: How Do You Even Talk to a Body You&#8217;ve Never Met?</h1>
+
+<p><strong>2.1 The Zero-Padding Sin</strong></p>
+
+<p>The na&#239;ve fix for &#8220;robots have different numbers of joints&#8221; is to pick the biggest robot, size your input and output vectors to that, and zero-pad everyone smaller. This is the one-size-fits-all hospital gown of machine learning: technically it covers every patient, dignifies none of them, and the moment someone unusual walks in, everything is flapping in the breeze.</p>
+
+<p>The gown hides two sins. Zero-padding tells the network nothing about what the extra slots <em>mean</em>, so it never learns that joint 4 on the hexapod is functionally the knee&#8217;s cousin. And it hard-codes an arbitrary roll call: the network must rediscover, weight by weight, that slot 7 on one robot plays the role slot 3 plays on another. Structure is thrown away at precisely the moment structure is the whole point.</p>
+
+<p><strong>2.2 Graph Nets: The Right Idea, Slightly Early</strong></p>
+
+<p>The first principled answer was graph neural networks &#8212; the NerveNet lineage: represent the robot as its kinematic tree, pass messages along the actual links, and let the policy learn physiology by learning topology. Philosophically correct &#8212; a robot <em>is</em> a graph &#8212; and it worked. It was also finicky to train and slow to scale: the electric car of 2010, unquestionably the future, currently sputtering. Then attention arrived and quietly ate its lunch &#8212; and it won on logistics, not philosophy. A transformer is, in effect, a fully connected graph network: every joint is one hop from every other, with no message relayed leg-by-leg up a long kinematic chain, and it trains fast on exactly the hardware everyone already owns. The future arrived; it just took the bus.</p>
+
+<p><strong>2.3 Joints as Tokens: the R&#233;sum&#233; Model of Robotics</strong></p>
+
+<p>The current reference design treats <em>each joint as a token</em>. This is the conceptual keystone of the whole field, so it deserves plain statement.</p>
+
+<p>Instead of one fixed vector, the policy receives a <em>set</em> of joint descriptors. Each joint hands over its little r&#233;sum&#233;: &#8220;Hi, I&#8217;m a revolute joint. My rotation axis is this, my parent in the kinematic tree is that, here are my position and torque limits, my link&#8217;s mass and inertia, my gear ratio, and &#8212; currently &#8212; my angle and velocity.&#8221; An attention mechanism pools over the r&#233;sum&#233;s, and per-joint action heads decode a command back to each applicant. This is the URMA idea &#8212; the Unified Robot Morphology Architecture: arbitrary observation and action spaces via attention over joint encodings, with the policy conditioned on the morphology descriptor itself.</p>
+
+<p>Because the input is a set rather than a vector, nobody has to agree on a numbering convention &#8212; the policy stops caring in what order the joints introduce themselves, which is exactly the invariance the hospital gown destroyed. And the interview analogy writes itself: previous policies had to guess the candidate&#8217;s skills from their fidgeting; URMA reads the dating profile before the date. Here are my joints, here&#8217;s my reach, here&#8217;s how much torque I can deliver before my knees file a complaint. Given the blueprint, the policy plans for the body it&#8217;s actually in rather than the body it wishes it had.</p>
+
+<p>And it genuinely understands what it reads. Project the trained policy&#8217;s internal action representations and they cluster cleanly by morphology class, with finer sub-structure organized by things like knee-joint count &#8212; the network spontaneously filed quadrupeds, hexapods, and humanoids into their own drawers, then alphabetized within each drawer by kinematics. Nobody told it to. That is the tell that it learned a real, structured notion of &#8220;body,&#8221; not a lookup table of memorized gaits.</p>
+</section>
+
+<section data-title="Part III - The Winning Recipe: Hire Specialists, Graduate a Generalist">
+<h1>Part III &#8212; The Winning Recipe: Hire Specialists, Graduate a Generalist</h1>
+
+<p>Here is the plot twist that surprises newcomers: the best generalist policies are not trained as generalists from birth.</p>
+
+<p>Run one big multi-embodiment RL job across every robot at once and two things sabotage you. First, <em>gradient conflict</em>: the humanoid and the hexapod want the shared weights pulled in incompatible directions, and the optimizer spends its life refereeing a custody dispute. Second, <em>reward-scale mismatch</em>: a big heavy robot racks up bigger raw numbers, quietly bullies the loss, and the little robots get ignored like the youngest sibling at a loud dinner.</p>
+
+<p>The fix is a two-stage expert-then-distill pipeline:</p>
+
+<ul>
+<li><strong>Train per-embodiment experts with RL</strong> &#8212; plain PPO, asymmetric actor-critic: a privileged critic that peeks at true masses and contact forces, a humble actor that gets only proprioception. Each expert obsesses over exactly one body and masters it. These runs are embarrassingly parallel, which is exactly what a rack of GPUs is for.</li>
+<li><strong>Distill all the experts into one morphology-aware policy</strong> by behavior cloning. The generalist attends the lectures of a thousand specialist tutors and internalizes the common grammar of walking.</li>
+</ul>
+
+<p>It&#8217;s the difference between forcing one overwhelmed student through medical school, law school, and culinary school simultaneously &#8212; gradient conflict: the graduate emerges confused and slightly dangerous &#8212; versus letting specialists master their domains and then having one brilliant student study the specialists. Distillation is a calm supervised-learning afternoon compared to the knife-fight of joint multi-task RL.</p>
+
+<p>One craft note before you try this at home: pure behavior cloning carries its classic disease. Small imitation errors compound until the student wanders into states no tutor ever demonstrated, and then it panics, expensively. The standard cure is DAgger-shaped: let the student drive while the tutors grade &#8212; roll out the <em>student&#8217;s</em> policy, label its states with expert actions, retrain, repeat. The generalist learns not just the specialists&#8217; answers but how to recover from its own early misreadings of them, which is most of what expertise is.</p>
+</section>
+
+<section data-title="Part IV - The Headline: Embodiment Scaling Laws">
+<h1>Part IV &#8212; The Headline: Embodiment Scaling Laws</h1>
+
+<p>Now the result worth tattooing on the field&#8217;s collective forearm.</p>
+
+<p>We have scaling laws for data &#8212; more tokens, smarter language model &#8212; and everyone salutes them. The 2026 question: is there a scaling law for <em>bodies</em>? Does training on more distinct embodiments make a policy generalize to embodiments it has never seen &#8212; and does that beat simply grinding more data on the same old robots?</p>
+
+<p>Testing it requires bodies at a scale no machine shop could deliver, so the researchers procedurally generated about a thousand of them &#8212; a menagerie dubbed GenBot-1K: roughly 348 humanoids, 332 quadrupeds, and 332 hexapods, built by systematically varying geometry (link and body scaling), topology (how many knee joints per leg), and kinematics (joint limits). A thousand robots that never existed, conjured specifically to be walked. Dr. Frankenstein, but with a URDF exporter and better documentation.</p>
+
+<p>The findings, stated with appropriate reverence:</p>
+
+<ul>
+<li><strong>The scaling law is real.</strong> Zero-shot performance on unseen robots climbs steadily as training embodiments are added. More bodies worn, better improvisation in the next new body &#8212; a dose-response curve for <em>Quantum Leap</em>.</li>
+<li><strong>Embodiment scaling beats data scaling.</strong> Grinding more experience on the same fixed robots plateaus; adding <em>variety of body</em> keeps paying. Breadth of anatomy dominates depth of repetition.</li>
+<li><strong>There&#8217;s a floor.</strong> Below roughly tens of embodiments the magic doesn&#8217;t ignite &#8212; you need a genuine crowd before &#8220;general prior over bodies&#8221; emerges instead of &#8220;memorized this handful.&#8221;</li>
+</ul>
+
+<p>And the money shot: the policy, trained on hundreds of purely simulated bodies, transferred <em>zero-shot</em> to real hardware it had never met &#8212; a Unitree Go2 quadruped and an H1 humanoid, walking on cobblestone and grass out of the box. Then the researchers, being the sort of people who poke bears, artificially restricted one of the Go2&#8217;s knee joints by 20% mid-experiment. The policy shrugged and produced a stable limping gait. It had never seen that specific injury. It read the body it was handed and adapted on the spot &#8212; the robotic equivalent of rolling your ankle at mile three and simply adjusting your stride, because your motor system has, over a lifetime of bodies-in-motion, developed opinions about improvisation.</p>
+
+<p>That limp is the whole thesis of the field in one clip. Not a memorized policy &#8212; a general one.</p>
+</section>
+
+<section data-title="Part V - The Frontier's Frontier: Three Schools of Thought">
+<h1>Part V &#8212; The Frontier&#8217;s Frontier: Three Schools of Thought</h1>
+
+<p>The scaling-law result set the table; several 2025&#8211;2026 lines of work are now feasting on it from different angles.</p>
+
+<p><strong>The Humanoid Purists</strong> (XHugWBC, H-Zero). Humanoids are the awkward guests &#8212; heterogeneous structures, high control complexity, tempers. Rather than one policy for all legged life, these methods specialize in whole-body control across the humanoid family: generating physically consistent embodiment data and using hybrid-mask attention transformers to capture broad humanoid motion priors. H-Zero in particular reframes the goal from zero-shot heroics to few-shot pragmatism &#8212; pretrain across many humanoids, then rapidly adapt to the specific real one with little data and few knobs. If you own the target hardware, &#8220;pretrain broadly, fine-tune fast&#8221; beats &#8220;pray for zero-shot.&#8221; Studying abroad, then a short intensive with the local dialect coach, versus hoping your textbook Mandarin survives contact with Sichuan.</p>
+
+<p><strong>The Diffusion Jazz Ensemble</strong> (Multi-Loco). A genuinely different bet: let a morphology-<em>agnostic</em> diffusion model capture the deep, invariant rhythm of legged locomotion &#8212; the universal groove of how legged things move &#8212; and let a shared lightweight RL residual riff on top for the specific robot and task. A jazz standard plus a soloist: the diffusion model plays the timeless changes; the residual improvises this robot&#8217;s particular flourishes. Across four real robots it beat a standard PPO baseline by about 10% average return. The catch is diffusion&#8217;s heavier inference bill, so for deploy-on-a-microcontroller reality the attention-token policies remain the sensible daily driver &#8212; but the ceiling here is intriguing.</p>
+
+<p><strong>The Adaptation Realists</strong> (RMA-style latents). Kinematic descriptors tell you a body&#8217;s shape, but two robots with identical blueprints can still behave differently &#8212; worn gearbox, mystery payload, a motor having a bad day. So bolt on a small context encoder that watches roughly fifty steps of proprioception and infers a latent &#8220;what body-and-dynamics am I <em>actually</em> in right now&#8221; vector, trained to match a privileged teacher that got to cheat and see ground truth. Descriptors handle identity; the latent handles residual reality. The policy takes a few exploratory steps and goes &#8220;ah &#8212; heavier than advertised, and the left hip is sticky, noted&#8221; &#8212; which is exactly what you do in the first three strides wearing a backpack you didn&#8217;t pack yourself. This is also where domain randomization&#8217;s performance tax from Part I gets refunded: a policy that can <em>measure</em> its body no longer has to brace for every body it might have been given.</p>
+</section>
+
+<section data-title="Part VI - The Fine Print That Separates a Paper From a Faceplant">
+<h1>Part VI &#8212; The Fine Print That Separates a Paper From a Faceplant</h1>
+
+<p>The concepts above are clean. The reasons implementations fail are grubby, and worth memorizing, because reviewers and real robots both find them instantly.</p>
+
+<p><strong>Normalize everything by the body.</strong> Express actions as fractions of each joint&#8217;s real torque and position limits; scale rewards by nominal mass, leg length, standing height. Skip this and your distillation dataset is dominated by big robots posting big raw numbers, and the generalist grows up thinking it&#8217;s a forklift.</p>
+
+<p><strong>Descriptors must be sufficient statistics.</strong> If two robots share a descriptor but differ dynamically, the policy cannot tell them apart from the blueprint alone &#8212; that ambiguity is precisely the RMA latent&#8217;s job. Shape from the r&#233;sum&#233;, dynamics from the first few steps. Ask either channel to do the other&#8217;s work and both fail.</p>
+
+<p><strong>Curriculum over morphology, not just terrain.</strong> Everyone curricula their terrain (flat, then rubble). Fewer people curricula their <em>bodies</em>. Start tight around a canonical morphology and widen the variance as experts converge. Sample the full feral morphology space from step zero and your experts never get good enough to be worth distilling &#8212; a thousand mediocre tutors and one confused graduate.</p>
+
+<p><strong>Hold out embodiments from day one &#8212; and split by topology class, not parameter values.</strong> The real metric is zero-shot return on genuinely unseen bodies. If your &#8220;held-out&#8221; hexapod is a training hexapod with slightly longer shins, you have measured interpolation and called it generalization &#8212; the field&#8217;s most popular way to lie to itself with a straight face.</p>
+
+<p><strong>Isaac Lab&#8217;s inconvenient truth.</strong> Its vectorized environments want homogeneous articulations per scene. So: generate URDFs, convert to USD, group embodiments by DoF and topology into homogeneous batches, and round-robin the batches across GPUs. Run experts as separate parallel processes &#8212; they&#8217;re independent anyway; stage two of the recipe rescues you again &#8212; then distill offline on logged (observation, expert action, descriptor) tuples, which is cheap enough to run on one card while the other keeps training.</p>
+</section>
+
+<section data-title="Part VII - Where the Magic Stops">
+<h1>Part VII &#8212; Where the Magic Stops</h1>
+
+<p>Every scaling law ships with a folder of asterisks. Before this one gets wired into a product roadmap, four of them deserve daylight.</p>
+
+<p><strong>Locomotion is the friendly case.</strong> Walking has deep cross-body structure to exploit &#8212; rhythm, alternating contacts, a shared grammar of not-falling that a thousand different anatomies all conjugate. That is precisely why a general prior over bodies is learnable here. Manipulation offers no such courtesy: contact-rich, task-entangled, and unforgiving of the centimeter. The embodiment scaling law has been demonstrated for legs. Extrapolating it to hands is, for now, a bet &#8212; a plausible one, but do not let the demo reel cash checks the gripper hasn&#8217;t signed.</p>
+
+<p><strong>The blueprint is a trusted input.</strong> A descriptor-conditioned policy inherits its descriptor&#8217;s lies. Feed it a URDF whose masses are fiction &#8212; and every URDF&#8217;s masses are a little bit fiction &#8212; and the wrongness arrives dressed as ground truth. The RMA latent patches <em>residual</em> dynamics; it is a correction term, not a fraud department. Part VI&#8217;s sufficient-statistics rule has a converse: the blueprint channel must also not actively deceive.</p>
+
+<p><strong>A thousand bodies, one physics.</strong> GenBot-1K is a crowd of a thousand strangers who all grew up in the same house. Procedural generation buys spectacular diversity of anatomy while inheriting a monoculture of contact models, solver quirks, and simulator assumptions. Embodiment scaling does not refund the sim-to-real tax; it changes what the tax is levied on. Domain randomization keeps its job.</p>
+
+<p><strong>Zero-shot demos are photogenic; benchmarks are load-bearing.</strong> The cobblestone clip convinces a room in eight seconds, but the field&#8217;s callback to Part VI stands: held-out <em>topology classes</em>, reported as a matter of course, are what separate a general policy from a well-rehearsed one. The papers doing this properly deserve the citations they&#8217;re getting. The ones that aren&#8217;t deserve the reviewers they&#8217;re about to get.</p>
+
+<p>None of this dims the result. It locates it &#8212; which is what fine print is for.</p>
+</section>
+
+<section data-title="Epilogue: One Policy to Run Them All">
+<h1>Epilogue: One Policy to Run Them All</h1>
+
+<p>Zoom out and the arc is clean enough to be suspicious of. We began with policies that were exquisitely, uselessly specific &#8212; a genius that knew exactly one body and panicked at any other. We added noise until they stopped believing the world was fixed. We gave them an architecture that could read anatomy instead of guessing it. We taught them by hiring specialists and graduating one generalist. And then we discovered that the generalist keeps getting more general the more bodies it has worn &#8212; a scaling law not over data, but over flesh. Well &#8212; over URDFs. Let the metaphor breathe.</p>
+
+<p>The result is a policy that can be dropped into a robot it has never met, read that robot&#8217;s blueprint, take a few steps to feel out the dynamics, and walk &#8212; and, if you cruelly hobble one of its knees, limp with dignity. That is not a controller. That is the first faint outline of a locomotion <em>instinct</em>: portable, body-agnostic, faintly annoyed that you doubted it.</p>
+
+<p>The old dream was a robot that could do everything. The nearer, stranger dream turns out to be a mind that can inhabit anything with legs &#8212; and increasingly does. We spent decades building better robots. The better move, it turns out, was building a brain that stopped caring which robot it woke up in.</p>
+
+<p>Somewhere a 1940s studio executive is spinning in his grave. The character actor finally learned to play every part &#8212; and never once asked to see the script in advance.</p>
+</section>
+
+<section data-title="Canonical Reading Order">
+<h1>Canonical Reading Order</h1>
+
+<p><em>Foundational to frontier:</em></p>
+
+<ul>
+<li><strong>URMA</strong> &#8212; Bohlinger et al. (2024), &#8220;One Policy to Run Them All&#8221; &#8212; the joint-tokenization architecture everything else builds on.</li>
+<li><strong>GenLoco</strong> &#8212; the origins of procedural morphology randomization, and its fixed-DoF ceiling.</li>
+<li><strong>Embodiment Scaling Laws / GenBot-1K</strong> &#8212; arXiv 2505.05753 (RSS 2026) &#8212; the ~1,000-robot scaling study and the zero-shot Go2/H1 transfer. The centerpiece.</li>
+<li><strong>XHugWBC</strong> &#8212; arXiv 2602.05791 &#8212; cross-humanoid whole-body control via hybrid-mask transformer.</li>
+<li><strong>H-Zero</strong> &#8212; arXiv 2512.00971 &#8212; cross-humanoid pretraining for few-shot novel-embodiment transfer.</li>
+<li><strong>Multi-Loco</strong> &#8212; arXiv 2506.11470 &#8212; the diffusion-plus-RL-residual hybrid.</li>
+</ul>
+
+<p>Sources are real papers; the jokes are the author&#8217;s own fault.</p>
+</section>
