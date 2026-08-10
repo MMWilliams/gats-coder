@@ -53,11 +53,13 @@ class ClaudeCLIBackend:
         self.calls = 0
 
     def complete(self, prompt: str) -> str:
-        cmd = [self._exe, "-p", prompt, "--output-format", "text"]
+        # Prompt goes over stdin: on Windows `claude` resolves to an npm .cmd
+        # shim parsed by cmd.exe, which truncates argv at the first newline.
+        cmd = [self._exe, "-p", "--output-format", "text"]
         if self._model:
             cmd += ["--model", self._model]
         self.calls += 1
-        proc = subprocess.run(cmd, capture_output=True, text=True,
+        proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
                               timeout=self._timeout)
         if proc.returncode != 0:
             raise RuntimeError(f"claude CLI failed: {proc.stderr.strip()[:500]}")
