@@ -59,7 +59,10 @@ class ClaudeCLIBackend:
         if self._model:
             cmd += ["--model", self._model]
         self.calls += 1
-        proc = subprocess.run(cmd, input=prompt, capture_output=True, text=True,
+        # encoding pinned: claude emits UTF-8; text=True alone would decode
+        # with the Windows locale codepage and mojibake non-ASCII output.
+        proc = subprocess.run(cmd, input=prompt, capture_output=True,
+                              text=True, encoding="utf-8", errors="replace",
                               timeout=self._timeout)
         if proc.returncode != 0:
             raise RuntimeError(f"claude CLI failed: {proc.stderr.strip()[:500]}")
