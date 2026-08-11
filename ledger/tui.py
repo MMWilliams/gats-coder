@@ -286,7 +286,8 @@ class LineEditor:
 
         out = sys.stdout
         if not first:
-            out.write("\r\x1b[2A")  # back to the frame's top line
+            # parked on the input line (frame line 2): top is ONE line up
+            out.write("\r\x1b[1A")
         top = ui.dim(tl + h + " session " + h * max(1, width - 12) + tr)
         mid = (ui.dim(v) + " " + ui.accent(prompt) + shown
                + "\x1b[K")
@@ -298,6 +299,10 @@ class LineEditor:
         out.flush()
 
     def read(self, _prompt: str = "") -> str:
+        # A non-default prompt is a question (episode confirmation etc.) --
+        # it must be visible above the frame, not swallowed by it.
+        if _prompt and _prompt.strip() and _prompt != "> ":
+            sys.stdout.write(ui.warn(_prompt.strip()) + "\n")
         first = True
         self._draw(first)
         first = False
