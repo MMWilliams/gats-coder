@@ -43,6 +43,28 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 
 ---
 
+## Done (2026-08-11, seventh pass — v0.7.0 unified session)
+
+- [x] **One session for everything** — `ledger chat` routes plain messages
+      (fail-safe LLM intent check + one-keystroke confirm) and runs verified
+      episodes inline; `/do` bypasses; auto episode naming (slug+dedupe),
+      auto-resume of failed episodes, auto-init of config; chat journal gets
+      EPISODE_LAUNCHED/RESULT links.
+- [x] **Multi-provider backends** — AnthropicAPIBackend + OpenAIAPIBackend
+      (stdlib urllib): OpenAI, Ollama (local), Groq/DeepSeek/Kimi/vLLM via
+      --base-url; config "backend" block; per-agent backend/model/base_url
+      in session specs; doctor checks keys.
+- [x] **TUI** — framed input field, live /command autocomplete (Tab cycles
+      via completion-prefix memory), history, braille spinner, session
+      banner; off-TTY falls back to plain input, tests unaffected.
+- [x] **MCP tool calling** — stdio JSON-RPC client (initialize/tools/list/
+      tools/call), config "mcp.servers"; chat tool loop (reply = one JSON
+      object), gated per `mcp.<server>` family, journaled MCP_CALL/RESULT,
+      max 5 calls/turn, /tools command.
+- [x] **--dangerously-skip-permissions** on run + chat — bypasses gates,
+      prompts, AND policy rules, with a red stderr warning.
+      Tests 110 → 134.
+
 ## Done (2026-08-10, sixth pass — v0.6.0 UI)
 
 - [x] **Terminal UI** (`ledger/ui.py`, stdlib-only) — verdict headlines

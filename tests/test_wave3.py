@@ -1,4 +1,4 @@
-"""Wave-3 parity: episode resume, best-of-N attempts, CreatePR via a stub
+﻿"""Wave-3 parity: episode resume, best-of-N attempts, CreatePR via a stub
 gh, and policy rules inside a real episode."""
 
 import json
@@ -87,7 +87,7 @@ def test_policy_deny_beats_permissive_profile(repo, tmp_path):
 @needs_git
 def test_run_attempts_picks_a_winner(repo, monkeypatch, capsys):
     monkeypatch.setattr(cli, "_backend",
-                        lambda args: FakeBackend(_responder))
+                        lambda args, cfg=None: FakeBackend(_responder))
     d = repo / ".ledger"
     d.mkdir()
     (d / "config.json").write_text(json.dumps({"test_cmd": TEST_CMD}),
@@ -103,7 +103,7 @@ def test_run_attempts_picks_a_winner(repo, monkeypatch, capsys):
 
 
 def test_run_attempts_requires_yes(tmp_path, capsys, monkeypatch):
-    monkeypatch.setattr(cli, "_backend", lambda args: FakeBackend("x"))
+    monkeypatch.setattr(cli, "_backend", lambda args, cfg=None: FakeBackend("x"))
     repo = tmp_path / "r"
     repo.mkdir()
     subprocess.run(["git", "init", "-q", str(repo)], check=True,
@@ -165,3 +165,4 @@ def test_create_pr_flow(repo, tmp_path, monkeypatch):
     assert executor.incidents == 0
     ok, err = Journal.verify_chain(str(journal_path))
     assert ok, err
+

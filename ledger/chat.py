@@ -13,6 +13,7 @@ into the prompt deterministically rather than held server-side.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -26,9 +27,22 @@ and briefly. When you are uncertain about the contents of a file you have not
 been shown, say so rather than guessing -- claims you cannot support are the
 one thing this system exists to catch.
 
-When the user asks you to actually change the code, tell them to run
-`ledger run` with a task description; you are the conversational surface, and
-the planner owns edits so they stay verified and replayable."""
+Change requests are executed right here in this session: the deterministic
+planner runs a verified, journaled episode and reports back. You never apply
+edits yourself in conversation -- the planner owns edits so they stay
+verified and replayable."""
+
+CLASSIFY_PROMPT = """You route messages inside a coding agent's session.
+Decide whether the user's message asks for the repository to be CHANGED
+(fix, add, implement, refactor, update, remove code; make tests pass) or is
+conversation ABOUT it (questions, explanations, opinions, greetings).
+
+User message:
+{text}
+
+Respond with ONLY this JSON:
+{{"intent": "change" or "chat",
+ "task": "<one-line imperative restatement if change, else empty>"}}"""
 
 MAX_TURNS_IN_PROMPT = 12
 
@@ -37,6 +51,17 @@ MAX_TURNS_IN_PROMPT = 12
 class Turn:
     role: str  # "user" | "assistant"
     text: str
+
+
+TOOLS_PROTOCOL = """AVAILABLE TOOLS
+{tools}
+
+To use a tool, reply with ONLY one JSON object (no prose around it):
+{{"tool": "<server:name>", "arguments": {{...}}}}
+You will be shown the result and can then call another tool or answer.
+Use tools only when they genuinely help answer the user."""
+
+MAX_TOOL_CALLS_PER_TURN = 5
 
 
 @dataclass
@@ -48,6 +73,10 @@ class Conversation:
     turns: list[Turn] = field(default_factory=list)
     context: str = ""
     journal: Journal | None = None
+    # MCP surface: qualified "server:tool" -> description, and the gated
+    # executor closure (qualified, arguments) -> result text.
+    tools: dict = field(default_factory=dict)
+    tool_call: object = None
 
     def add_repo_context(self, root: Path, files: list[str] | None = None) -> None:
         parts = []
@@ -64,6 +93,10 @@ class Conversation:
         blocks = [self.system]
         if self.context:
             blocks.append(self.context)
+        if self.tools:
+            listing = "\n".join(f"- {name}: {desc}"
+                                for name, desc in sorted(self.tools.items()))
+            blocks.append(TOOLS_PROTOCOL.format(tools=listing))
         recent = self.turns[-MAX_TURNS_IN_PROMPT:]
         if recent:
             transcript = "\n\n".join(
@@ -74,18 +107,77 @@ class Conversation:
         blocks.append(f"User: {user_text}\nLEDGER:")
         return "\n\n".join(blocks)
 
+    @staticmethod
+    def _tool_request(reply: str) -> tuple[str, dict] | None:
+        """A tool call is a reply that IS one JSON object with a 'tool'
+        key -- anything else is prose for the user."""
+        stripped = reply.strip()
+        if not stripped.startswith("{"):
+            return None
+        from .llm import extract_json
+        obj = extract_json(stripped)
+        if not obj or "tool" not in obj:
+            return None
+        args = obj.get("arguments")
+        return str(obj["tool"]), (args if isinstance(args, dict) else {})
+
     def ask(self, user_text: str) -> str:
-        prompt = self.render(user_text)
         if self.journal is not None:
-            self.journal.append("CHAT_USER", text=user_text,
-                                prompt_chars=len(prompt))
-        reply = self.backend.complete(prompt).strip()
-        self.turns.append(Turn("user", user_text))
+            self.journal.append("CHAT_USER", text=user_text)
+        pending = user_text
+        reply = ""
+        for _ in range(MAX_TOOL_CALLS_PER_TURN + 1):
+            reply = self.backend.complete(self.render(pending)).strip()
+            self.turns.append(Turn("user", pending))
+            call = self._tool_request(reply) if self.tool_call else None
+            if call is None:
+                break
+            name, args = call
+            if self.journal is not None:
+                self.journal.append("MCP_CALL", tool=name, arguments=args)
+            result = self.tool_call(name, args)
+            if self.journal is not None:
+                self.journal.append(
+                    "MCP_RESULT", tool=name, chars=len(result),
+                    denied=result.startswith("DENIED"))
+            self.turns.append(Turn("assistant",
+                                   f"[tool] {name} {json.dumps(args)}"))
+            pending = (f"TOOL RESULT {name}:\n{result[:4000]}\n\n"
+                       "Continue: answer the user, or call another tool.")
         self.turns.append(Turn("assistant", reply))
         if self.journal is not None:
             self.journal.append("CHAT_ASSISTANT", text=reply,
                                 backend=getattr(self.backend, "id", "?"))
         return reply
+
+    def classify(self, user_text: str) -> tuple[str, str]:
+        """Route a message: ("change", task) or ("chat", ""). Fails safe --
+        anything unparseable is conversation, never an accidental episode."""
+        from .llm import extract_json
+        try:
+            obj = extract_json(self.backend.complete(
+                CLASSIFY_PROMPT.format(text=user_text)))
+        except Exception:
+            return "chat", ""
+        if not obj or obj.get("intent") != "change":
+            return "chat", ""
+        task = str(obj.get("task") or "").strip() or user_text.strip()
+        return "change", task
+
+    def record_episode(self, user_text: str, task: str, outcome: dict,
+                       summary: str) -> None:
+        """Link conversation and episode in both directions: journal entries
+        answer 'which turn launched which episode', and the transcript keeps
+        the result so follow-up questions have it as context."""
+        if self.journal is not None:
+            self.journal.append("EPISODE_LAUNCHED", text=user_text, task=task,
+                                journal=str(outcome.get("journal", "")))
+            self.journal.append("EPISODE_RESULT",
+                                success=bool(outcome.get("success")),
+                                plan=list(outcome.get("plan", [])),
+                                escalation=outcome.get("escalation"))
+        self.turns.append(Turn("user", user_text))
+        self.turns.append(Turn("assistant", summary))
 
     def transcript(self) -> str:
         return "\n\n".join(
@@ -96,19 +188,54 @@ class Conversation:
 
 HELP = """Commands:
   /help              show this
+  /do <task>         run a change episode without the intent check
+  /tools             list connected MCP tools
   /context <files>   inline file contents into the conversation context
   /tree              re-read the repository file list
   /clear             forget the conversation (keeps repo context)
   /save <path>       write the transcript to a file
   /exit              leave chat
-Anything else is sent to the model."""
+Plain messages are routed automatically: questions get answers, change
+requests run as verified, journaled episodes -- right here."""
+
+
+def _run_change(conv: Conversation, runner, user_text: str, task: str,
+                input_fn, output_fn, confirm: bool, busy) -> None:
+    if confirm:
+        try:
+            resp = input_fn(f"run episode for: {task!r}? [Y/n] ")
+        except (EOFError, KeyboardInterrupt):
+            output_fn("cancelled")
+            return
+        if resp.strip().lower() in ("n", "no"):
+            output_fn("not running it -- rephrase or use /do <task>")
+            return
+    try:
+        with busy("planning · authoring · verifying"):
+            outcome = runner(task)
+    except Exception as exc:
+        output_fn(f"episode failed to start: {exc}")
+        return
+    summary = outcome.get("summary_plain", "")
+    output_fn(outcome.get("summary_styled", summary))
+    conv.record_episode(user_text, task, outcome, summary)
 
 
 def repl(conv: Conversation, root: Path, *, input_fn=input,
-         output_fn=print) -> int:
-    """Interactive loop. `input_fn`/`output_fn` are injected so the loop is
-    testable without a terminal."""
-    output_fn("LEDGER chat. /help for commands, /exit to leave.")
+         output_fn=print, runner=None, busy=None) -> int:
+    """Interactive loop -- the one session for everything. `input_fn` /
+    `output_fn` are injected so the loop is testable without a terminal;
+    `runner` (task_text -> outcome dict) executes change episodes inline;
+    `busy(label)` is an optional progress context manager (the spinner).
+    """
+    from contextlib import nullcontext
+    busy = busy or (lambda label: nullcontext())
+    if runner is not None:
+        output_fn("LEDGER. Ask about the repo, or just say what to change -- "
+                  "changes run as verified, journaled episodes right here. "
+                  "/help for commands.")
+    else:
+        output_fn("LEDGER chat. /help for commands, /exit to leave.")
     while True:
         try:
             line = input_fn("> ").strip()
@@ -130,6 +257,14 @@ def repl(conv: Conversation, root: Path, *, input_fn=input,
             conv.add_repo_context(root)
             output_fn("repository context refreshed")
             continue
+        if line == "/tools":
+            if not conv.tools:
+                output_fn('no MCP tools connected -- configure '
+                          '"mcp": {"servers": {...}} in .ledger/config.json')
+            else:
+                for name, desc in sorted(conv.tools.items()):
+                    output_fn(f"  {name}  {desc}")
+            continue
         if line.startswith("/context"):
             files = line.split()[1:]
             if not files:
@@ -146,11 +281,32 @@ def repl(conv: Conversation, root: Path, *, input_fn=input,
             Path(parts[1]).write_text(conv.transcript(), encoding="utf-8")
             output_fn(f"transcript written to {parts[1]}")
             continue
+        if line.startswith("/do"):
+            task = line[3:].strip()
+            if not task:
+                output_fn("usage: /do <what you want changed>")
+                continue
+            if runner is None:
+                output_fn("change episodes are unavailable here "
+                          "(not a git repository)")
+                continue
+            _run_change(conv, runner, line, task, input_fn, output_fn,
+                        confirm=False, busy=busy)
+            continue
         if line.startswith("/"):
             output_fn(f"unknown command {line.split()[0]!r} -- /help for the list")
             continue
+        if runner is not None:
+            with busy("routing"):
+                intent, task = conv.classify(line)
+            if intent == "change":
+                _run_change(conv, runner, line, task, input_fn, output_fn,
+                            confirm=True, busy=busy)
+                continue
         try:
-            output_fn(conv.ask(line))
+            with busy("thinking"):
+                reply = conv.ask(line)
+            output_fn(reply)
         except Exception as exc:  # backend failures must not kill the session
             output_fn(f"backend error: {exc}")
     return 0

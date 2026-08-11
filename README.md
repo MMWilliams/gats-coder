@@ -11,7 +11,7 @@ incident rather than a state transition. Every episode replays bit-exact.
 
 ```
 pip install -e .[dev]
-pytest                      # 110 tests
+pytest                      # 134 tests
 python -m ledger.cli demo   # paper's 100-task suite: SR / optimality / calls / variance
 ```
 
@@ -83,18 +83,52 @@ per-invocation rules. A `gate: true` pre-action hook blocks the action on
 nonzero exit (fail closed); every hook run is journaled with its output
 blob. `ledger doctor` lints the whole config.
 
-## Talking to it
+## One session for everything
 
 ```
-ledger chat                                  # REPL, repo-aware
-ledger chat --ask "what does planner.py do?" # one-shot
-ledger chat --context ledger/planner.py      # inline specific files
+ledger chat                                  # THE session: talk AND change code
+ledger chat --ask "what does planner.py do?" # one-shot question
 ledger chat --journal chat.jsonl             # hash-chained conversation log
 ```
 
-Chat never mutates repo state and never consumes planning budget. It shares
-the audit surface: journaled turns mean "what did I ask, what did it answer,
-and which turn led to that episode" stays answerable.
+`ledger chat` is the unified surface. Ask a question and you get an answer;
+say what you want changed and LEDGER routes it, confirms in one keystroke,
+and runs a verified, journaled episode inline — episode names, resume of
+failed attempts, and config are all automatic. `/do <task>` skips the
+router. The conversation journal records which turn launched which episode.
+Conversation itself never mutates the repo; only the planner does.
+
+On an interactive terminal the session gets the full TUI: a framed input
+field with live `/command` autocomplete (Tab completes and cycles), input
+history, and a spinner while the model or an episode works.
+
+**MCP tools.** Configure servers in `.ledger/config.json` and the session
+can call their tools mid-conversation — every call is permission-gated
+(family `mcp.<server>`, deniable by policy rules) and journaled:
+
+```jsonc
+"mcp": {"servers": {
+  "docs": {"command": ["python", "tools/docs_server.py"], "risk": "network"}
+}}
+```
+
+## Model backends
+
+The claude CLI is the default; any prominent API or local model works:
+
+```
+ledger chat --backend anthropic --model claude-sonnet-5     # ANTHROPIC_API_KEY
+ledger run "..." --backend openai --model gpt-5.2           # OPENAI_API_KEY
+ledger chat --backend ollama --model qwen3-coder            # local, no key
+ledger run "..." --backend openai --model kimi-k3 \
+  --base-url https://api.kimi.ai/v1                         # any compatible API
+```
+
+Or persist it: `"backend": {"kind": "ollama", "model": "qwen3-coder"}` in
+config.json. Per-agent `"backend"`/`"model"`/`"base_url"` in session specs
+bind cheap models to fan-out work. `--dangerously-skip-permissions` exists
+for sandboxes where a wrong action is cheap — it bypasses every gate,
+prompt, and policy rule, and says so in red.
 
 ## Parallel agents in one session
 

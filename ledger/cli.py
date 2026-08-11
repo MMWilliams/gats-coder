@@ -15,6 +15,8 @@ import argparse
 import dataclasses
 import json
 import math
+import os
+import re
 import shutil
 import subprocess
 import sys
@@ -37,15 +39,19 @@ DEFAULT_AUTHOR_ATTEMPTS = 6
 
 # -- helpers -----------------------------------------------------------------
 
-def _backend(args):
-    """Resolve an LLM backend from CLI flags. Returns None when not needed."""
-    kind = getattr(args, "backend", "claude")
-    if kind == "none":
-        return None
-    if kind == "claude":
-        from .llm import ClaudeCLIBackend
-        return ClaudeCLIBackend(model=getattr(args, "model", None))
-    raise SystemExit(f"unknown backend {kind!r}")
+def _backend(args, cfg: dict | None = None):
+    """Resolve an LLM backend: flags win, then config "backend" block, then
+    the claude CLI. Returns None for kind='none'."""
+    from .llm import resolve_backend
+    block = (cfg or {}).get("backend")
+    block = block if isinstance(block, dict) else {}
+    kind = getattr(args, "backend", None) or block.get("kind") or "claude"
+    model = getattr(args, "model", None) or block.get("model")
+    base_url = getattr(args, "base_url", None) or block.get("base_url")
+    try:
+        return resolve_backend(kind, model, base_url)
+    except RuntimeError as exc:
+        raise SystemExit(str(exc))
 
 
 def _config(root: Path) -> dict:
@@ -126,6 +132,11 @@ def _gate_and_profile(args, cfg: dict):
     if profile not in GATED_RISKS:
         raise SystemExit(f"unknown profile {profile!r} "
                          f"(choose from {sorted(GATED_RISKS)})")
+    if getattr(args, "dangerously_skip_permissions", False):
+        print(ui.bad("! permissions disabled: every gate, prompt, and "
+                     "policy rule is bypassed for this run"),
+              file=sys.stderr)
+        return attended_gate, profile
     approver = attended_gate if getattr(args, "yes", False) else tty_approver
     try:
         gate = PolicyGate(profile, approver=approver,
@@ -248,7 +259,7 @@ def cmd_run(args) -> int:
     else:
         slots = [str(s) for s in cfg_file.get("slots", ["a", "b"])]
     try:
-        backend = _backend(args)
+        backend = _backend(args, cfg_file)
     except RuntimeError as exc:
         return _fail(str(exc))
     if backend is None:
@@ -345,10 +356,122 @@ def cmd_run(args) -> int:
     return 0 if result.success else 1
 
 
+def _episode_outcome(episode_dir: Path) -> str:
+    """'succeeded' | 'failed' | 'unfinished' from the latest journal
+    segment (episode.jsonl, episode.r2.jsonl, ...)."""
+    def seg_key(p: Path):
+        m = re.match(r"episode(?:\.r(\d+))?\.jsonl$", p.name)
+        return int(m.group(1)) if m and m.group(1) else 1
+
+    segs = sorted((p for p in episode_dir.glob("episode*.jsonl")
+                   if re.match(r"episode(?:\.r\d+)?\.jsonl$", p.name)),
+                  key=seg_key)
+    if not segs:
+        return "unfinished"
+    try:
+        entries = Journal.read(str(segs[-1]))
+    except (OSError, ValueError):
+        return "unfinished"
+    end = next((e for e in reversed(entries) if e.get("t") == "END"), None)
+    if end is None:
+        return "unfinished"
+    return "succeeded" if end.get("success") else "failed"
+
+
+def _auto_episode(root: Path, task_text: str) -> tuple[str, bool]:
+    """Intelligent episode tracking: name from the task, resume the episode
+    if its last attempt didn't finish the job, start fresh otherwise."""
+    from .session import slugify
+    base = slugify(task_text)[:48] or "task"
+    episodes = root / ".ledger" / "episodes"
+    name, n = base, 1
+    while (episodes / name).exists():
+        if _episode_outcome(episodes / name) in ("failed", "unfinished"):
+            return name, True
+        n += 1
+        name = f"{base}-{n}"
+    return name, False
+
+
+DEFAULT_CONFIG = {
+    "test_cmd": DEFAULT_TEST_CMD,
+    "profile": "attended",
+    "slots": ["a", "b"],
+    "max_author_attempts": DEFAULT_AUTHOR_ATTEMPTS,
+}
+
+
+def _chat_runner(root: Path, args, cfg_file: dict, backend):
+    """The unified session's execution arm: task text in, verified episode
+    out. All the tracking a run needs -- naming, resume, config -- is
+    automatic; the planner and gates work exactly as in `ledger run`."""
+    from .executor import run_repo_episode
+
+    def runner(task_text: str) -> dict:
+        cfg_now = dict(cfg_file)
+        cfg_path = root / ".ledger" / "config.json"
+        if not cfg_path.is_file():
+            cfg_path.parent.mkdir(parents=True, exist_ok=True)
+            cfg_now = {**DEFAULT_CONFIG, "planner": PlanConfig().to_dict()}
+            cfg_path.write_text(json.dumps(cfg_now, indent=2) + "\n",
+                                encoding="utf-8")
+            print(ui.dim("initialized .ledger/config.json with defaults"))
+        gate, profile = _gate_and_profile(args, cfg_now)
+        budget = getattr(args, "max_author_attempts", None) \
+            or int(cfg_now.get("max_author_attempts",
+                               DEFAULT_AUTHOR_ATTEMPTS))
+        name, resume = _auto_episode(root, task_text)
+        episode_dir = root / ".ledger" / "episodes" / name
+        episode_dir.mkdir(parents=True, exist_ok=True)
+        result, executor, journal_path = run_repo_episode(
+            root, episode_dir, None, _test_cmd(args, cfg_now),
+            cfg=_plan_config(args, cfg_now),
+            gate=gate, profile=profile, max_author_attempts=budget,
+            task_text=task_text, backend=backend,
+            l2_path=str(root / ".ledger" / "l2.sqlite"),
+            l3_cache_path=str(root / ".ledger" / "l3.sqlite"),
+            slots=[str(s) for s in cfg_now.get("slots", ["a", "b"])],
+            hooks=cfg_now.get("hooks")
+            if isinstance(cfg_now.get("hooks"), list) else None,
+            resume=resume,
+        )
+        entries = Journal.read(str(journal_path))
+        esc = next((e for e in reversed(entries)
+                    if e["t"] == "ESCALATION"), None)
+        reason = esc.get("reason") if esc else None
+        plan_txt = " -> ".join(result.plan) or "(empty)"
+        plain = (f"Episode {name!r} "
+                 f"{'succeeded' if result.success else 'did not reach the goal'}"
+                 f"{' (resumed)' if resume else ''}: {plan_txt} "
+                 f"[{result.steps} steps, {executor.incidents} incidents"
+                 + (f", escalated: {reason}" if reason else "") + "]")
+        styled = "\n".join(filter(None, [
+            ui.headline(result.success,
+                        f"episode {name} — goal reached",
+                        f"episode {name} — goal NOT reached"),
+            ui.kv("plan", ui.plan_chain(result.plan)),
+            ui.kv("verify",
+                  (ui.ok(f"{ui.OK} 0 incidents") if executor.incidents == 0
+                   else ui.bad(f"{ui.FAIL} {executor.incidents} incidents"))
+                  + (f"  {ui.warn(str(executor.denials) + ' denials')}"
+                     if executor.denials else "")),
+            ui.kv("escalated", ui.bad(reason)) if reason else "",
+            ui.kv("journal", ui.dim(str(journal_path))),
+            ui.dim(f"  audit: ledger vis {journal_path}"),
+        ]))
+        return {"success": result.success, "plan": result.plan,
+                "steps": result.steps, "incidents": executor.incidents,
+                "escalation": reason, "journal": str(journal_path),
+                "episode": name, "resumed": resume,
+                "summary_plain": plain, "summary_styled": styled}
+    return runner
+
+
 def cmd_chat(args) -> int:
     root = Path(args.repo).resolve()
+    cfg_file = _config(root)
     try:
-        backend = _backend(args)
+        backend = _backend(args, cfg_file)
     except RuntimeError as exc:
         return _fail(str(exc))
     if backend is None:
@@ -357,16 +480,58 @@ def cmd_chat(args) -> int:
     if args.journal:
         journal = Journal(args.journal)
     conv = Conversation(backend=backend, journal=journal)
-    if (root / ".git").exists():
+    is_repo = (root / ".git").exists()
+    if is_repo:
         conv.add_repo_context(root, args.context.split(",") if args.context else None)
+    runner = _chat_runner(root, args, cfg_file, backend) if is_repo else None
+
+    # MCP: connect configured servers and expose their tools, gated.
+    servers = {}
+    if isinstance(cfg_file.get("mcp"), dict):
+        from .mcp import load_servers
+        servers = load_servers(cfg_file,
+                               on_error=lambda m: print(ui.warn(m),
+                                                        file=sys.stderr))
+    if servers:
+        tool_gate, _ = _gate_and_profile(args, cfg_file)
+
+        def tool_call(qualified: str, arguments: dict) -> str:
+            sname, _, tname = qualified.partition(":")
+            srv = servers.get(sname)
+            if srv is None or tname not in {t.name for t in srv.tools}:
+                return f"TOOL ERROR: unknown tool {qualified!r}"
+            if not tool_gate(f"mcp.{sname}:{tname}", srv.risk):
+                return ("DENIED by the permission gate -- tell the user "
+                        "and continue without it")
+            try:
+                return srv.call(tname, arguments)
+            except Exception as exc:
+                return f"TOOL ERROR: {exc}"
+
+        conv.tools = {f"{sname}:{t.name}": t.description or t.name
+                      for sname, srv in servers.items()
+                      for t in srv.tools}
+        conv.tool_call = tool_call
     try:
         if args.ask:
             print(conv.ask(args.ask))
             return 0
-        return repl(conv, root)
+        from . import tui
+        if tui.interactive():
+            profile = getattr(args, "profile", None) \
+                or cfg_file.get("profile", "attended")
+            extra = f" · {len(conv.tools)} MCP tools" if conv.tools else ""
+            print(tui.banner(root.name, profile,
+                             getattr(backend, "id", "?") + extra))
+            editor = tui.LineEditor(tui.COMMANDS)
+            return repl(conv, root, input_fn=editor.read,
+                        runner=runner, busy=tui.spinner)
+        return repl(conv, root, runner=runner)
     finally:
         if journal is not None:
             journal.close()
+        for srv in servers.values():
+            srv.close()
 
 
 REVIEW_PROMPT = """You are reviewing a git diff for correctness bugs and \
@@ -385,7 +550,7 @@ def cmd_review(args) -> int:
     if not (root / ".git").exists():
         return _fail(f"{root} is not a git repository")
     try:
-        backend = _backend(args)
+        backend = _backend(args, _config(root))
     except RuntimeError as exc:
         return _fail(str(exc))
     if backend is None:
@@ -445,9 +610,11 @@ def cmd_session(args) -> int:
     for item in raw:
         try:
             agent_backend = None
-            if item.get("model"):
-                from .llm import ClaudeCLIBackend
-                agent_backend = ClaudeCLIBackend(model=str(item["model"]))
+            if item.get("model") or item.get("backend"):
+                from .llm import resolve_backend
+                agent_backend = resolve_backend(
+                    str(item.get("backend") or "claude"),
+                    item.get("model"), item.get("base_url"))
             specs.append(AgentSpec(
                 name=item["name"],
                 repo_root=Path(item.get("repo", args.repo)).resolve(),
@@ -490,7 +657,7 @@ def cmd_session(args) -> int:
 
 _KNOWN_CONFIG_KEYS = frozenset({
     "test_cmd", "planner", "profile", "slots", "max_author_attempts",
-    "policy", "hooks",
+    "policy", "hooks", "backend", "mcp",
 })
 
 
@@ -540,6 +707,17 @@ def cmd_doctor(args) -> int:
                    claude is not None))
     gh = shutil.which("gh")
     checks.append(("gh CLI", gh or "not found (only needed for --pr)", True))
+    kind = (_config(Path(args.repo).resolve()).get("backend") or {})
+    kind = kind.get("kind") if isinstance(kind, dict) else None
+    if kind == "anthropic":
+        checks.append(("ANTHROPIC_API_KEY",
+                       "set" if os.environ.get("ANTHROPIC_API_KEY")
+                       else "NOT SET (backend 'anthropic' needs it)",
+                       bool(os.environ.get("ANTHROPIC_API_KEY"))))
+    elif kind == "openai":
+        checks.append(("OPENAI_API_KEY",
+                       "set" if os.environ.get("OPENAI_API_KEY")
+                       else "not set (fine for keyless endpoints)", True))
     checks.append(("python", sys.version.split()[0], True))
     root = Path(args.repo).resolve()
     checks.append((f"repo {root.name}", "git repo" if (root / ".git").exists()
@@ -761,9 +939,16 @@ def build_parser() -> argparse.ArgumentParser:
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def add_backend(p):
-        p.add_argument("--backend", default="claude",
-                       choices=["claude", "none"], help="LLM backend")
+        p.add_argument("--backend", default=None,
+                       choices=["claude", "anthropic", "openai", "ollama",
+                                "none"],
+                       help="LLM backend: claude CLI (default), Anthropic "
+                            "API, OpenAI API, or any OpenAI-compatible "
+                            "endpoint incl. local Ollama")
         p.add_argument("--model", default=None, help="backend model id")
+        p.add_argument("--base-url", dest="base_url", default=None,
+                       help="override the API base URL (OpenAI-compatible "
+                            "providers: Groq, DeepSeek, Kimi, vLLM, ...)")
 
     p = sub.add_parser("init", help="create .ledger/config.json in a repo")
     p.add_argument("--repo", default=".")
@@ -817,6 +1002,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--json", action="store_true",
                    help="print one JSON result object instead of the "
                         "human summary (journal remains the event stream)")
+    p.add_argument("--dangerously-skip-permissions",
+                   dest="dangerously_skip_permissions", action="store_true",
+                   help="bypass every gate, prompt, and policy rule "
+                        "(use only where a wrong action is cheap)")
     add_backend(p)
     p.set_defaults(fn=cmd_run)
 
@@ -832,12 +1021,23 @@ def build_parser() -> argparse.ArgumentParser:
     add_backend(p)
     p.set_defaults(fn=cmd_review)
 
-    p = sub.add_parser("chat", help="talk to the model about this repo")
+    p = sub.add_parser("chat",
+                       help="the unified session: converse AND change code")
     p.add_argument("--repo", default=".")
     p.add_argument("--ask", default=None, help="one-shot question, no REPL")
     p.add_argument("--context", default=None,
                    help="comma-separated files to inline")
     p.add_argument("--journal", default=None, help="journal the conversation")
+    p.add_argument("--profile", default=None, choices=sorted(GATED_RISKS),
+                   help="autonomy profile for inline episodes")
+    p.add_argument("--yes", action="store_true",
+                   help="pre-approve gated actions in inline episodes")
+    p.add_argument("--max-author-attempts", dest="max_author_attempts",
+                   type=int, default=None)
+    p.add_argument("--dangerously-skip-permissions",
+                   dest="dangerously_skip_permissions", action="store_true",
+                   help="bypass every gate, prompt, and policy rule "
+                        "(use only where a wrong action is cheap)")
     add_backend(p)
     p.set_defaults(fn=cmd_chat)
 

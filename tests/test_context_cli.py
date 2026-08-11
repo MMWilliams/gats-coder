@@ -1,4 +1,4 @@
-"""Context assembly (evidence, deterministic selection, project
+﻿"""Context assembly (evidence, deterministic selection, project
 instructions) and the CLI config/review surface."""
 
 import json
@@ -181,7 +181,7 @@ def test_review_reports_findings(repo, monkeypatch, capsys):
                                   encoding="utf-8")
     monkeypatch.setattr(
         cli, "_backend",
-        lambda args: FakeBackend("1. calc.py: subtraction bug remains."))
+        lambda args, cfg=None: FakeBackend("1. calc.py: subtraction bug remains."))
     rc = cli.main(["review", "--repo", str(repo)])
     out = capsys.readouterr().out
     assert rc == 0
@@ -190,7 +190,7 @@ def test_review_reports_findings(repo, monkeypatch, capsys):
 
 @needs_git
 def test_review_empty_diff(repo, monkeypatch, capsys):
-    monkeypatch.setattr(cli, "_backend", lambda args: FakeBackend("unused"))
+    monkeypatch.setattr(cli, "_backend", lambda args, cfg=None: FakeBackend("unused"))
     rc = cli.main(["review", "--repo", str(repo)])
     assert rc == 0
     assert "nothing to review" in capsys.readouterr().out
@@ -207,8 +207,9 @@ def test_review_prompt_includes_diff_and_instructions(repo, monkeypatch):
         return "the diff looks correct"
 
     monkeypatch.setattr(cli, "_backend",
-                        lambda args: FakeBackend(capture))
+                        lambda args, cfg=None: FakeBackend(capture))
     rc = cli.main(["review", "--repo", str(repo)])
     assert rc == 0
     assert "Watch for sign errors." in seen["prompt"]
     assert "return a + b" in seen["prompt"]
+

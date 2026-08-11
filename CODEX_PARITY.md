@@ -161,17 +161,26 @@ Kimi Code CLI (the agent).
 # Combined table-stakes (union of all three studies)
 
 1. OS-enforced sandbox — **GAP** (the one every rival has in some form)
-2. Graduated autonomy + policy rules + hooks — **HAVE (v0.5.0)**
+2. Graduated autonomy + policy rules + hooks — **HAVE (v0.5.0)**;
+   `--dangerously-skip-permissions` bypass with a red warning (v0.7.0)
 3. Layered instruction files — **HAVE**
 4. Headless CI (`--json`, exit codes, event stream) — **HAVE**
-5. Session/episode resume — **HAVE (v0.5.0)** (episode-level)
-6. MCP — **GAP**
-7. Git depth (review ✓ push ✓ PR ✓; @mention auto-review ✗) — **HAVE-** 
+5. Session/episode resume — **HAVE (v0.5.0+0.7.0)** (episode-level +
+   automatic resume of failed episodes in the unified session)
+6. MCP — **PART (v0.7.0)**: stdio client, tools gated + journaled in the
+   unified session; MCP-backed *episode actions/sensors* still open
+7. Git depth (review ✓ push ✓ PR ✓; @mention auto-review ✗) — **HAVE-**
 8. Parallel subagents w/ per-agent models — **HAVE (v0.5.0)**
 9. Test-iterate with hard evidence — **HAVE+** (differentiator)
-10. Model controls (picker ✓; effort dial ✗; alt providers ✗) — **PART**
+10. Model controls — **HAVE (v0.7.0)**: Anthropic API, OpenAI API, any
+    OpenAI-compatible endpoint, local Ollama; per-agent binding
 11. Best-of-N — **HAVE (v0.5.0)**
-12. Extensibility (hooks ✓; skills/plugins ✗) — **PART**
+12. Extensibility (hooks ✓ MCP ✓; skills/plugins ✗) — **PART**
+
+**Unified session (v0.7.0)** — the Claude Code/Codex interaction model:
+one REPL that converses AND executes. Intent routing (fail-safe to chat),
+one-keystroke confirmation, automatic episode naming/resume, `/do`, TUI
+with framed input + slash autocomplete + history + spinner.
 
 ### Build order after v0.5.0 — status as of v0.6.0
 1. OS sandbox for skill subprocesses (Job Objects / bwrap) — still open.

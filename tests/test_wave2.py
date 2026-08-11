@@ -1,4 +1,4 @@
-"""Wave-2 parity: secret redaction, PushBranch (network-gated publishing),
+﻿"""Wave-2 parity: secret redaction, PushBranch (network-gated publishing),
 and `ledger run --json` structured output."""
 
 import json
@@ -114,7 +114,7 @@ def test_run_json_output(repo, monkeypatch, capsys):
                            "rationale": "green and committed"})
 
     monkeypatch.setattr(cli, "_backend",
-                        lambda args: FakeBackend(responder))
+                        lambda args, cfg=None: FakeBackend(responder))
     d = repo / ".ledger"
     d.mkdir()
     (d / "config.json").write_text(json.dumps({"test_cmd": TEST_CMD}),
@@ -129,3 +129,4 @@ def test_run_json_output(repo, monkeypatch, capsys):
     assert out["incidents"] == 0 and out["denials"] == 0
     assert sorted(out["goal"]) == sorted(GOAL)
     assert out["journal"].endswith("episode.jsonl")
+
