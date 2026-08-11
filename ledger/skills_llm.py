@@ -244,7 +244,18 @@ class AuthorPatchSkill:
                                   f"({self.meter.spent}/{self.meter.limit})")
                     break
                 self.meter.charge()
-            response = self.backend.complete(self._prompt(ctx, failure))
+            try:
+                response = self.backend.complete(self._prompt(ctx, failure))
+            except Exception as exc:
+                # A backend failure (timeout, network, provider error) is a
+                # non-effect, never a crash: the planner re-plans and the
+                # budget meter escalates persistent failure (SS12.3).
+                reason = f"backend error: {exc}"
+                claims.append(f"attempt {attempt + 1}: {reason}")
+                commands.append({"cmd": "llm.author_patch", "exit": -1,
+                                 "out": ctx.blobs.put(reason)})
+                failure = ""
+                continue
             raw_sha = ctx.blobs.put(response)
             diff = extract_diff(response)
             if diff is None:

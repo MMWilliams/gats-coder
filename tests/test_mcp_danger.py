@@ -157,3 +157,44 @@ def test_without_danger_flag_deny_still_wins():
                            deny="PushBranch", allow=None)
     gate, _ = cli._gate_and_profile(args, {})
     assert gate("PushBranch", "network") is False
+
+
+# -- backend failures are non-effects, never crashes -------------------------
+
+def test_raising_backend_escalates_instead_of_crashing(tmp_path):
+    import subprocess as sp
+
+    from conftest import TEST_CMD, needs_git  # noqa: F401
+    from ledger.executor import run_repo_episode
+
+    repo = tmp_path / "r"
+    repo.mkdir()
+    sp.run(["git", "init", "-qb", "main", str(repo)], check=True,
+           capture_output=True)
+    (repo / "calc.py").write_text("def add(a, b):\n    return a - b\n",
+                                  encoding="utf-8")
+    (repo / "test_calc.py").write_text(
+        "from calc import add\n\n\ndef test_add():\n"
+        "    assert add(2, 3) == 5\n", encoding="utf-8")
+    sp.run(["git", "-C", str(repo), "add", "-A"], check=True,
+           capture_output=True)
+    sp.run(["git", "-C", str(repo), "-c", "user.email=t@t",
+            "-c", "user.name=t", "commit", "-qm", "seed"], check=True,
+           capture_output=True)
+
+    class Exploding:
+        id = "exploding"
+        calls = 0
+
+        def complete(self, prompt):
+            raise TimeoutError("simulated backend timeout")
+
+    result, executor, journal_path = run_repo_episode(
+        repo, tmp_path / "ep", frozenset({"tests.pass:unit"}), TEST_CMD,
+        backend=Exploding(), slots=["a"], max_author_attempts=2)
+    assert not result.success                      # no crash, a clean failure
+    entries = Journal.read(str(journal_path))
+    esc = [e for e in entries if e["t"] == "ESCALATION"]
+    assert esc and esc[0]["reason"] == "budget_exhausted"
+    ok, err = Journal.verify_chain(str(journal_path))
+    assert ok, err

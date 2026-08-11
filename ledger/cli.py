@@ -48,8 +48,10 @@ def _backend(args, cfg: dict | None = None):
     kind = getattr(args, "backend", None) or block.get("kind") or "claude"
     model = getattr(args, "model", None) or block.get("model")
     base_url = getattr(args, "base_url", None) or block.get("base_url")
+    timeout = block.get("timeout")
     try:
-        return resolve_backend(kind, model, base_url)
+        return resolve_backend(kind, model, base_url,
+                               int(timeout) if timeout else None)
     except RuntimeError as exc:
         raise SystemExit(str(exc))
 

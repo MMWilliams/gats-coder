@@ -45,7 +45,8 @@ class ClaudeCLIBackend:
     use on this machine; API-based backends can implement the same protocol.
     """
 
-    def __init__(self, model: str | None = None, timeout: int = 180):
+    def __init__(self, model: str | None = None, timeout: int = 600):
+        # 600s: authoring a multi-file diff routinely outruns shorter caps.
         exe = shutil.which("claude")
         if exe is None:
             raise RuntimeError("claude CLI not found on PATH")
@@ -154,24 +155,27 @@ class OpenAIAPIBackend:
 
 
 def resolve_backend(kind: str, model: str | None = None,
-                    base_url: str | None = None):
+                    base_url: str | None = None,
+                    timeout: int | None = None):
     """One resolver for every surface (run/chat/review/session specs).
     Returns None for kind='none'."""
     kind = (kind or "claude").lower()
     if kind == "none":
         return None
     if kind == "claude":
-        return ClaudeCLIBackend(model=model)
+        return ClaudeCLIBackend(model=model, timeout=timeout or 600)
     if kind == "anthropic":
         return AnthropicAPIBackend(model=model or "claude-sonnet-5",
-                                   base_url=base_url)
+                                   base_url=base_url,
+                                   timeout=timeout or 300)
     if kind == "openai":
         if not model:
             raise RuntimeError("backend 'openai' needs a model "
                                "(e.g. --model gpt-5.2)")
         return OpenAIAPIBackend(model=model,
                                 base_url=base_url
-                                or "https://api.openai.com/v1")
+                                or "https://api.openai.com/v1",
+                                timeout=timeout or 300)
     if kind == "ollama":
         if not model:
             raise RuntimeError("backend 'ollama' needs a model "
@@ -179,7 +183,8 @@ def resolve_backend(kind: str, model: str | None = None,
         return OpenAIAPIBackend(model=model, api_key="",
                                 base_url=base_url
                                 or "http://localhost:11434/v1",
-                                id_prefix="ollama")
+                                id_prefix="ollama",
+                                timeout=timeout or 600)
     raise RuntimeError(f"unknown backend {kind!r} "
                        "(claude, anthropic, openai, ollama, none)")
 
