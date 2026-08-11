@@ -16,6 +16,7 @@ import hashlib
 import re
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Protocol
@@ -34,6 +35,32 @@ from .world_model import L3Generative, LayeredWorldModel
 
 class GateDenied(RuntimeError):
     pass
+
+
+class BudgetMeter:
+    """Per-episode spend counter for a metered resource (design SS12.3).
+
+    Skills charge it; a sensor reads it. Exhaustion is surfaced as the
+    *absence* of the resource proposition, which makes budget-gated actions
+    symbolically inapplicable -- the planner routes around them or the
+    episode ends in escalation. No exceptions, no hidden retries.
+    """
+
+    def __init__(self, limit: int, resource: str = "llm"):
+        self.limit = int(limit)
+        self.resource = resource
+        self.spent = 0
+
+    def charge(self, n: int = 1) -> None:
+        self.spent += n
+
+    @property
+    def exhausted(self) -> bool:
+        return self.spent >= self.limit
+
+    @property
+    def prop(self) -> str:
+        return f"budget.{self.resource}:ok"
 
 
 class BlobStore:
@@ -68,6 +95,9 @@ class ExecContext:
     test_cache: ExpensiveResultCache
     queue_dir: Path
     applied_dir: Path
+    # Most recent failing suite output (tail), deposited by RunSuiteSkill and
+    # read by AuthorPatchSkill so the model patches against real evidence.
+    suite_evidence: dict = field(default_factory=dict)
 
 
 class Skill(Protocol):
@@ -98,11 +128,14 @@ class RunSuiteSkill:
         if proc.returncode == 0:
             props = {f"tests.pass:{self.suite}"}
             claims = [f"{self.suite} suite passes"]
+            ctx.suite_evidence.pop(self.suite, None)
         else:
             m = re.search(r"(\d+) failed", proc.stdout)
             bucket = fail_bucket(int(m.group(1))) if m else "1-5"
             props = {f"tests.fail_count:{self.suite}:{bucket}"}
             claims = [f"{self.suite} suite failing ({bucket})"]
+            tail = (proc.stdout + proc.stderr)[-4000:]
+            ctx.suite_evidence[self.suite] = {"tail": tail, "sha": rec["out"]}
         ctx.test_cache.put(content_fingerprint(ctx.worktree), props)
         return SkillResult(ok=proc.returncode == 0,
                            claimed_props=frozenset(props),
@@ -156,9 +189,54 @@ Gate = Callable[[str, str], bool]
 
 
 def attended_gate(action_name: str, risk: str) -> bool:
-    """M2 'attended' profile stand-in: approve and journal everything.
-    Interactive/policy gates land in M4."""
+    """Approve everything (used by tests and unattended callers that opt in
+    explicitly, e.g. `ledger run --yes`)."""
     return True
+
+
+# Which risk classes each autonomy profile stops on (design SS7.4).
+GATED_RISKS = {
+    "attended": frozenset({"write", "exec", "network", "irreversible"}),
+    "supervised": frozenset({"network", "irreversible"}),
+    "autonomous": frozenset({"irreversible"}),
+}
+
+
+def tty_approver(action_name: str, risk: str) -> bool:
+    """Ask the human at the terminal. Without a terminal there is no human,
+    so the only safe answer is no."""
+    if not sys.stdin.isatty():
+        return False
+    try:
+        resp = input(f"[gate] allow {action_name} (risk={risk})? [y/N] ")
+    except EOFError:
+        return False
+    return resp.strip().lower() in ("y", "yes")
+
+
+class PolicyGate:
+    """M4 risk gate: profile decides *which* risks stop, an approver decides
+    *whether* they proceed. The answer for an action family (`AuthorPatch`,
+    not `AuthorPatch:a`) is remembered for the episode, so a plan that visits
+    the same action ten times asks once.
+    """
+
+    def __init__(self, profile: str = "supervised",
+                 approver: Gate = tty_approver):
+        if profile not in GATED_RISKS:
+            raise ValueError(f"unknown profile {profile!r} "
+                             f"(choose from {sorted(GATED_RISKS)})")
+        self.profile = profile
+        self.approver = approver
+        self.memo: dict[str, bool] = {}
+
+    def __call__(self, action_name: str, risk: str) -> bool:
+        if risk not in GATED_RISKS[self.profile]:
+            return True
+        family = action_name.split(":", 1)[0]
+        if family not in self.memo:
+            self.memo[family] = self.approver(action_name, risk)
+        return self.memo[family]
 
 
 class RepoExecutor:
@@ -174,6 +252,7 @@ class RepoExecutor:
         self.gate = gate
         self.profile = profile
         self.incidents = 0
+        self.denials = 0
 
     def env_step(self, s: Props, action_name: str) -> Props:
         action = self.catalog.get(action_name)
@@ -187,7 +266,12 @@ class RepoExecutor:
                                     risk=action.risk, approved=approved,
                                     profile=self.profile)
             if not approved:
-                raise GateDenied(f"{action_name} ({action.risk}) denied")
+                # SS8.1: a denial is an observation, not a crash. The state
+                # does not change, the divergence arm learns the self-loop,
+                # and useful_actions() prunes the arm from future search --
+                # the planner routes around the human's "no".
+                self.denials += 1
+                return self.sensors.probe(self.ctx.worktree)
 
         result = self.skills[action_name].run(self.ctx)
         if self.journal is not None:
@@ -249,6 +333,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                      l3_cache_path: str | None = None,
                      slots: list[str] | None = None,
                      context_files: list[str] | None = None,
+                     profile: str = "attended",
+                     max_author_attempts: int = 6,
                      ) -> tuple[EpisodeResult, RepoExecutor, Path]:
     """End-to-end journaled episode on a real repo (M2/M3).
 
@@ -290,12 +376,18 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     worktree = Worktree.add(repo_root, episode_dir / "worktree",
                             branch=f"ledger/{episode_dir.name}")
     test_cache = ExpensiveResultCache()
-    sensors = SensorBank([
+    sensor_list = [
         git_sensor(),
         test_status_sensor(test_cache, content_fingerprint),
         dir_marker_sensor("queue", "patch.queued:", queue_dir),
         dir_marker_sensor("applied", "patch.applied:", applied_dir),
-    ])
+    ]
+    meter = None
+    if slots:
+        from .sensors import budget_sensor
+        meter = BudgetMeter(max_author_attempts, resource="llm")
+        sensor_list.append(budget_sensor(meter))
+    sensors = SensorBank(sensor_list)
     ctx = ExecContext(worktree=worktree.path,
                       blobs=BlobStore(episode_dir / "blobs"),
                       test_cache=test_cache,
@@ -308,7 +400,7 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     if slots:
         for slot in sorted(slots):
             skills[f"AuthorPatch:{slot}"] = AuthorPatchSkill(
-                slot, backend, task_text or "", context_files)
+                slot, backend, task_text or "", context_files, meter=meter)
             skills[f"ApplyPatch:{slot}"] = ApplyPatchSkill(slot)
     skills.update(skill_overrides or {})
 
@@ -322,7 +414,7 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     journal_path = episode_dir / "episode.jsonl"
     with Journal(str(journal_path)) as journal:
         executor = RepoExecutor(ctx, catalog, skills, sensors,
-                                journal=journal, gate=gate)
+                                journal=journal, gate=gate, profile=profile)
         task = Task("repo-episode", sensors.probe(worktree.path), goal, catalog)
         graph = TransitionGraph()
         wm = LayeredWorldModel(catalog, l3=l3)
@@ -334,6 +426,23 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                           "profile": executor.profile,
                           "branch": worktree.branch, **goal_extra},
         )
+        if not result.success:
+            # SS7.4 escalation: the episode could not reach the goal on its
+            # own. Journal *why* so the human resumes from evidence, not
+            # from a shrug.
+            if meter is not None and meter.exhausted:
+                reason = "budget_exhausted"
+            elif executor.denials:
+                reason = "gate_denied"
+            elif result.steps >= cfg.max_steps:
+                reason = "max_steps"
+            else:
+                reason = "no_path"
+            journal.append(
+                "ESCALATION", reason=reason, denials=executor.denials,
+                author_attempts=(meter.spent if meter is not None else 0),
+                author_attempt_limit=(meter.limit if meter is not None else 0),
+            )
         graph.save(str(episode_dir / "graph.sqlite"))
         if l2_path:
             wm.l2.save(l2_path)

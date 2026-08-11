@@ -95,6 +95,19 @@ def test_status_sensor(cache: ExpensiveResultCache,
                   cost_tier="expensive", probe=probe)
 
 
+def budget_sensor(meter) -> Sensor:
+    """Emits `budget.<resource>:ok` while the meter has headroom (design
+    SS12.3). Exhaustion is the absence of the proposition -- actions whose
+    preconditions require it become symbolically inapplicable, which is how
+    a spend ceiling turns into planner behavior instead of an exception."""
+
+    def probe(root: Path) -> set:
+        return set() if meter.exhausted else {meter.prop}
+
+    return Sensor(name=f"budget[{meter.resource}]", version="1",
+                  cost_tier="instant", probe=probe)
+
+
 def dir_marker_sensor(label: str, prop_prefix: str, directory: Path,
                       suffix: str = ".patch") -> Sensor:
     """Emits <prop_prefix><stem> for each matching file in a directory

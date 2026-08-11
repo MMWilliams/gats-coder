@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .journal import Journal
-from .skills_llm import read_files, repo_tree
+from .skills_llm import project_instructions, read_files, repo_tree
 
 SYSTEM = """You are LEDGER, an audit-first coding assistant.
 
@@ -50,7 +50,12 @@ class Conversation:
     journal: Journal | None = None
 
     def add_repo_context(self, root: Path, files: list[str] | None = None) -> None:
-        parts = [f"REPOSITORY FILES\n{repo_tree(Path(root))}"]
+        parts = []
+        instructions = project_instructions(Path(root))
+        if instructions:
+            parts.append("PROJECT INSTRUCTIONS (from the repository)\n"
+                         + instructions)
+        parts.append(f"REPOSITORY FILES\n{repo_tree(Path(root))}")
         if files:
             parts.append("FILE CONTENTS\n" + read_files(Path(root), files))
         self.context = "\n\n".join(parts)

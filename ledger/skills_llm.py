@@ -44,6 +44,66 @@ prefixes. Do not modify test files unless the task explicitly asks you to.
 """
 
 
+STOPWORDS = frozenset("""
+a an and are as at be but by can do does for from in into is it its make not
+of on or please should so that the this to update use using when where which
+will with add change code error bug issue fix failing file files repo
+repository test tests suite
+""".split())
+
+
+def project_instructions(root: Path, max_chars: int = 8000) -> str:
+    """Repo-provided standing instructions, Codex-style: the first of
+    AGENTS.md / LEDGER.md / CLAUDE.md found at the repo root."""
+    for name in ("AGENTS.md", "LEDGER.md", "CLAUDE.md"):
+        f = Path(root) / name
+        if f.is_file():
+            try:
+                return f.read_text(encoding="utf-8", errors="replace")[:max_chars]
+            except OSError:
+                continue
+    return ""
+
+
+def select_context(root: Path, query: str, k: int = 4,
+                   max_file_bytes: int = 200_000) -> list[str]:
+    """Deterministic context selection: rank tracked files against the task
+    text + failure evidence. No embeddings, no RNG -- a path named in the
+    evidence dominates, then identifier tokens in filenames, then content
+    occurrences. Ties break lexicographically, so the same repo state and
+    query always select the same files.
+    """
+    proc = subprocess.run(["git", "ls-files"], cwd=root, capture_output=True,
+                          text=True, timeout=60)
+    files = sorted(f for f in proc.stdout.split() if f)
+    tokens = sorted({t for t in re.findall(r"[a-z_][a-z0-9_]{2,}",
+                                           query.lower())
+                     if t not in STOPWORDS})
+    scores: dict[str, int] = {}
+    for rel in files:
+        f = root / rel
+        try:
+            if not f.is_file() or f.stat().st_size > max_file_bytes:
+                continue
+            text = f.read_text(encoding="utf-8", errors="replace")
+        except OSError:
+            continue
+        score = 0
+        if rel in query:
+            score += 50
+        elif f.name in query:
+            score += 30
+        low = text.lower()
+        for t in tokens:
+            if t in rel.lower():
+                score += 5
+            score += min(low.count(t), 10)
+        if score > 0:
+            scores[rel] = score
+    ranked = sorted(scores, key=lambda r: (-scores[r], r))
+    return ranked[:k]
+
+
 def repo_tree(root: Path, max_files: int = 200) -> str:
     """Deterministic file listing for prompt context (tracked files only)."""
     proc = subprocess.run(["git", "ls-files"], cwd=root, capture_output=True,
@@ -112,18 +172,30 @@ class AuthorPatchSkill:
 
     def __init__(self, slot: str, backend, task_text: str,
                  context_files: list[str] | None = None,
-                 max_attempts: int = 2):
+                 max_attempts: int = 2, meter=None):
         self.slot = slot
         self.backend = backend
         self.task_text = task_text
         self.context_files = list(context_files or [])
         self.max_attempts = max_attempts
+        self.meter = meter
 
     def _prompt(self, ctx, failure: str = "") -> str:
         extra_parts = []
-        if self.context_files:
+        instructions = project_instructions(ctx.worktree)
+        if instructions:
+            extra_parts.append("PROJECT INSTRUCTIONS (from the repository)\n"
+                               + instructions)
+        evidence = getattr(ctx, "suite_evidence", {}) or {}
+        evidence_tail = "\n".join(e["tail"] for _, e in sorted(evidence.items()))
+        if evidence_tail:
+            extra_parts.append("MOST RECENT FAILING TEST OUTPUT\n"
+                               + evidence_tail)
+        files = self.context_files or select_context(
+            ctx.worktree, self.task_text + "\n" + evidence_tail)
+        if files:
             extra_parts.append("RELEVANT FILE CONTENTS\n"
-                               + read_files(ctx.worktree, self.context_files))
+                               + read_files(ctx.worktree, files))
         if failure:
             extra_parts.append(
                 "YOUR PREVIOUS ATTEMPT WAS REJECTED\n" + failure
@@ -151,6 +223,12 @@ class AuthorPatchSkill:
         claims: list[str] = []
         failure = ""
         for attempt in range(self.max_attempts):
+            if self.meter is not None:
+                if self.meter.exhausted:
+                    claims.append("author budget exhausted "
+                                  f"({self.meter.spent}/{self.meter.limit})")
+                    break
+                self.meter.charge()
             response = self.backend.complete(self._prompt(ctx, failure))
             raw_sha = ctx.blobs.put(response)
             diff = extract_diff(response)
@@ -207,13 +285,16 @@ def build_authoring_catalog(slots: list[str], suite: str = "unit") -> Catalog:
             # Preconditions are conjunctive (paper SS3.1), so "author only
             # when a suite is failing" is not expressible -- the two failure
             # buckets are alternatives, and requiring both is unsatisfiable.
-            # An empty precondition is also the honest contract: authoring a
-            # patch is always *possible*. Ordering is left to search, which
-            # prefers RunSuite first because it is the shorter path to the
-            # goal, and only reaches for AuthorPatch once that path is
-            # falsified by reality.
+            # Authoring is otherwise always *possible*, so the only honest
+            # precondition is the resource one: LLM budget remains (SS12.3).
+            # When the meter runs dry the proposition vanishes and authoring
+            # becomes symbolically inapplicable -- the budget surfaces as
+            # planner behavior, not an exception. Ordering is left to
+            # search, which prefers RunSuite first because it is the
+            # shorter path to the goal, and only reaches for AuthorPatch
+            # once that path is falsified by reality.
             f"AuthorPatch:{slot}",
-            prec=frozenset(),
+            prec=frozenset({"budget.llm:ok"}),
             add=frozenset({f"patch.queued:{slot}"}),
             risk="write", deterministic=False))
         actions.append(Action(

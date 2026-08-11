@@ -12,6 +12,7 @@ a hash-chained journal that the audit family reads back.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import math
 import shutil
@@ -20,6 +21,7 @@ import sys
 from pathlib import Path
 
 from .chat import Conversation, repl
+from .executor import GATED_RISKS, PolicyGate, attended_gate
 from .graph import TransitionGraph
 from .journal import Journal
 from .planner import PlanConfig, run_episode
@@ -29,6 +31,7 @@ from .tasks import OPTIMAL_LENGTH, SyntheticEnv, suite
 from .world_model import LayeredWorldModel
 
 DEFAULT_TEST_CMD = ["python", "-m", "pytest", "-q"]
+DEFAULT_AUTHOR_ATTEMPTS = 6
 
 
 # -- helpers -----------------------------------------------------------------
@@ -44,9 +47,59 @@ def _backend(args):
     raise SystemExit(f"unknown backend {kind!r}")
 
 
-def _test_cmd(args) -> list[str]:
+def _config(root: Path) -> dict:
+    """`.ledger/config.json`, or {} when absent/unreadable. Flags win over
+    config; config wins over built-in defaults."""
+    p = Path(root) / ".ledger" / "config.json"
+    if not p.is_file():
+        return {}
+    try:
+        cfg = json.loads(p.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return cfg if isinstance(cfg, dict) else {}
+
+
+def _test_cmd(args, cfg: dict | None = None) -> list[str]:
     raw = getattr(args, "test", None)
-    return raw.split() if raw else list(DEFAULT_TEST_CMD)
+    if raw:
+        return raw.split()
+    from_cfg = (cfg or {}).get("test_cmd")
+    if isinstance(from_cfg, list) and from_cfg:
+        return [str(c) for c in from_cfg]
+    return list(DEFAULT_TEST_CMD)
+
+
+def _plan_config(args, cfg: dict) -> PlanConfig:
+    base = PlanConfig()
+    stored = cfg.get("planner")
+    if isinstance(stored, dict):
+        try:
+            base = PlanConfig.from_dict(stored)
+        except TypeError:
+            pass
+    overrides = {}
+    if getattr(args, "budget", None) is not None:
+        overrides["budget"] = args.budget
+    if getattr(args, "max_steps", None) is not None:
+        overrides["max_steps"] = args.max_steps
+    return dataclasses.replace(base, **overrides) if overrides else base
+
+
+def _gate_and_profile(args, cfg: dict):
+    """Resolve the autonomy profile and build its risk gate (design SS7.4).
+
+    --yes approves everything the profile would have asked about; without a
+    terminal the interactive gate denies, so unattended runs must say --yes
+    (or use a permissive profile) explicitly.
+    """
+    profile = getattr(args, "profile", None) or cfg.get("profile", "attended")
+    if profile not in GATED_RISKS:
+        raise SystemExit(f"unknown profile {profile!r} "
+                         f"(choose from {sorted(GATED_RISKS)})")
+    if getattr(args, "yes", False):
+        return attended_gate, profile
+    return PolicyGate(profile), profile
 
 
 def _fail(msg: str) -> int:
@@ -70,6 +123,7 @@ def cmd_init(args) -> int:
         "planner": PlanConfig().to_dict(),
         "profile": "attended",
         "slots": ["a", "b"],
+        "max_author_attempts": DEFAULT_AUTHOR_ATTEMPTS,
     }
     cfg_path.write_text(json.dumps(cfg, indent=2) + "\n", encoding="utf-8")
     gitignore = d / ".gitignore"
@@ -84,24 +138,32 @@ def cmd_run(args) -> int:
     root = Path(args.repo).resolve()
     if not (root / ".git").exists():
         return _fail(f"{root} is not a git repository")
+    cfg_file = _config(root)
     episode_dir = Path(args.out).resolve() if args.out else \
         root / ".ledger" / "episodes" / args.name
     episode_dir.mkdir(parents=True, exist_ok=True)
 
-    slots = args.slots.split(",") if args.slots else ["a", "b"]
+    if args.slots:
+        slots = args.slots.split(",")
+    else:
+        slots = [str(s) for s in cfg_file.get("slots", ["a", "b"])]
     try:
         backend = _backend(args)
     except RuntimeError as exc:
         return _fail(str(exc))
     if backend is None:
         return _fail("run requires an LLM backend (--backend claude)")
+    gate, profile = _gate_and_profile(args, cfg_file)
+    attempts = args.max_author_attempts if args.max_author_attempts is not None \
+        else int(cfg_file.get("max_author_attempts", DEFAULT_AUTHOR_ATTEMPTS))
 
     from .executor import run_repo_episode
     ledger_dir = root / ".ledger"
     ledger_dir.mkdir(exist_ok=True)
     result, executor, journal_path = run_repo_episode(
-        root, episode_dir, None, _test_cmd(args),
-        cfg=PlanConfig(budget=args.budget, max_steps=args.max_steps),
+        root, episode_dir, None, _test_cmd(args, cfg_file),
+        cfg=_plan_config(args, cfg_file),
+        gate=gate, profile=profile, max_author_attempts=attempts,
         task_text=args.task, backend=backend,
         l2_path=str(ledger_dir / "l2.sqlite"),
         l3_cache_path=str(ledger_dir / "l3.sqlite"),
@@ -111,7 +173,10 @@ def cmd_run(args) -> int:
     print(f"goal:      {'reached' if result.success else 'NOT reached'}")
     print(f"plan:      {' -> '.join(result.plan) or '(empty)'}")
     print(f"steps:     {result.steps}")
+    print(f"profile:   {profile}")
     print(f"incidents: {executor.incidents}")
+    if executor.denials:
+        print(f"denials:   {executor.denials} (gated actions the human refused)")
     print(f"LLM planning calls: {result.llm_planning_calls}")
     print(f"journal:   {journal_path}")
     print(f"audit:     ledger status {journal_path}")
@@ -140,6 +205,66 @@ def cmd_chat(args) -> int:
     finally:
         if journal is not None:
             journal.close()
+
+
+REVIEW_PROMPT = """You are reviewing a git diff for correctness bugs and \
+risky changes.
+
+{instructions}DIFF
+{diff}
+
+Report findings as a list, most severe first. For each: file, the problem in
+one sentence, and the concrete failure it causes. If the diff looks correct,
+say exactly that in one line. Do not restate the diff or pad the answer."""
+
+
+def cmd_review(args) -> int:
+    root = Path(args.repo).resolve()
+    if not (root / ".git").exists():
+        return _fail(f"{root} is not a git repository")
+    try:
+        backend = _backend(args)
+    except RuntimeError as exc:
+        return _fail(str(exc))
+    if backend is None:
+        return _fail("review requires an LLM backend (--backend claude)")
+
+    if args.range:
+        diff_args = ["git", "diff", args.range]
+    elif args.staged:
+        diff_args = ["git", "diff", "--cached"]
+    else:
+        diff_args = ["git", "diff", "HEAD"]
+    proc = subprocess.run(diff_args, cwd=root, capture_output=True,
+                          text=True, timeout=120)
+    if proc.returncode != 0:
+        return _fail(f"git diff failed: {proc.stderr.strip()[:300]}")
+    diff = proc.stdout
+    if not diff.strip():
+        print("nothing to review: the diff is empty")
+        return 0
+    if len(diff) > 80_000:
+        print(f"note: diff truncated to 80000 of {len(diff)} chars",
+              file=sys.stderr)
+        diff = diff[:80_000]
+
+    from .skills_llm import project_instructions
+    instructions = project_instructions(root)
+    prompt = REVIEW_PROMPT.format(
+        diff=diff,
+        instructions=("PROJECT INSTRUCTIONS\n" + instructions + "\n\n")
+        if instructions else "")
+    if args.journal:
+        with Journal(args.journal) as journal:
+            journal.append("REVIEW_REQUEST", diff_args=diff_args,
+                           diff_chars=len(diff))
+            reply = backend.complete(prompt).strip()
+            journal.append("REVIEW_FINDINGS", text=reply,
+                           backend=getattr(backend, "id", "?"))
+    else:
+        reply = backend.complete(prompt).strip()
+    print(reply)
+    return 0
 
 
 def cmd_session(args) -> int:
@@ -235,6 +360,16 @@ def cmd_status(args) -> int:
     print(f"LLM planning calls: {end.get('llm_planning_calls', 0)}")
     print(f"incidents:   {counts.get('INCIDENT', 0)}")
     print(f"divergences: {sum(1 for e in entries if e['t'] == 'OBSERVE' and e.get('diverged'))}")
+    denials = sum(1 for e in entries
+                  if e["t"] == "GATE" and not e.get("approved", True))
+    if denials:
+        print(f"denials:     {denials}")
+    esc = next((e for e in reversed(entries) if e["t"] == "ESCALATION"), None)
+    if esc is not None:
+        print(f"escalation:  {esc.get('reason', '?')} "
+              f"(denials={esc.get('denials', 0)}, "
+              f"author_attempts={esc.get('author_attempts', 0)}"
+              f"/{esc.get('author_attempt_limit', 0)})")
     print(f"chain:       {'intact' if chain_ok else f'BROKEN ({chain_err})'}")
     print("entries:     " + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
     return 0 if chain_ok else 1
@@ -368,11 +503,34 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--slots", default=None,
                    help="comma-separated patch slots (default: a,b)")
     p.add_argument("--context", default=None,
-                   help="comma-separated files to show the model")
-    p.add_argument("--budget", type=int, default=10)
-    p.add_argument("--max-steps", dest="max_steps", type=int, default=20)
+                   help="comma-separated files to show the model "
+                        "(default: selected automatically)")
+    p.add_argument("--budget", type=int, default=None)
+    p.add_argument("--max-steps", dest="max_steps", type=int, default=None)
+    p.add_argument("--profile", default=None,
+                   choices=sorted(GATED_RISKS),
+                   help="autonomy profile: which risk classes stop for "
+                        "approval (default: config, then 'attended')")
+    p.add_argument("--yes", action="store_true",
+                   help="pre-approve every gated action (unattended runs)")
+    p.add_argument("--max-author-attempts", dest="max_author_attempts",
+                   type=int, default=None,
+                   help="LLM patch-authoring budget for the episode "
+                        f"(default: config, then {DEFAULT_AUTHOR_ATTEMPTS})")
     add_backend(p)
     p.set_defaults(fn=cmd_run)
+
+    p = sub.add_parser("review",
+                       help="LLM review of a git diff (working tree by default)")
+    p.add_argument("--repo", default=".")
+    p.add_argument("--staged", action="store_true",
+                   help="review staged changes only")
+    p.add_argument("--range", default=None,
+                   help="git diff range, e.g. main..HEAD")
+    p.add_argument("--journal", default=None,
+                   help="journal the review request + findings")
+    add_backend(p)
+    p.set_defaults(fn=cmd_review)
 
     p = sub.add_parser("chat", help="talk to the model about this repo")
     p.add_argument("--repo", default=".")
