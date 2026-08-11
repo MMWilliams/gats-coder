@@ -969,6 +969,8 @@ def build_parser() -> argparse.ArgumentParser:
         prog="ledger",
         description="Audit-first coding agent: GATS plans, the LLM writes, "
                     "sensors verify, the journal proves it.")
+    ap.add_argument("-V", "--version", action="version",
+                    version=f"ledger {AGENT_VERSION}")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     def add_backend(p):
