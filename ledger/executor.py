@@ -13,6 +13,7 @@ Journal ordering per step: PLAN (planner) -> GATE -> EXEC [-> INCIDENT]
 from __future__ import annotations
 
 import hashlib
+import os
 import re
 import shutil
 import subprocess
@@ -227,6 +228,34 @@ class PushBranchSkill:
             claims=[f"pushed {self.branch} to origin"], commands=[rec])
 
 
+class CreatePRSkill:
+    """Opens a pull request for the pushed episode branch via the `gh` CLI.
+    risk='network'. The claim is `repo.pr:<branch>`; the sensor confirms it
+    by asking `gh pr view`, not by trusting this exit code."""
+
+    def __init__(self, branch: str, title: str, body: str = ""):
+        self.branch = branch
+        self.title = title[:120] or branch
+        self.body = body
+        self.gh = shutil.which("gh")
+
+    def run(self, ctx: ExecContext) -> SkillResult:
+        if self.gh is None:
+            return SkillResult(ok=False,
+                               claims=["gh CLI not found on PATH"])
+        proc, rec = _run_cmd(ctx, [
+            self.gh, "pr", "create", "--head", self.branch,
+            "--title", self.title,
+            "--body", self.body or f"LEDGER episode branch `{self.branch}`."])
+        if proc.returncode != 0:
+            return SkillResult(ok=False, claims=["pr create failed"],
+                               commands=[rec])
+        return SkillResult(
+            ok=True,
+            claimed_props=frozenset({f"repo.pr:{self.branch}"}),
+            claims=[f"opened PR for {self.branch}"], commands=[rec])
+
+
 # gate(action_name, risk) -> bool (approve). Design SS8.1: gates fire at
 # execution, never during search.
 Gate = Callable[[str, str], bool]
@@ -263,21 +292,68 @@ class PolicyGate:
     *whether* they proceed. The answer for an action family (`AuthorPatch`,
     not `AuthorPatch:a`) is remembered for the episode, so a plan that visits
     the same action ten times asks once.
+
+    `rules` (execpolicy / permission-list analog) is standing policy over
+    action families: {"deny": [...], "allow": [...]}. Deny always wins --
+    over the profile, over the approver, and over --yes; allow pre-approves
+    a family the profile would otherwise stop on. Rules are policy, prompts
+    are consent; policy outranks consent.
     """
 
     def __init__(self, profile: str = "supervised",
-                 approver: Gate = tty_approver):
+                 approver: Gate = tty_approver,
+                 rules: dict | list | None = None):
         if profile not in GATED_RISKS:
             raise ValueError(f"unknown profile {profile!r} "
                              f"(choose from {sorted(GATED_RISKS)})")
         self.profile = profile
         self.approver = approver
+        self.rules = self._normalize(rules)
         self.memo: dict[str, bool] = {}
+        # Why the last decision came out the way it did; journaled by the
+        # executor next to the GATE entry (audit trail, Kimi-rule style).
+        self.last_reason: str | None = None
+
+    @staticmethod
+    def _normalize(rules) -> list[tuple[str, str, str | None]]:
+        """Accepts the set form {"deny": [...], "allow": [...]} (deny wins)
+        or the ordered form [{"action": ..., "decision": allow|deny|ask,
+        "reason": ...}] (first match wins). Returns an ordered rule list."""
+        if not rules:
+            return []
+        if isinstance(rules, dict) and "rules" in rules:
+            rules = rules["rules"]
+        if isinstance(rules, dict):
+            out = [(str(f), "deny", None) for f in rules.get("deny", ())]
+            out += [(str(f), "allow", None) for f in rules.get("allow", ())]
+            return out
+        out = []
+        for r in rules:
+            decision = r.get("decision")
+            if decision not in ("allow", "deny", "ask"):
+                raise ValueError(f"rule decision must be allow/deny/ask: {r}")
+            out.append((str(r.get("action", "*")), decision,
+                        r.get("reason")))
+        return out
+
+    def _match(self, action_name: str, family: str):
+        for pattern, decision, reason in self.rules:
+            if pattern in ("*", family, action_name):
+                return decision, reason
+        return None, None
 
     def __call__(self, action_name: str, risk: str) -> bool:
-        if risk not in GATED_RISKS[self.profile]:
-            return True
         family = action_name.split(":", 1)[0]
+        self.last_reason = None
+        decision, reason = self._match(action_name, family)
+        if decision == "deny":
+            self.last_reason = reason or "denied by policy rule"
+            return False
+        if decision == "allow":
+            self.last_reason = reason
+            return True
+        if decision != "ask" and risk not in GATED_RISKS[self.profile]:
+            return True
         if family not in self.memo:
             self.memo[family] = self.approver(action_name, risk)
         return self.memo[family]
@@ -287,7 +363,8 @@ class RepoExecutor:
     def __init__(self, ctx: ExecContext, catalog: Catalog,
                  skills: dict[str, Skill], sensors: SensorBank,
                  journal: Journal | None = None,
-                 gate: Gate = attended_gate, profile: str = "attended"):
+                 gate: Gate = attended_gate, profile: str = "attended",
+                 hooks: list[dict] | None = None):
         self.ctx = ctx
         self.catalog = catalog
         self.skills = skills
@@ -295,8 +372,62 @@ class RepoExecutor:
         self.journal = journal
         self.gate = gate
         self.profile = profile
+        self.hooks = list(hooks or [])
         self.incidents = 0
         self.denials = 0
+
+    # -- hooks (Claude Code / Kimi hook engine analog) -----------------------
+    # Deterministic commands around actions, journaled like everything else.
+    # A pre_action hook with "gate": true blocks the action on nonzero exit
+    # (fail closed -- a gate that cannot run is a gate that says no).
+
+    @staticmethod
+    def _hook_matches(hook: dict, action_name: str, family: str) -> bool:
+        m = str(hook.get("match", "*"))
+        return m in ("*", family, action_name)
+
+    def _run_hook(self, hook: dict, event: str, action_name: str,
+                  risk: str) -> int:
+        cmd = [str(c) for c in hook.get("command", [])]
+        if not cmd:
+            return -1
+        try:
+            proc = subprocess.run(
+                cmd, cwd=self.ctx.worktree, capture_output=True, text=True,
+                timeout=int(hook.get("timeout", 30)),
+                env={**os.environ,
+                     "LEDGER_EVENT": event,
+                     "LEDGER_ACTION": action_name,
+                     "LEDGER_RISK": risk,
+                     "LEDGER_WORKTREE": str(self.ctx.worktree)})
+            exit_code = proc.returncode
+            out_sha = self.ctx.blobs.put(
+                proc.stdout + "\n--- stderr ---\n" + proc.stderr)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            exit_code = -1
+            out_sha = self.ctx.blobs.put(f"hook failed to run: {exc}")
+        if self.journal is not None:
+            self.journal.append(
+                "HOOK", event=event, action=action_name,
+                match=str(hook.get("match", "*")), cmd=" ".join(cmd),
+                exit=exit_code, out=out_sha,
+                gate=bool(hook.get("gate")),
+                blocked=bool(hook.get("gate")) and exit_code != 0)
+        return exit_code
+
+    def _fire_hooks(self, event: str, action_name: str, risk: str) -> bool:
+        """Run matching hooks; returns True if a gate hook blocks."""
+        family = action_name.split(":", 1)[0]
+        blocked = False
+        for hook in self.hooks:
+            if hook.get("event", "pre_action") != event:
+                continue
+            if not self._hook_matches(hook, action_name, family):
+                continue
+            exit_code = self._run_hook(hook, event, action_name, risk)
+            if event == "pre_action" and hook.get("gate") and exit_code != 0:
+                blocked = True
+        return blocked
 
     def env_step(self, s: Props, action_name: str) -> Props:
         action = self.catalog.get(action_name)
@@ -305,10 +436,11 @@ class RepoExecutor:
 
         if action.risk != "read":
             approved = self.gate(action_name, action.risk)
+            reason = getattr(self.gate, "last_reason", None)
             if self.journal is not None:
                 self.journal.append("GATE", action=action_name,
                                     risk=action.risk, approved=approved,
-                                    profile=self.profile)
+                                    profile=self.profile, reason=reason)
             if not approved:
                 # SS8.1: a denial is an observation, not a crash. The state
                 # does not change, the divergence arm learns the self-loop,
@@ -316,6 +448,10 @@ class RepoExecutor:
                 # the planner routes around the human's "no".
                 self.denials += 1
                 return self.sensors.probe(self.ctx.worktree)
+
+        if self._fire_hooks("pre_action", action_name, action.risk):
+            self.denials += 1
+            return self.sensors.probe(self.ctx.worktree)
 
         result = self.skills[action_name].run(self.ctx)
         if self.journal is not None:
@@ -326,6 +462,7 @@ class RepoExecutor:
                 commands=result.commands, artifacts=result.artifacts,
                 risk=action.risk,
             )
+        self._fire_hooks("post_action", action_name, action.risk)
 
         obs = self.sensors.probe(self.ctx.worktree)
         false_claims = sorted(set(result.claimed_props) - obs)
@@ -380,6 +517,9 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                      profile: str = "attended",
                      max_author_attempts: int = 6,
                      push: bool = False,
+                     pr: bool = False,
+                     resume: bool = False,
+                     hooks: list[dict] | None = None,
                      ) -> tuple[EpisodeResult, RepoExecutor, Path]:
     """End-to-end journaled episode on a real repo (M2/M3).
 
@@ -407,14 +547,24 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         catalog = build_coding_catalog(patch_ids)
 
     branch = f"ledger/{episode_dir.name}"
+    push = push or pr
+    extra_actions = []
     if push:
         # Publishing is a separate, network-risk action: reachable only from
         # a clean (committed) worktree, gated under attended/supervised.
-        catalog = Catalog(list(catalog) + [Action(
+        extra_actions.append(Action(
             "PushBranch",
             prec=frozenset({"repo.clean"}),
             add=frozenset({f"repo.pushed:{branch}"}),
-            risk="network", deterministic=False)])
+            risk="network", deterministic=False))
+    if pr:
+        extra_actions.append(Action(
+            "CreatePR",
+            prec=frozenset({f"repo.pushed:{branch}"}),
+            add=frozenset({f"repo.pr:{branch}"}),
+            risk="network", deterministic=False))
+    if extra_actions:
+        catalog = Catalog(list(catalog) + extra_actions)
 
     goal_extra: dict = {}
     if task_text is not None:
@@ -428,8 +578,11 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     if goal is None:
         raise ValueError("either goal or task_text must be provided")
 
-    worktree = Worktree.add(repo_root, episode_dir / "worktree",
-                            branch=f"ledger/{episode_dir.name}")
+    worktree_dir = episode_dir / "worktree"
+    if resume and (worktree_dir / ".git").exists():
+        worktree = Worktree.reuse(repo_root, worktree_dir, branch=branch)
+    else:
+        worktree = Worktree.add(repo_root, worktree_dir, branch=branch)
     test_cache = ExpensiveResultCache()
     sensor_list = [
         git_sensor(),
@@ -445,6 +598,9 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     if push:
         from .sensors import remote_branch_sensor
         sensor_list.append(remote_branch_sensor(branch))
+    if pr:
+        from .sensors import pr_sensor
+        sensor_list.append(pr_sensor(branch))
     sensors = SensorBank(sensor_list)
     ctx = ExecContext(worktree=worktree.path,
                       blobs=BlobStore(episode_dir / "blobs"),
@@ -457,6 +613,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     }
     if push:
         skills["PushBranch"] = PushBranchSkill(branch)
+    if pr:
+        skills["CreatePR"] = CreatePRSkill(branch, title=task_text or branch)
     if slots:
         for slot in sorted(slots):
             skills[f"AuthorPatch:{slot}"] = AuthorPatchSkill(
@@ -471,12 +629,26 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
             cache_path=l3_cache_path
             if l3_cache_path and Path(l3_cache_path).exists() else None)
 
+    # Resume appends a fresh journal *segment* (episode.r2.jsonl, ...): each
+    # file stays an independently verifiable, independently replayable chain.
     journal_path = episode_dir / "episode.jsonl"
+    segment = 1
+    if resume:
+        while journal_path.exists():
+            segment += 1
+            journal_path = episode_dir / f"episode.r{segment}.jsonl"
     with Journal(str(journal_path)) as journal:
         executor = RepoExecutor(ctx, catalog, skills, sensors,
-                                journal=journal, gate=gate, profile=profile)
+                                journal=journal, gate=gate, profile=profile,
+                                hooks=hooks)
         task = Task("repo-episode", sensors.probe(worktree.path), goal, catalog)
-        graph = TransitionGraph()
+        graph_path = episode_dir / "graph.sqlite"
+        if resume and graph_path.exists():
+            # Warm start: the prior segment's transition graph -- learned
+            # edges, UCB statistics, dead ends -- carries over.
+            graph = TransitionGraph.load(str(graph_path))
+        else:
+            graph = TransitionGraph()
         wm = LayeredWorldModel(catalog, l3=l3)
         if l2_path and Path(l2_path).exists():
             wm.l2.load(l2_path)
@@ -484,7 +656,9 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
             task, graph, wm, cfg, executor.env_step, journal=journal,
             header_extra={"sensor_set_hash": sensors.set_hash(),
                           "profile": executor.profile,
-                          "branch": worktree.branch, **goal_extra},
+                          "branch": worktree.branch,
+                          "segment": segment, "resumed": bool(resume),
+                          **goal_extra},
         )
         if not result.success:
             # SS7.4 escalation: the episode could not reach the goal on its

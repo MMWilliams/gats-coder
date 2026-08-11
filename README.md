@@ -11,7 +11,7 @@ incident rather than a state transition. Every episode replays bit-exact.
 
 ```
 pip install -e .[dev]
-pytest                      # 88 tests
+pytest                      # 103 tests
 python -m ledger.cli demo   # paper's 100-task suite: SR / optimality / calls / variance
 ```
 
@@ -24,6 +24,10 @@ ledger run "fix the failing test"   # plan, author a patch, apply, verify, commi
 ledger run "..." --yes              # unattended: pre-approve gated actions
 ledger run "..." --json             # CI: one JSON result object + exit code
 ledger run "... and push" --push    # adds a network-gated PushBranch action
+ledger run "... open a PR" --pr     # adds PushBranch + CreatePR (gh)
+ledger run "..." --resume           # re-enter the episode: worktree + warm graph
+ledger run "..." --attempts 3 --yes # best-of-N in parallel worktrees
+ledger run "..." --deny PushBranch  # per-invocation policy rule
 ledger review                       # LLM review of your working-tree diff
 ledger status .ledger/episodes/episode/episode.jsonl
 ```
@@ -56,6 +60,28 @@ route remains, the episode ends with a journaled `ESCALATION` (reason:
 authoring is metered per episode (`--max-author-attempts`, default 6) — a
 persistently failing model exhausts its budget and escalates instead of
 looping.
+
+On top of profiles sit **policy rules** and **hooks** (config.json):
+
+```jsonc
+"policy": {"rules": [
+  {"action": "PushBranch", "decision": "deny",
+   "reason": "publishing is a human's job here"},
+  {"action": "RunSuite", "decision": "allow"}
+]},
+"hooks": [
+  {"event": "pre_action", "match": "Commit", "gate": true,
+   "command": ["python", "tools/lint_gate.py"]},
+  {"event": "post_action", "match": "*",
+   "command": ["python", "tools/notify.py"]}
+]
+```
+
+Rules are first-match with an audit `reason` that lands in the journal's
+GATE entry; a deny outranks `--yes`. `--allow`/`--deny` flags prepend
+per-invocation rules. A `gate: true` pre-action hook blocks the action on
+nonzero exit (fail closed); every hook run is journaled with its output
+blob. `ledger doctor` lints the whole config.
 
 ## Talking to it
 

@@ -138,7 +138,22 @@ def test_config_precedence_flags_over_file(tmp_path):
     assert cli._plan_config(B(), cfg).budget == 12
     gate, profile = cli._gate_and_profile(B(), cfg)
     assert profile == "supervised"
-    assert gate is cli.attended_gate  # --yes pre-approves
+    assert gate("PushBranch", "network")  # --yes pre-approves gated risks
+
+
+def test_policy_rules_deny_wins_over_yes(tmp_path):
+    _write_cfg(tmp_path, {"policy": {"deny": ["PushBranch"],
+                                     "allow": ["Commit"]}})
+    cfg = cli._config(tmp_path)
+
+    class A:
+        profile = "attended"
+        yes = True
+
+    gate, _ = cli._gate_and_profile(A(), cfg)
+    assert not gate("PushBranch", "network")   # deny beats --yes
+    assert gate("Commit", "write")             # allowed family
+    assert gate("RunSuite", "exec")            # --yes approves the rest
 
 
 def test_missing_or_bad_config_is_empty(tmp_path):

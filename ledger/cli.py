@@ -22,7 +22,7 @@ from pathlib import Path
 
 from . import AGENT_VERSION
 from .chat import Conversation, repl
-from .executor import GATED_RISKS, PolicyGate, attended_gate
+from .executor import GATED_RISKS, PolicyGate, attended_gate, tty_approver
 from .graph import TransitionGraph
 from .journal import Journal
 from .planner import PlanConfig, run_episode
@@ -87,20 +87,52 @@ def _plan_config(args, cfg: dict) -> PlanConfig:
     return dataclasses.replace(base, **overrides) if overrides else base
 
 
+def _merged_rules(args, cfg: dict) -> list | None:
+    """Ordered policy rules, closest scope first (Kimi's scope ladder):
+    --deny / --allow flags (this invocation), then config "policy" (project).
+    First match wins; deny flags come before allow flags."""
+    rules: list = []
+    for f in (getattr(args, "deny", None) or "").split(","):
+        if f.strip():
+            rules.append({"action": f.strip(), "decision": "deny",
+                          "reason": "--deny flag"})
+    for f in (getattr(args, "allow", None) or "").split(","):
+        if f.strip():
+            rules.append({"action": f.strip(), "decision": "allow",
+                          "reason": "--allow flag"})
+    policy = cfg.get("policy")
+    if isinstance(policy, dict):
+        if isinstance(policy.get("rules"), list):
+            rules += list(policy["rules"])
+        else:
+            rules += [{"action": str(f), "decision": "deny"}
+                      for f in policy.get("deny", ())]
+            rules += [{"action": str(f), "decision": "allow"}
+                      for f in policy.get("allow", ())]
+    elif isinstance(policy, list):
+        rules += list(policy)
+    return rules or None
+
+
 def _gate_and_profile(args, cfg: dict):
     """Resolve the autonomy profile and build its risk gate (design SS7.4).
 
     --yes approves everything the profile would have asked about; without a
     terminal the interactive gate denies, so unattended runs must say --yes
-    (or use a permissive profile) explicitly.
+    (or use a permissive profile) explicitly. Policy rules apply regardless
+    -- a deny rule outranks --yes.
     """
     profile = getattr(args, "profile", None) or cfg.get("profile", "attended")
     if profile not in GATED_RISKS:
         raise SystemExit(f"unknown profile {profile!r} "
                          f"(choose from {sorted(GATED_RISKS)})")
-    if getattr(args, "yes", False):
-        return attended_gate, profile
-    return PolicyGate(profile), profile
+    approver = attended_gate if getattr(args, "yes", False) else tty_approver
+    try:
+        gate = PolicyGate(profile, approver=approver,
+                          rules=_merged_rules(args, cfg))
+    except ValueError as exc:
+        raise SystemExit(str(exc))
+    return gate, profile
 
 
 def _fail(msg: str) -> int:
@@ -135,14 +167,66 @@ def cmd_init(args) -> int:
     return 0
 
 
+def _run_attempts(args, root, cfg_file, backend, gate, profile,
+                  author_budget, slots) -> int:
+    """Best-of-N: N identical-task agents in isolated worktrees (the session
+    machinery), a deterministic winner pick, and the losers reported rather
+    than hidden."""
+    if not args.yes:
+        return _fail("--attempts needs --yes: parallel agents cannot share "
+                     "one terminal prompt")
+    if args.push or args.pr or args.resume:
+        return _fail("--attempts cannot combine with --push/--pr/--resume "
+                     "(publish the winning branch afterwards)")
+    session = Session(
+        root / ".ledger" / "sessions" / f"{args.name}-attempts",
+        cfg=_plan_config(args, cfg_file), backend=backend,
+        gate=gate, profile=profile, max_author_attempts=author_budget)
+    specs = [AgentSpec(
+        name=f"attempt-{i + 1}", repo_root=root,
+        test_cmd=_test_cmd(args, cfg_file), task_text=args.task,
+        slots=slots,
+        context_files=args.context.split(",") if args.context else [])
+        for i in range(args.attempts)]
+    outcomes = session.run_parallel(specs,
+                                    max_workers=min(args.attempts, 4))
+    ranked = sorted(outcomes,
+                    key=lambda o: (not o.success, o.steps, o.name))
+    winner = ranked[0]
+    if args.json:
+        print(json.dumps({
+            "agent_version": AGENT_VERSION,
+            "task": args.task,
+            "attempts": [{"name": o.name, "success": o.success,
+                          "steps": o.steps, "incidents": o.incidents,
+                          "plan": o.plan, "error": o.error}
+                         for o in outcomes],
+            "winner": winner.name if winner.success else None,
+            "winner_journal": str(winner.journal_path)
+            if winner.success and winner.journal_path else None,
+            "session_journal": str(session.journal_path),
+        }))
+        return 0 if winner.success else 1
+    for o in ranked:
+        mark = "ok  " if o.success else "FAIL"
+        detail = o.error or f"{o.steps} steps, {o.incidents} incidents"
+        print(f"  {mark} {o.name}  {detail}")
+    if winner.success:
+        print(f"\nwinner:  {winner.name} "
+              f"({winner.steps} steps: {' -> '.join(winner.plan)})")
+        print(f"branch:  ledger/{winner.name} (in its episode worktree)")
+        print(f"journal: {winner.journal_path}")
+    else:
+        print("\nno attempt reached the goal")
+    print(f"session journal: {session.journal_path}")
+    return 0 if winner.success else 1
+
+
 def cmd_run(args) -> int:
     root = Path(args.repo).resolve()
     if not (root / ".git").exists():
         return _fail(f"{root} is not a git repository")
     cfg_file = _config(root)
-    episode_dir = Path(args.out).resolve() if args.out else \
-        root / ".ledger" / "episodes" / args.name
-    episode_dir.mkdir(parents=True, exist_ok=True)
 
     if args.slots:
         slots = args.slots.split(",")
@@ -155,8 +239,17 @@ def cmd_run(args) -> int:
     if backend is None:
         return _fail("run requires an LLM backend (--backend claude)")
     gate, profile = _gate_and_profile(args, cfg_file)
-    attempts = args.max_author_attempts if args.max_author_attempts is not None \
+    author_budget = args.max_author_attempts \
+        if args.max_author_attempts is not None \
         else int(cfg_file.get("max_author_attempts", DEFAULT_AUTHOR_ATTEMPTS))
+
+    if args.attempts and args.attempts > 1:
+        return _run_attempts(args, root, cfg_file, backend, gate, profile,
+                             author_budget, slots)
+
+    episode_dir = Path(args.out).resolve() if args.out else \
+        root / ".ledger" / "episodes" / args.name
+    episode_dir.mkdir(parents=True, exist_ok=True)
 
     from .executor import run_repo_episode
     ledger_dir = root / ".ledger"
@@ -164,13 +257,15 @@ def cmd_run(args) -> int:
     result, executor, journal_path = run_repo_episode(
         root, episode_dir, None, _test_cmd(args, cfg_file),
         cfg=_plan_config(args, cfg_file),
-        gate=gate, profile=profile, max_author_attempts=attempts,
+        gate=gate, profile=profile, max_author_attempts=author_budget,
         task_text=args.task, backend=backend,
         l2_path=str(ledger_dir / "l2.sqlite"),
         l3_cache_path=str(ledger_dir / "l3.sqlite"),
         slots=slots,
         context_files=args.context.split(",") if args.context else None,
-        push=args.push,
+        push=args.push, pr=args.pr, resume=args.resume,
+        hooks=cfg_file.get("hooks")
+        if isinstance(cfg_file.get("hooks"), list) else None,
     )
     if args.json:
         entries = Journal.read(str(journal_path))
@@ -303,6 +398,10 @@ def cmd_session(args) -> int:
     specs = []
     for item in raw:
         try:
+            agent_backend = None
+            if item.get("model"):
+                from .llm import ClaudeCLIBackend
+                agent_backend = ClaudeCLIBackend(model=str(item["model"]))
             specs.append(AgentSpec(
                 name=item["name"],
                 repo_root=Path(item.get("repo", args.repo)).resolve(),
@@ -310,8 +409,9 @@ def cmd_session(args) -> int:
                 task_text=item.get("task"),
                 slots=item.get("slots", ["a", "b"]),
                 context_files=item.get("context", []),
+                backend=agent_backend,
             ))
-        except (KeyError, ValueError) as exc:
+        except (KeyError, ValueError, RuntimeError) as exc:
             return _fail(f"bad agent entry {item!r}: {exc}")
 
     try:
@@ -335,6 +435,46 @@ def cmd_session(args) -> int:
     return 0 if all(o.success for o in outcomes) else 1
 
 
+_KNOWN_CONFIG_KEYS = frozenset({
+    "test_cmd", "planner", "profile", "slots", "max_author_attempts",
+    "policy", "hooks",
+})
+
+
+def _validate_config(path: Path) -> list[str]:
+    """Config linter (doctor): parse errors, unknown keys, bad shapes."""
+    problems: list[str] = []
+    try:
+        cfg = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return [f"config unreadable: {exc}"]
+    if not isinstance(cfg, dict):
+        return ["config must be a JSON object"]
+    for key in sorted(set(cfg) - _KNOWN_CONFIG_KEYS):
+        problems.append(f"unknown key {key!r} (ignored)")
+    if "profile" in cfg and cfg["profile"] not in GATED_RISKS:
+        problems.append(f"unknown profile {cfg['profile']!r} "
+                        f"(choose from {sorted(GATED_RISKS)})")
+    if "test_cmd" in cfg and not (
+            isinstance(cfg["test_cmd"], list) and cfg["test_cmd"]):
+        problems.append("test_cmd must be a non-empty list of strings")
+    if "hooks" in cfg:
+        if not isinstance(cfg["hooks"], list):
+            problems.append("hooks must be a list")
+        else:
+            for i, h in enumerate(cfg["hooks"]):
+                if not isinstance(h, dict) or not h.get("command"):
+                    problems.append(f"hooks[{i}] needs a command list")
+                elif h.get("event", "pre_action") not in ("pre_action",
+                                                         "post_action"):
+                    problems.append(f"hooks[{i}] event must be "
+                                    "pre_action or post_action")
+    policy = cfg.get("policy")
+    if policy is not None and not isinstance(policy, (dict, list)):
+        problems.append("policy must be an object or a rule list")
+    return problems
+
+
 def cmd_doctor(args) -> int:
     checks = []
     git = shutil.which("git")
@@ -345,6 +485,8 @@ def cmd_doctor(args) -> int:
     claude = shutil.which("claude")
     checks.append(("claude CLI", claude or "NOT FOUND (needed for run/chat)",
                    claude is not None))
+    gh = shutil.which("gh")
+    checks.append(("gh CLI", gh or "not found (only needed for --pr)", True))
     checks.append(("python", sys.version.split()[0], True))
     root = Path(args.repo).resolve()
     checks.append((f"repo {root.name}", "git repo" if (root / ".git").exists()
@@ -352,6 +494,13 @@ def cmd_doctor(args) -> int:
     cfg = root / ".ledger" / "config.json"
     checks.append((".ledger/config.json", "present" if cfg.exists()
                    else "missing (run: ledger init)", cfg.exists()))
+    if cfg.exists():
+        problems = _validate_config(cfg)
+        if problems:
+            for p in problems:
+                checks.append(("config lint", p, False))
+        else:
+            checks.append(("config lint", "clean", True))
     width = max(len(name) for name, _, _ in checks)
     ok = True
     for name, detail, good in checks:
@@ -543,6 +692,22 @@ def build_parser() -> argparse.ArgumentParser:
                    help="add a network-gated PushBranch action (pushes the "
                         "episode branch to origin; mention pushing in the "
                         "task so the goal compiler requires it)")
+    p.add_argument("--pr", action="store_true",
+                   help="add PushBranch + CreatePR actions (gh pr create; "
+                        "network-gated; mention the PR in the task)")
+    p.add_argument("--resume", action="store_true",
+                   help="re-enter an existing episode: reuse its worktree "
+                        "and branch, warm-start its graph, journal a new "
+                        "segment, refresh the authoring budget")
+    p.add_argument("--attempts", type=int, default=1,
+                   help="best-of-N: run N isolated attempts in parallel and "
+                        "report the winner (requires --yes)")
+    p.add_argument("--allow", default=None,
+                   help="comma-separated action families to pre-approve "
+                        "for this run (policy rule, journaled)")
+    p.add_argument("--deny", default=None,
+                   help="comma-separated action families to block for this "
+                        "run; outranks --yes and the profile")
     p.add_argument("--json", action="store_true",
                    help="print one JSON result object instead of the "
                         "human summary (journal remains the event stream)")

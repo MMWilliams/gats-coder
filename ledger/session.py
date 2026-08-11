@@ -56,6 +56,9 @@ class AgentSpec:
     goal: Props | None = None
     slots: list[str] | None = None
     context_files: list[str] = field(default_factory=list)
+    # Per-agent backend override (secondary-model economics: bind cheap
+    # models to fan-out work by declaration). None -> the session backend.
+    backend: object | None = None
 
     def __post_init__(self):
         if self.task_text is None and self.goal is None:
@@ -122,11 +125,16 @@ class Session:
     """A working session that can run many agents and pool what they learn."""
 
     def __init__(self, session_dir: Path | str, cfg: PlanConfig | None = None,
-                 backend=None):
+                 backend=None, gate=None, profile: str = "attended",
+                 max_author_attempts: int = 6):
         self.dir = Path(session_dir)
         self.dir.mkdir(parents=True, exist_ok=True)
         self.cfg = cfg or PlanConfig()
         self.backend = backend
+        from .executor import attended_gate
+        self.gate = gate or attended_gate
+        self.profile = profile
+        self.max_author_attempts = max_author_attempts
         self.graph_path = self.dir / "shared-graph.sqlite"
         self.l2_path = self.dir / "shared-l2.sqlite"
         self.l3_path = self.dir / "shared-l3.sqlite"
@@ -147,9 +155,12 @@ class Session:
         try:
             result, executor, journal_path = run_repo_episode(
                 spec.repo_root, episode_dir, spec.goal, spec.test_cmd,
-                cfg=self.cfg, task_text=spec.task_text, backend=self.backend,
+                cfg=self.cfg, task_text=spec.task_text,
+                backend=spec.backend or self.backend,
                 l2_path=str(private_l2), l3_cache_path=str(private_l3),
                 slots=spec.slots, context_files=spec.context_files,
+                gate=self.gate, profile=self.profile,
+                max_author_attempts=self.max_author_attempts,
             )
         except Exception as exc:
             return AgentOutcome(spec.name, False, [], 0, 0, 0, None, None,

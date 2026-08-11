@@ -108,6 +108,27 @@ def remote_branch_sensor(branch: str) -> Sensor:
                   cost_tier="cheap", probe=probe)
 
 
+def pr_sensor(branch: str) -> Sensor:
+    """Emits `repo.pr:<branch>` iff `gh pr view <branch>` says a PR exists.
+    Absent gh (or no PR yet) emits nothing -- unknown is never a guess."""
+    import shutil as _shutil
+    gh = _shutil.which("gh")
+
+    def probe(root: Path) -> set:
+        if gh is None:
+            return set()
+        try:
+            proc = subprocess.run([gh, "pr", "view", branch, "--json", "url"],
+                                  cwd=root, capture_output=True, text=True,
+                                  timeout=30)
+        except (OSError, subprocess.TimeoutExpired):
+            return set()
+        return {f"repo.pr:{branch}"} if proc.returncode == 0 else set()
+
+    return Sensor(name=f"pr[{branch}]", version="1",
+                  cost_tier="cheap", probe=probe)
+
+
 def budget_sensor(meter) -> Sensor:
     """Emits `budget.<resource>:ok` while the meter has headroom (design
     SS12.3). Exhaustion is the absence of the proposition -- actions whose

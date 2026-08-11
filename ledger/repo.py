@@ -61,5 +61,19 @@ class Worktree:
         git(dest, "checkout", "-B", branch)
         return cls(repo_root, dest, branch)
 
+    @classmethod
+    def reuse(cls, repo_root: Path | str, dest: Path | str,
+              branch: str) -> "Worktree":
+        """Re-enter an existing episode worktree (resume): applied patches,
+        commits, and untracked state are all still there. Only re-attaches;
+        never resets."""
+        repo_root, dest = Path(repo_root), Path(dest)
+        if not (dest / ".git").exists():
+            raise GitError(f"{dest} is not an existing worktree")
+        current = git(dest, "rev-parse", "--abbrev-ref", "HEAD").stdout.strip()
+        if current != branch:
+            git(dest, "checkout", "-B", branch)
+        return cls(repo_root, dest, branch)
+
     def remove(self) -> None:
         git(self.repo_root, "worktree", "remove", "--force", str(self.path))

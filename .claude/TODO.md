@@ -15,15 +15,18 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 - [ ] Decide on PyPI. Publishing `ledger-agent` would replace the version-pinned
       URL with a plain `pip install ledger-agent` and delete this whole section.
 
-## Product gaps (Codex-parity build order — see CODEX_PARITY.md scorecard)
+## Product gaps (combined build order — see CODEX_PARITY.md scorecard)
 
-- [ ] **PR creation.** `gh pr create` as a network-gated action on top of
-      the shipped PushBranch. Finishes the Git story vs `codex` cloud.
-- [ ] **Best-of-N via slots.** Author k candidate patches, RunSuite
-      arbitrates. The catalog supports it today; needs a strategy flag.
-- [ ] **OS-level sandbox** for RunSuite subprocesses (Job Objects on
-      Windows / bwrap on Linux). Top remaining table-stakes gap.
-- [ ] **Episode resume** — re-enter a failed episode with graph/L2 warm.
+- [ ] **OS-level sandbox** for skill subprocesses (Job Objects on Windows /
+      bwrap on Linux). The one table-stake every rival has some form of.
+- [ ] **OpenAI-compatible + local backends** (Ollama etc.) via the
+      `LLMBackend` protocol — one class per provider.
+- [ ] **MCP client** surfaced as contracted sensors/actions (never a free
+      tool loop).
+- [ ] **GitHub Action wrapper** around `ledger run --json` + PR auto-review.
+- [ ] **`ledger vis`** — static HTML render of a journal (plan, UCB tables,
+      gates/hooks, incidents).
+- [ ] HTTP hook type; nested-dir instruction files.
 - [ ] **L2 merge across agents.** Currently seeded read-only and not merged
       back, so parallel agents share structure but not learned dynamics.
       Blocked on the state-abstraction fix (DESIGN.md §12.8:
@@ -41,6 +44,27 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       AAMAS full paper: **Oct 8, 2026**.
 
 ---
+
+## Done (2026-08-10, fifth pass — v0.5.0 from the Claude Code + Kimi study)
+
+- [x] **Studied Claude Code (v2.1.219 docs) + Kimi (K3/K2.7-Code/Kimi Code
+      v0.34 docs)**; inventories + LEDGER mapping appended to CODEX_PARITY.md.
+      (Kimi naming note: no literal "K3 Coder" product — covered all three.)
+- [x] **Action hooks** — config-driven `pre_action` (gate-capable, fail
+      closed) + `post_action` commands, matched per family, journaled as
+      HOOK entries with output blobs, env: LEDGER_EVENT/ACTION/RISK/WORKTREE.
+- [x] **Ordered policy rules** — first-match allow/deny/ask with `reason`
+      journaled in GATE entries; `ask` forces a prompt even on ungated risks;
+      scope ladder --deny/--allow flags → config; deny outranks --yes.
+- [x] **Episode resume** (`--resume`) — worktree reuse, warm graph,
+      independent journal segments (episode.r2.jsonl…).
+- [x] **Best-of-N** (`--attempts N --yes`) — parallel isolated attempts via
+      the session layer, deterministic winner, losers reported.
+- [x] **CreatePR** (`--pr`) — gh-based PR action gated as network risk,
+      `gh pr view`-confirmed sensor, offline-tested with a stub gh.
+- [x] **Per-agent models in sessions** (`"model"` per agent spec) and
+      **doctor config lint** (unknown keys, bad profile, malformed hooks).
+      Tests 88 → 103.
 
 ## Done (2026-08-10, fourth pass — v0.4.0 wave 2)
 

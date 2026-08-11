@@ -1,6 +1,9 @@
-# CODEX_PARITY — what "rival Codex" means for LEDGER
+# CODEX_PARITY — what "rival the frontier agents" means for LEDGER
 
-Compiled 2026-08-10 from the official Codex docs/changelog (CLI v0.147.0 era).
+Compiled 2026-08-10 from the official Codex docs/changelog (CLI v0.147.0
+era). Extended the same day with studies of **Claude Code** (v2.1.219-era
+docs) and **Kimi** (K3 / K2.7-Code / Kimi Code CLI v0.34-era docs) — their
+sections and the combined scorecard are at the end of this file.
 Status column: **HAVE** (shipped in LEDGER), **PART** (partial),
 **GAP** (missing, worth building), **DESIGN** (LEDGER deliberately does it
 differently — the audit-first architecture is the product), **SCOPE**
@@ -103,10 +106,78 @@ is adopted *inside* that architecture or consciously skipped.
 11. Multimodal/web search — **GAP**
 12. Skills/plugins/hooks — **SCOPE**
 
-### Build order after v0.4.0
-1. PR creation (`gh pr create` as a network-gated action on top of
-   PushBranch) — finishes the Git story.
-2. Best-of-N via slots (author k candidates, RunSuite arbitrates).
-3. OS sandbox for RunSuite subprocesses (Job Objects on Windows).
-4. Episode resume (re-enter a failed episode with its graph/L2 warm).
-5. MCP sensors/actions.
+### Build order after v0.4.0 — status as of v0.5.0
+1. ~~PR creation~~ — **SHIPPED v0.5.0** (`--pr`: CreatePR via `gh`,
+   network-gated, `gh pr view`-confirmed sensor).
+2. ~~Best-of-N~~ — **SHIPPED v0.5.0** (`--attempts N`: parallel isolated
+   attempts via the session layer, deterministic winner pick).
+3. OS sandbox for RunSuite subprocesses — still open.
+4. ~~Episode resume~~ — **SHIPPED v0.5.0** (`--resume`: worktree reuse,
+   warm graph, journal segments that verify independently).
+5. MCP sensors/actions — still open.
+
+---
+
+# Claude Code study (docs v2.1.219-era)
+
+| Claude Code capability | LEDGER status | Notes |
+|---|---|---|
+| Permission rules (allow/deny/ask) + modes | **HAVE (v0.5.0)** | Ordered policy rules with `ask` decisions and journaled reasons; scope ladder: `--deny`/`--allow` flags (invocation) → config (project). Deny outranks `--yes`. |
+| Hooks (PreToolUse/PostToolUse …) | **HAVE (v0.5.0)** | `pre_action` (gate-capable: nonzero exit blocks, fail closed) + `post_action`, matched by action family, journaled as HOOK entries with output blobs. Command hooks only — HTTP/MCP/prompt hook types not yet. |
+| CLAUDE.md hierarchy + imports | HAVE | AGENTS.md/LEDGER.md/CLAUDE.md, global `~/.ledger` + repo root layering. Nested-dir + imports: open. |
+| Auto memory (agent-written) | DESIGN | LEDGER's memory is *mined from the journal* (L2), never self-narrated — learned dynamics instead of learned prose. |
+| OS sandbox (FS/network for Bash) | GAP | Top remaining gap, all three rivals have some form. |
+| Headless `-p` + json/stream-json | HAVE | `--json` result object; the hash-chained journal *is* the stream (tail the .jsonl). |
+| Session resume/fork/checkpoints | PART | Episode `--resume` shipped; conversation forking N/A by design (the planner has no conversation); worktree+git = code checkpoints. |
+| Subagents (isolated context, per-agent model) | **HAVE (v0.5.0)** | Session agents now take per-agent backends (`"model"` in the spec). |
+| Dynamic workflows (script orchestration) | DESIGN | The deterministic planner + session fan-out is LEDGER's orchestration; a script layer would just be a second planner. |
+| Skills / plugins / marketplaces | SCOPE | |
+| MCP client/server | GAP | |
+| GitHub Action + @claude PR review | GAP | `--json` + exit codes make CI wiring trivial; the action wrapper is packaging work. |
+| Checkpoint/rewind (Esc-Esc) | DESIGN | Episode branches are disposable; `git reset` on the episode branch is the rewind. |
+| /doctor with config validation | **HAVE (v0.5.0)** | doctor lints config.json: unknown keys, bad profile, malformed hooks/policy. |
+
+# Kimi study (K3 / K2.7-Code / Kimi Code CLI v0.34-era)
+
+Naming note: there is no product literally called "Kimi K3 Coder" — the
+study covers Kimi K3 (open-weight flagship), K2.7-Code (coding model), and
+Kimi Code CLI (the agent).
+
+| Kimi capability | LEDGER status | Notes |
+|---|---|---|
+| Scoped permission rules with `reason` audit field | **HAVE (v0.5.0)** | First-match ordered rules; the firing rule's reason lands in the GATE journal entry. |
+| Hooks as gates (PreToolUse …) | **HAVE (v0.5.0)** | Same engine as above. |
+| `[loop_control]` step/attempt caps | HAVE | Planner max_steps + author budget → escalation. |
+| AGENTS.md + kimi.md memory hierarchy | HAVE | Layered instructions; journal-mined L2 as memory. |
+| Secondary-model economics (per-subagent models) | **HAVE (v0.5.0)** | `"model"` per session agent spec. |
+| Agent Swarm / PARL (RL-trained orchestrator) | ROADMAP | LEDGER's §14 RL roadmap trains *skills* under sensor rewards; orchestration stays deterministic on purpose. |
+| WebBridge (user's own browser via CDP) / Computer Use plugin | SCOPE | Not expressible as verifiable contracts yet. |
+| Native video input in the coding loop | SCOPE | Backend-dependent. |
+| Conversational MCP setup, plugin marketplace | GAP/SCOPE | With MCP. |
+| Session export / `kimi vis` run visualizer | PART | Journals are plain JSONL (exportable today); an HTML run visualizer is a natural `ledger vis`. |
+| Open weights / protocol-agnostic backends | PART | `LLMBackend` protocol is model-agnostic; only the claude CLI backend is implemented — an OpenAI-compatible/local backend is a small add. |
+| doctor config validation | **HAVE (v0.5.0)** | |
+
+# Combined table-stakes (union of all three studies)
+
+1. OS-enforced sandbox — **GAP** (the one every rival has in some form)
+2. Graduated autonomy + policy rules + hooks — **HAVE (v0.5.0)**
+3. Layered instruction files — **HAVE**
+4. Headless CI (`--json`, exit codes, event stream) — **HAVE**
+5. Session/episode resume — **HAVE (v0.5.0)** (episode-level)
+6. MCP — **GAP**
+7. Git depth (review ✓ push ✓ PR ✓; @mention auto-review ✗) — **HAVE-** 
+8. Parallel subagents w/ per-agent models — **HAVE (v0.5.0)**
+9. Test-iterate with hard evidence — **HAVE+** (differentiator)
+10. Model controls (picker ✓; effort dial ✗; alt providers ✗) — **PART**
+11. Best-of-N — **HAVE (v0.5.0)**
+12. Extensibility (hooks ✓; skills/plugins ✗) — **PART**
+
+### Build order after v0.5.0
+1. OS sandbox for skill subprocesses (Job Objects / bwrap).
+2. OpenAI-compatible + local (Ollama) backends via `LLMBackend`.
+3. MCP client surfaced as contracted sensors/actions.
+4. GitHub Action wrapper (`ledger run --json` in CI) + PR auto-review.
+5. `ledger vis` — static HTML render of a journal (plan, UCB tables,
+   gates, incidents).
+6. HTTP hook type; nested-dir instruction files.
