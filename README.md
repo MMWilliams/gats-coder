@@ -11,7 +11,7 @@ incident rather than a state transition. Every episode replays bit-exact.
 
 ```
 pip install -e .[dev]
-pytest                      # 60 tests
+pytest                      # 82 tests
 python -m ledger.cli demo   # paper's 100-task suite: SR / optimality / calls / variance
 ```
 
@@ -21,12 +21,36 @@ python -m ledger.cli demo   # paper's 100-task suite: SR / optimality / calls / 
 ledger doctor                       # check git, claude CLI, repo, config
 ledger init                         # write .ledger/config.json
 ledger run "fix the failing test"   # plan, author a patch, apply, verify, commit
+ledger run "..." --yes              # unattended: pre-approve gated actions
+ledger review                       # LLM review of your working-tree diff
 ledger status .ledger/episodes/episode/episode.jsonl
 ```
 
 `run` needs an LLM backend for the patch-authoring skill and the goal
 compiler (`--backend claude` uses the local `claude` CLI). The planner itself
-makes zero model calls.
+makes zero model calls. Patch prompts carry the failing suite output, a
+deterministic selection of relevant files (no embeddings — same repo state,
+same files), and the repo's `AGENTS.md` / `LEDGER.md` instructions if present.
+
+## Autonomy profiles (risk gates)
+
+Every action carries a declared risk class; the profile decides which classes
+stop for approval at *execution* (search may still plan through them):
+
+| profile | stops on |
+|---|---|
+| `attended` (default) | write, exec, network, irreversible |
+| `supervised` | network, irreversible |
+| `autonomous` | irreversible |
+
+`--profile` (or `profile` in `.ledger/config.json`) selects one; `--yes`
+pre-approves everything for unattended runs. A denial is not a crash: it is
+journaled, observed as a non-effect, and the planner routes around it. If no
+route remains, the episode ends with a journaled `ESCALATION` (reason:
+`gate_denied`, `budget_exhausted`, `max_steps`, or `no_path`). Patch
+authoring is metered per episode (`--max-author-attempts`, default 6) — a
+persistently failing model exhausts its budget and escalates instead of
+looping.
 
 ## Talking to it
 
@@ -84,17 +108,22 @@ confidence per arm — not a model's after-the-fact explanation of itself.
 
 ## Status
 
-**M3 + patch authoring.** Core port (M1), real-repo execution layer (M2:
-worktree sandbox, skills, fingerprint-memoized sensors, GATE/EXEC journaling,
-lie-detection INCIDENTs), learned/generative layers (M3: journal-mined L2,
-pluggable L3 with an Eq. 8 cache that drives planning calls to zero on repeat
-episodes, goal compiler), plus the LLM patch-authoring skill and the
-multi-agent session layer.
+**M4.** Core port (M1), real-repo execution layer (M2: worktree sandbox,
+skills, fingerprint-memoized sensors, GATE/EXEC journaling, lie-detection
+INCIDENTs), learned/generative layers (M3: journal-mined L2, pluggable L3
+with an Eq. 8 cache that drives planning calls to zero on repeat episodes,
+goal compiler), the LLM patch-authoring skill, the multi-agent session
+layer, and M4: autonomy profiles with risk gates, survivable denials,
+journaled escalation, and per-episode authoring budgets.
 
 Authored diffs are validated with `git apply --check` before they are allowed
 into the queue, so a malformed or hallucinated patch produces a plain
 non-effect the planner re-plans around rather than a corrupted worktree.
 
+`CODEX_PARITY.md` maps LEDGER against the OpenAI Codex capability set —
+what's matched, what's next (PR flow, AGENTS.md hierarchy, `--json` output,
+OS-level sandboxing), and what LEDGER deliberately does differently.
+
 Milestones (DESIGN.md §13/§14.7): M1 core → M2 executor/sandbox/divergence →
-M3 L2/L3/goal compiler → **M4 risk gates** (next) → M5 eval harness → M6–M9
+M3 L2/L3/goal compiler → M4 risk gates → **M5 eval harness** (next) → M6–M9
 RL roadmap.

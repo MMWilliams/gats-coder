@@ -15,23 +15,25 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 - [ ] Decide on PyPI. Publishing `ledger-agent` would replace the version-pinned
       URL with a plain `pip install ledger-agent` and delete this whole section.
 
-## Product gaps
+## Product gaps (Codex-parity build order — see CODEX_PARITY.md scorecard)
 
-- [ ] **M4 risk gates.** `attended_gate` approves everything. Needed: policy
-      gates, dead-end persistence, human escalation. Until this lands, the
-      product page's "run it on branches you're willing to throw away" warning
-      is load-bearing.
-- [ ] **Per-episode attempt budget for `AuthorPatchSkill`.** A persistently
-      failing model burns calls with no ceiling. DESIGN.md §12.3 wants this
-      surfaced as a budget proposition that forces escalation.
-- [ ] **Multi-slot authoring is untested** with more than one slot in a single
-      episode. The catalog supports it; nothing exercises it.
+- [ ] **PR flow.** `gh` push/PR-create as `risk="network"` catalog actions —
+      the gates already model it. Completes the Git story vs `codex` cloud.
+- [ ] **AGENTS.md hierarchy.** Root-level file ships in 0.3.0; global
+      (`~/.ledger/AGENTS.md`) + nested-dir layering (closest wins) pending.
+- [ ] **`ledger run --json`.** Structured final output (END record +
+      escalation) for CI; the journal already is the event stream.
+- [ ] **Best-of-N via slots.** Author k candidate patches, RunSuite
+      arbitrates. The catalog supports it today; needs a strategy flag.
+- [ ] **OS-level sandbox** for RunSuite subprocesses (Job Objects on
+      Windows / bwrap on Linux). Top remaining table-stakes gap.
 - [ ] **L2 merge across agents.** Currently seeded read-only and not merged
       back, so parallel agents share structure but not learned dynamics.
       Blocked on the state-abstraction fix (DESIGN.md §12.8:
       `repo.branch:ledger/<episode>` makes state keys episode-unique).
-- [ ] `ledger session` has no live-backend test either — the parallel tests use
+- [ ] `ledger session` has no live-backend test — the parallel tests use
       pre-queued patches and no LLM.
+- [ ] Secret redaction in journaled command output blobs.
 
 ## Research
 
@@ -43,6 +45,29 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       AAMAS full paper: **Oct 8, 2026**.
 
 ---
+
+## Done (2026-08-10, third pass — v0.3.0 "rival Codex" hardening)
+
+- [x] **CODEX_PARITY.md** — full Codex CLI v0.147-era capability inventory
+      (researched from official docs) mapped to LEDGER: have / partial / gap /
+      different-by-design, with the ranked build order above.
+- [x] **M4 risk gates** — PolicyGate profiles (attended/supervised/autonomous),
+      per-family approval memory, `--yes`, fail-closed without a TTY. A denial
+      is a journaled observation the planner routes around; failed episodes end
+      in a journaled ESCALATION with reason.
+- [x] **Author budget (§12.3)** — BudgetMeter + budget sensor; AuthorPatch
+      requires `budget.llm:ok`; exhaustion escalates instead of looping.
+- [x] **Evidence-driven authoring** — failing-suite tail, deterministic
+      auto-context selection, and AGENTS.md/LEDGER.md instructions in patch
+      prompts (and chat/review).
+- [x] **CLI** — config.json actually read (test_cmd/planner/profile/slots/
+      max_author_attempts, flags win); `ledger review` (working tree/staged/
+      range, journalable); status prints denials + escalation.
+- [x] **Multi-slot exercised** — two-bug iterative episode + forced
+      both-slots-applied episode. Tests 60 → 82, all green.
+- [x] **Live-verified** — two-bug repo: one authored patch fixed both files,
+      honored AGENTS.md one-liner rule, replay bit-exact, chain intact;
+      `ledger review` caught a planted divisor bug with concrete failures.
 
 ## Done (2026-08-10, second pass)
 
