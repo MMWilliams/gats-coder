@@ -34,6 +34,52 @@ def test_table_alignment_plain():
     assert lines[1].index("10") == lines[2].index("3")  # columns align
 
 
+def test_windows_vt_enable_uses_a_pointer_sized_handle():
+    """Regression: ctypes defaults GetStdHandle's restype to C int, which
+    truncates the 64-bit console handle so every console call fails and
+    colour is reported unsupported -- the bug that made the styled UI
+    silently degrade to plain text in a normal terminal."""
+    import sys as _sys
+    if _sys.platform != "win32":
+        return
+    import ctypes
+    from ctypes import wintypes
+    ui._enable_windows_vt()                      # declares the signatures
+    k32 = ctypes.windll.kernel32
+    assert k32.GetStdHandle.restype is wintypes.HANDLE
+    assert ctypes.sizeof(wintypes.HANDLE) == ctypes.sizeof(ctypes.c_void_p)
+
+
+def test_color_env_overrides(monkeypatch):
+    monkeypatch.setenv("LEDGER_COLOR", "0")
+    assert ui._detect_color() is False
+    monkeypatch.setenv("LEDGER_COLOR", "1")
+    assert ui._detect_color() is True           # forced on even off-TTY
+    monkeypatch.delenv("LEDGER_COLOR")
+    monkeypatch.setenv("NO_COLOR", "1")
+    assert ui._detect_color() is False
+
+
+def test_diagnostics_explain_the_current_console():
+    rows = ui.diagnostics()
+    labels = [label for label, _, _ in rows]
+    assert labels == ["colour", "glyphs", "interactive UI"]
+    why = dict((label, detail) for label, detail, _ in rows)["colour"]
+    # Whatever the reason, it must NAME it -- "the UI looks different here"
+    # has to be answerable from `ledger doctor` alone.
+    assert any(cause in why for cause in
+               ("not a terminal", "NO_COLOR", "LEDGER_COLOR",
+                "refused ANSI", "ANSI enabled"))
+
+
+def test_no_color_is_reported_by_name(monkeypatch):
+    monkeypatch.setenv("NO_COLOR", "1")
+    monkeypatch.delenv("LEDGER_COLOR", raising=False)
+    monkeypatch.setattr(ui, "COLOR", ui._detect_color())
+    why = dict((label, detail) for label, detail, _ in ui.diagnostics())
+    assert "NO_COLOR is set" in why["colour"]
+
+
 def test_headline_and_next_steps():
     assert "reached" in ui.headline(True, "reached", "nope")
     steps = ui.next_steps("ledger status x", "ledger why x 0")

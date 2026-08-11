@@ -22,19 +22,47 @@ _CODES = {
 
 
 def _enable_windows_vt() -> bool:
+    """Turn on ANSI processing for this console. Returns whether escapes
+    will actually render."""
     if os.name != "nt":
         return True
     try:
         import ctypes
+        from ctypes import wintypes
         kernel32 = ctypes.windll.kernel32
-        handle = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
-        mode = ctypes.c_uint32()
+        # Declare the signatures: HANDLE is pointer-sized, and ctypes
+        # defaults an undeclared restype to C int -- which SILENTLY
+        # truncates the handle on 64-bit Windows, making every subsequent
+        # console call fail and colour look "unsupported".
+        kernel32.GetStdHandle.restype = wintypes.HANDLE
+        kernel32.GetStdHandle.argtypes = [wintypes.DWORD]
+        kernel32.GetConsoleMode.argtypes = [wintypes.HANDLE,
+                                            ctypes.POINTER(wintypes.DWORD)]
+        kernel32.SetConsoleMode.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+
+        handle = kernel32.GetStdHandle(wintypes.DWORD(-11 & 0xFFFFFFFF))
+        if not handle or handle == wintypes.HANDLE(-1).value:
+            return False
+        mode = wintypes.DWORD()
         if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
             return False
-        # ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
-        return bool(kernel32.SetConsoleMode(handle, mode.value | 0x0004))
+        VT = 0x0004  # ENABLE_VIRTUAL_TERMINAL_PROCESSING
+        if mode.value & VT:
+            return True                      # already on (Windows Terminal)
+        return bool(kernel32.SetConsoleMode(handle, mode.value | VT))
     except Exception:
         return False
+
+
+def _terminal_declares_ansi() -> bool:
+    """Environment signals from terminals that always speak ANSI, used when
+    the console API is unavailable (e.g. output through a pty shim)."""
+    return bool(os.environ.get("WT_SESSION")          # Windows Terminal
+                or os.environ.get("ConEmuANSI") == "ON"
+                or os.environ.get("ANSICON")
+                or os.environ.get("TERM_PROGRAM")
+                or (os.environ.get("TERM", "") not in ("", "dumb")
+                    and os.name != "nt"))
 
 
 def _detect_color() -> bool:
@@ -42,7 +70,8 @@ def _detect_color() -> bool:
     if override == "0":
         return False
     if override == "1":
-        return _enable_windows_vt() or True
+        _enable_windows_vt()
+        return True
     if os.environ.get("NO_COLOR") is not None:
         return False
     if os.environ.get("TERM") == "dumb":
@@ -52,7 +81,7 @@ def _detect_color() -> bool:
             return False
     except (AttributeError, ValueError):
         return False
-    return _enable_windows_vt()
+    return _enable_windows_vt() or _terminal_declares_ansi()
 
 
 def _detect_unicode() -> bool:
@@ -62,6 +91,34 @@ def _detect_unicode() -> bool:
 
 COLOR = _detect_color()
 UNICODE = _detect_unicode()
+
+
+def diagnostics() -> list[tuple[str, str, bool]]:
+    """(label, detail, healthy) rows explaining what this console got and
+    why -- so 'the UI looks different in my terminal' is answerable."""
+    try:
+        tty = sys.stdout.isatty()
+    except (AttributeError, ValueError):
+        tty = False
+    enc = getattr(sys.stdout, "encoding", None) or "unknown"
+    forced = os.environ.get("LEDGER_COLOR")
+    if COLOR:
+        why = "forced by LEDGER_COLOR=1" if forced == "1" else "ANSI enabled"
+    elif forced == "0":
+        why = "off: LEDGER_COLOR=0"
+    elif os.environ.get("NO_COLOR") is not None:
+        why = "off: NO_COLOR is set"
+    elif not tty:
+        why = "off: output is not a terminal (piped or redirected)"
+    else:
+        why = "off: this console refused ANSI (try LEDGER_COLOR=1)"
+    return [
+        ("colour", why, COLOR),
+        ("glyphs", f"{'unicode' if UNICODE else 'ascii fallback'} "
+                   f"(encoding {enc})", UNICODE),
+        ("interactive UI", "framed input + autocomplete" if (COLOR and tty)
+         else "plain prompt (needs a terminal with colour)", COLOR and tty),
+    ]
 
 # Glyphs degrade to ASCII when the console encoding can't carry them.
 OK = "✓" if UNICODE else "+"          # check mark

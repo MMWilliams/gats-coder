@@ -525,6 +525,14 @@ def cmd_chat(args) -> int:
             print(conv.ask(args.ask))
             return 0
         from . import tui
+        if not tui.interactive() and sys.stdout.isatty():
+            # A terminal that could be styled but isn't: say why, once,
+            # instead of silently looking broken.
+            reasons = {label: detail for label, detail, ok
+                       in ui.diagnostics() if not ok}
+            if "colour" in reasons:
+                print(ui.dim(f"styled UI off ({reasons['colour']}) — "
+                             "set LEDGER_COLOR=1 to force it on"))
         if tui.interactive():
             profile = getattr(args, "profile", None) \
                 or cfg_file.get("profile", "attended")
@@ -740,6 +748,7 @@ def cmd_doctor(args) -> int:
                 checks.append(("config lint", p, False))
         else:
             checks.append(("config lint", "clean", True))
+    checks.extend(ui.diagnostics())
     width = max(len(name) for name, _, _ in checks)
     ok = True
     for name, detail, good in checks:
