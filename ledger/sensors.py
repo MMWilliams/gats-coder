@@ -95,6 +95,19 @@ def test_status_sensor(cache: ExpensiveResultCache,
                   cost_tier="expensive", probe=probe)
 
 
+def remote_branch_sensor(branch: str) -> Sensor:
+    """Emits `repo.pushed:<branch>` iff origin actually has the branch --
+    the push skill's claim is confirmed by asking the remote, never by
+    trusting the exit code alone."""
+
+    def probe(root: Path) -> set:
+        out = _git(root, "ls-remote", "--heads", "origin", branch)
+        return {f"repo.pushed:{branch}"} if out else set()
+
+    return Sensor(name=f"remote_branch[{branch}]", version="1",
+                  cost_tier="cheap", probe=probe)
+
+
 def budget_sensor(meter) -> Sensor:
     """Emits `budget.<resource>:ok` while the meter has headroom (design
     SS12.3). Exhaustion is the absence of the proposition -- actions whose

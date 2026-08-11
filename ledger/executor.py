@@ -63,15 +63,40 @@ class BudgetMeter:
         return f"budget.{self.resource}:ok"
 
 
+# Credential shapes scrubbed from journaled evidence. The journal is meant
+# to be shared (bug reports, audits); tokens that leak into command output
+# must not outlive the run.
+_SECRET_PATTERNS = [
+    (re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----.*?"
+                r"-----END [A-Z ]*PRIVATE KEY-----", re.DOTALL),
+     "[REDACTED PRIVATE KEY]"),
+    (re.compile(r"(?i)(bearer\s+)[a-z0-9_.=+/-]{16,}"), r"\1[REDACTED]"),
+    (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b"), "[REDACTED]"),
+    (re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b"), "[REDACTED]"),
+    (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[REDACTED]"),
+    (re.compile(r"(?i)((?:api[_-]?key|access[_-]?token|auth[_-]?token|"
+                r"secret|password|passwd)\s*[=:]\s*)[^\s'\"]{8,}"),
+     r"\1[REDACTED]"),
+]
+
+
+def redact_secrets(text: str) -> str:
+    for pattern, replacement in _SECRET_PATTERNS:
+        text = pattern.sub(replacement, text)
+    return text
+
+
 class BlobStore:
-    """Content-addressed store for execution evidence (design SS9.1)."""
+    """Content-addressed store for execution evidence (design SS9.1).
+    Content is secret-redacted before hashing, so the stored blob and its
+    address agree and neither retains credentials."""
 
     def __init__(self, directory: Path):
         self.directory = Path(directory)
         self.directory.mkdir(parents=True, exist_ok=True)
 
     def put(self, content: str) -> str:
-        data = content.encode("utf-8", errors="replace")
+        data = redact_secrets(content).encode("utf-8", errors="replace")
         sha = hashlib.sha256(data).hexdigest()
         path = self.directory / f"{sha}.txt"
         if not path.exists():
@@ -134,7 +159,7 @@ class RunSuiteSkill:
             bucket = fail_bucket(int(m.group(1))) if m else "1-5"
             props = {f"tests.fail_count:{self.suite}:{bucket}"}
             claims = [f"{self.suite} suite failing ({bucket})"]
-            tail = (proc.stdout + proc.stderr)[-4000:]
+            tail = redact_secrets((proc.stdout + proc.stderr)[-4000:])
             ctx.suite_evidence[self.suite] = {"tail": tail, "sha": rec["out"]}
         ctx.test_cache.put(content_fingerprint(ctx.worktree), props)
         return SkillResult(ok=proc.returncode == 0,
@@ -181,6 +206,25 @@ class CommitSkill:
                                    commands=recs)
         return SkillResult(ok=True, claimed_props=frozenset({"repo.clean"}),
                            claims=[f"committed: {self.message}"], commands=recs)
+
+
+class PushBranchSkill:
+    """Pushes the episode branch to origin. risk='network': supervised and
+    attended profiles stop here — publishing is the boundary where a wrong
+    patch stops being free to undo."""
+
+    def __init__(self, branch: str):
+        self.branch = branch
+
+    def run(self, ctx: ExecContext) -> SkillResult:
+        proc, rec = _run_cmd(ctx, ["git", "push", "origin", self.branch])
+        if proc.returncode != 0:
+            return SkillResult(ok=False, claims=["push failed"],
+                               commands=[rec])
+        return SkillResult(
+            ok=True,
+            claimed_props=frozenset({f"repo.pushed:{self.branch}"}),
+            claims=[f"pushed {self.branch} to origin"], commands=[rec])
 
 
 # gate(action_name, risk) -> bool (approve). Design SS8.1: gates fire at
@@ -335,6 +379,7 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                      context_files: list[str] | None = None,
                      profile: str = "attended",
                      max_author_attempts: int = 6,
+                     push: bool = False,
                      ) -> tuple[EpisodeResult, RepoExecutor, Path]:
     """End-to-end journaled episode on a real repo (M2/M3).
 
@@ -360,6 +405,16 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         catalog = build_authoring_catalog(sorted(slots))
     else:
         catalog = build_coding_catalog(patch_ids)
+
+    branch = f"ledger/{episode_dir.name}"
+    if push:
+        # Publishing is a separate, network-risk action: reachable only from
+        # a clean (committed) worktree, gated under attended/supervised.
+        catalog = Catalog(list(catalog) + [Action(
+            "PushBranch",
+            prec=frozenset({"repo.clean"}),
+            add=frozenset({f"repo.pushed:{branch}"}),
+            risk="network", deterministic=False)])
 
     goal_extra: dict = {}
     if task_text is not None:
@@ -387,6 +442,9 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         from .sensors import budget_sensor
         meter = BudgetMeter(max_author_attempts, resource="llm")
         sensor_list.append(budget_sensor(meter))
+    if push:
+        from .sensors import remote_branch_sensor
+        sensor_list.append(remote_branch_sensor(branch))
     sensors = SensorBank(sensor_list)
     ctx = ExecContext(worktree=worktree.path,
                       blobs=BlobStore(episode_dir / "blobs"),
@@ -397,6 +455,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         "Commit": CommitSkill("ledger: apply queued fix"),
         **{f"ApplyPatch:{pid}": ApplyPatchSkill(pid) for pid in patch_ids},
     }
+    if push:
+        skills["PushBranch"] = PushBranchSkill(branch)
     if slots:
         for slot in sorted(slots):
             skills[f"AuthorPatch:{slot}"] = AuthorPatchSkill(

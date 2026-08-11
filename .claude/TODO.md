@@ -17,23 +17,19 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 
 ## Product gaps (Codex-parity build order — see CODEX_PARITY.md scorecard)
 
-- [ ] **PR flow.** `gh` push/PR-create as `risk="network"` catalog actions —
-      the gates already model it. Completes the Git story vs `codex` cloud.
-- [ ] **AGENTS.md hierarchy.** Root-level file ships in 0.3.0; global
-      (`~/.ledger/AGENTS.md`) + nested-dir layering (closest wins) pending.
-- [ ] **`ledger run --json`.** Structured final output (END record +
-      escalation) for CI; the journal already is the event stream.
+- [ ] **PR creation.** `gh pr create` as a network-gated action on top of
+      the shipped PushBranch. Finishes the Git story vs `codex` cloud.
 - [ ] **Best-of-N via slots.** Author k candidate patches, RunSuite
       arbitrates. The catalog supports it today; needs a strategy flag.
 - [ ] **OS-level sandbox** for RunSuite subprocesses (Job Objects on
       Windows / bwrap on Linux). Top remaining table-stakes gap.
+- [ ] **Episode resume** — re-enter a failed episode with graph/L2 warm.
 - [ ] **L2 merge across agents.** Currently seeded read-only and not merged
       back, so parallel agents share structure but not learned dynamics.
       Blocked on the state-abstraction fix (DESIGN.md §12.8:
       `repo.branch:ledger/<episode>` makes state keys episode-unique).
 - [ ] `ledger session` has no live-backend test — the parallel tests use
       pre-queued patches and no LLM.
-- [ ] Secret redaction in journaled command output blobs.
 
 ## Research
 
@@ -45,6 +41,18 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       AAMAS full paper: **Oct 8, 2026**.
 
 ---
+
+## Done (2026-08-10, fourth pass — v0.4.0 wave 2)
+
+- [x] **`ledger run --json`** — one structured result object for CI (goal,
+      plan, incidents, denials, escalation, journal path) + exit code.
+- [x] **AGENTS.md layering** — `~/.ledger/AGENTS.md` global + repo root,
+      concatenated global→local so the closer file wins.
+- [x] **Secret redaction** — bearer/API tokens, GitHub/AWS keys, private-key
+      blocks scrubbed from blobs and suite evidence before content-addressing.
+- [x] **PushBranch** — `--push` adds a network-risk action (prec repo.clean);
+      `ls-remote`-backed sensor confirms origin actually has the branch;
+      supervised/attended deny it without a human. Tests 82 → 88.
 
 ## Done (2026-08-10, third pass — v0.3.0 "rival Codex" hardening)
 

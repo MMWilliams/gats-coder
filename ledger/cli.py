@@ -20,6 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from . import AGENT_VERSION
 from .chat import Conversation, repl
 from .executor import GATED_RISKS, PolicyGate, attended_gate
 from .graph import TransitionGraph
@@ -169,7 +170,28 @@ def cmd_run(args) -> int:
         l3_cache_path=str(ledger_dir / "l3.sqlite"),
         slots=slots,
         context_files=args.context.split(",") if args.context else None,
+        push=args.push,
     )
+    if args.json:
+        entries = Journal.read(str(journal_path))
+        header = entries[0] if entries and entries[0]["t"] == "HEADER" else {}
+        esc = next((e for e in reversed(entries)
+                    if e["t"] == "ESCALATION"), None)
+        print(json.dumps({
+            "agent_version": AGENT_VERSION,
+            "task": args.task,
+            "goal": header.get("goal", []),
+            "success": result.success,
+            "plan": result.plan,
+            "steps": result.steps,
+            "profile": profile,
+            "incidents": executor.incidents,
+            "denials": executor.denials,
+            "llm_planning_calls": result.llm_planning_calls,
+            "escalation": esc.get("reason") if esc else None,
+            "journal": str(journal_path),
+        }))
+        return 0 if result.success else 1
     print(f"goal:      {'reached' if result.success else 'NOT reached'}")
     print(f"plan:      {' -> '.join(result.plan) or '(empty)'}")
     print(f"steps:     {result.steps}")
@@ -517,6 +539,13 @@ def build_parser() -> argparse.ArgumentParser:
                    type=int, default=None,
                    help="LLM patch-authoring budget for the episode "
                         f"(default: config, then {DEFAULT_AUTHOR_ATTEMPTS})")
+    p.add_argument("--push", action="store_true",
+                   help="add a network-gated PushBranch action (pushes the "
+                        "episode branch to origin; mention pushing in the "
+                        "task so the goal compiler requires it)")
+    p.add_argument("--json", action="store_true",
+                   help="print one JSON result object instead of the "
+                        "human summary (journal remains the event stream)")
     add_backend(p)
     p.set_defaults(fn=cmd_run)
 

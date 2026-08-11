@@ -11,7 +11,7 @@ incident rather than a state transition. Every episode replays bit-exact.
 
 ```
 pip install -e .[dev]
-pytest                      # 82 tests
+pytest                      # 88 tests
 python -m ledger.cli demo   # paper's 100-task suite: SR / optimality / calls / variance
 ```
 
@@ -22,6 +22,8 @@ ledger doctor                       # check git, claude CLI, repo, config
 ledger init                         # write .ledger/config.json
 ledger run "fix the failing test"   # plan, author a patch, apply, verify, commit
 ledger run "..." --yes              # unattended: pre-approve gated actions
+ledger run "..." --json             # CI: one JSON result object + exit code
+ledger run "... and push" --push    # adds a network-gated PushBranch action
 ledger review                       # LLM review of your working-tree diff
 ledger status .ledger/episodes/episode/episode.jsonl
 ```
@@ -30,7 +32,10 @@ ledger status .ledger/episodes/episode/episode.jsonl
 compiler (`--backend claude` uses the local `claude` CLI). The planner itself
 makes zero model calls. Patch prompts carry the failing suite output, a
 deterministic selection of relevant files (no embeddings — same repo state,
-same files), and the repo's `AGENTS.md` / `LEDGER.md` instructions if present.
+same files), and layered `AGENTS.md` / `LEDGER.md` instructions
+(`~/.ledger/AGENTS.md` first, repo root second — the closer file wins).
+Journaled command output is secret-redacted (bearer/API tokens, GitHub/AWS
+keys, private-key blocks) before it is content-addressed.
 
 ## Autonomy profiles (risk gates)
 

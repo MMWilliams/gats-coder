@@ -52,17 +52,32 @@ repository test tests suite
 """.split())
 
 
-def project_instructions(root: Path, max_chars: int = 8000) -> str:
-    """Repo-provided standing instructions, Codex-style: the first of
-    AGENTS.md / LEDGER.md / CLAUDE.md found at the repo root."""
+def _first_instruction_file(directory: Path) -> str:
     for name in ("AGENTS.md", "LEDGER.md", "CLAUDE.md"):
-        f = Path(root) / name
+        f = directory / name
         if f.is_file():
             try:
-                return f.read_text(encoding="utf-8", errors="replace")[:max_chars]
+                return f.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
     return ""
+
+
+def project_instructions(root: Path, max_chars: int = 8000,
+                         home: Path | None = None) -> str:
+    """Standing instructions, AGENTS.md-style and layered like Codex:
+    global (`~/.ledger/AGENTS.md`) first, repo root second, so the closer
+    file speaks last and wins on conflict. First of AGENTS.md / LEDGER.md /
+    CLAUDE.md at each level."""
+    layers = []
+    home_dir = Path(home) if home is not None else Path.home()
+    global_part = _first_instruction_file(home_dir / ".ledger")
+    if global_part:
+        layers.append(global_part)
+    local_part = _first_instruction_file(Path(root))
+    if local_part:
+        layers.append(local_part)
+    return "\n\n".join(layers)[:max_chars]
 
 
 def select_context(root: Path, query: str, k: int = 4,

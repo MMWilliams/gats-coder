@@ -59,11 +59,26 @@ def test_select_context_empty_query_selects_nothing(repo):
 # -- project instructions ----------------------------------------------------
 
 def test_project_instructions_precedence(tmp_path):
-    assert project_instructions(tmp_path) == ""
+    home = tmp_path / "home"  # isolate from any real ~/.ledger
+    assert project_instructions(tmp_path, home=home) == ""
     (tmp_path / "LEDGER.md").write_text("ledger rules", encoding="utf-8")
-    assert project_instructions(tmp_path) == "ledger rules"
+    assert project_instructions(tmp_path, home=home) == "ledger rules"
     (tmp_path / "AGENTS.md").write_text("agents rules", encoding="utf-8")
-    assert project_instructions(tmp_path) == "agents rules"  # AGENTS.md wins
+    # AGENTS.md wins at a level
+    assert project_instructions(tmp_path, home=home) == "agents rules"
+
+
+def test_project_instructions_layers_global_then_local(tmp_path):
+    home = tmp_path / "home"
+    (home / ".ledger").mkdir(parents=True)
+    (home / ".ledger" / "AGENTS.md").write_text("global: be terse",
+                                                encoding="utf-8")
+    assert project_instructions(tmp_path, home=home) == "global: be terse"
+    (tmp_path / "AGENTS.md").write_text("local: no docstrings",
+                                        encoding="utf-8")
+    layered = project_instructions(tmp_path, home=home)
+    # Global first, local second: the closer file speaks last and wins.
+    assert layered == "global: be terse\n\nlocal: no docstrings"
 
 
 @needs_git

@@ -20,7 +20,7 @@ is adopted *inside* that architecture or consciously skipped.
 | apply_patch structured edits | HAVE | `AuthorPatch` → `git apply --check` → queue; sensors confirm. Stricter than Codex: a diff the repo rejects never becomes state. |
 | OS sandbox (Seatbelt/bwrap/Windows) | GAP | Worktree isolation only. OS-level enforcement (Job Objects / bwrap) is the real gap; risk classes + gates are the policy layer it would plug into. |
 | Network off by default | HAVE | No action in the catalog has network risk today; anything that does gets `risk="network"`, gated under attended/supervised profiles. |
-| Secret redaction | GAP | Journals store raw command output blobs. |
+| Secret redaction | **HAVE (v0.4.0)** | Blobs and suite evidence scrubbed (bearer/API tokens, GitHub/AWS keys, private-key blocks) before content-addressing. |
 
 ## 2. Approval / autonomy modes
 
@@ -37,7 +37,7 @@ is adopted *inside* that architecture or consciously skipped.
 
 | Codex capability | LEDGER status | Notes |
 |---|---|---|
-| AGENTS.md (hierarchy, 32KiB cap) | **PART (v0.3.0)** | Repo-root `AGENTS.md` / `LEDGER.md` / `CLAUDE.md` (first found, 8KB cap) feeds AuthorPatch prompts, chat, and review. Global + nested-dir layering: not yet. |
+| AGENTS.md (hierarchy, 32KiB cap) | **HAVE (v0.4.0)** | Global `~/.ledger/AGENTS.md` + repo root, concatenated global→local (closer wins), 8KB cap; feeds AuthorPatch, chat, review. Nested-dir layering: not yet (episodes are whole-repo). |
 | config.toml + profiles | **PART (v0.3.0)** | `.ledger/config.json` (test_cmd, planner, profile, slots, max_author_attempts) now actually read by run/chat; flags override. Named profiles/global config: no. |
 | Hooks / skills / plugins | SCOPE (for now) | Extensibility layer; revisit after M5. |
 
@@ -46,7 +46,7 @@ is adopted *inside* that architecture or consciously skipped.
 | Codex capability | LEDGER status | Notes |
 |---|---|---|
 | Interactive TUI | PART | `ledger chat` REPL (repo-aware, journaled) but no @file search / mid-turn injection. |
-| Headless exec + JSON events | PART | `ledger run` is headless and exit-coded; the journal *is* the JSONL event stream (hash-chained, richer than Codex's). No schema-validated final output yet. |
+| Headless exec + JSON events | **HAVE (v0.4.0)** | `ledger run --json` prints one structured result object (goal, plan, incidents, denials, escalation); the hash-chained journal is the event stream. |
 | Session resume/fork/history | GAP | Episodes are one-shot; graph/L2/L3 persist across runs (that's the resume of *knowledge*), but no conversation resume. |
 | Parallel subagents | HAVE | `ledger session`: parallel agents in isolated worktrees pooling one transition graph — Codex subagents don't share a learned model at all. |
 | Cloud delegation / automations | SCOPE | |
@@ -58,7 +58,7 @@ is adopted *inside* that architecture or consciously skipped.
 |---|---|---|
 | Local diffs/commits/branches | HAVE | Worktree per episode, `Commit` action, `ledger/<episode>` branches. |
 | `codex review` local diff review | **HAVE (v0.3.0)** | `ledger review` (working tree / --staged / --range), obeys project instructions, optional journaled findings. |
-| PR creation / @codex review / auto PR review | GAP | Needs a `gh` push/PR action with `risk="network"` — gates already model it. |
+| PR creation / @codex review / auto PR review | **PART (v0.4.0)** | `--push` adds a network-gated `PushBranch` action: reachable only from a committed worktree, confirmed by `ls-remote` (never the exit code), denied-by-default under supervised/attended. PR creation (`gh pr create`) still pending. |
 
 ## 6. Context handling
 
@@ -92,21 +92,21 @@ is adopted *inside* that architecture or consciously skipped.
 
 1. OS-enforced sandbox — **GAP** (worktree only; top remaining gap)
 2. Graduated autonomy — **HAVE (v0.3.0)**
-3. AGENTS.md — **PART (v0.3.0)** (root-level; hierarchy pending)
-4. Headless/CI mode — **PART** (exit codes + journal; no output schema)
+3. AGENTS.md — **HAVE (v0.4.0)** (global + root; nested-dir pending)
+4. Headless/CI mode — **HAVE (v0.4.0)** (`--json` + exit codes + journal)
 5. Session resume/fork — **GAP**
 6. MCP — **GAP**
-7. Git depth (review ✓, PR ✗) — **PART (v0.3.0)**
+7. Git depth (review ✓, push ✓, PR ✗) — **PART (v0.4.0)**
 8. Cloud delegation — **SCOPE**
 9. Test-iterate with evidence — **HAVE** (differentiator)
 10. Model controls — **PART**
 11. Multimodal/web search — **GAP**
 12. Skills/plugins/hooks — **SCOPE**
 
-### Build order after v0.3.0
-1. PR flow (`gh` actions, network-gated) — completes the Git story.
-2. AGENTS.md hierarchy + global config.
-3. Structured output for `run` (`--json`: END record + escalation).
-4. Best-of-N via slots (author k candidates, RunSuite arbitrates).
-5. OS sandbox for RunSuite subprocesses (Job Objects on Windows).
-6. MCP sensors/actions.
+### Build order after v0.4.0
+1. PR creation (`gh pr create` as a network-gated action on top of
+   PushBranch) — finishes the Git story.
+2. Best-of-N via slots (author k candidates, RunSuite arbitrates).
+3. OS sandbox for RunSuite subprocesses (Job Objects on Windows).
+4. Episode resume (re-enter a failed episode with its graph/L2 warm).
+5. MCP sensors/actions.
