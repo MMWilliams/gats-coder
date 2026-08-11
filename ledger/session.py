@@ -126,7 +126,7 @@ class Session:
 
     def __init__(self, session_dir: Path | str, cfg: PlanConfig | None = None,
                  backend=None, gate=None, profile: str = "attended",
-                 max_author_attempts: int = 6):
+                 max_author_attempts: int = 6, hooks: list[dict] | None = None):
         self.dir = Path(session_dir)
         self.dir.mkdir(parents=True, exist_ok=True)
         self.cfg = cfg or PlanConfig()
@@ -135,6 +135,7 @@ class Session:
         self.gate = gate or attended_gate
         self.profile = profile
         self.max_author_attempts = max_author_attempts
+        self.hooks = hooks
         self.graph_path = self.dir / "shared-graph.sqlite"
         self.l2_path = self.dir / "shared-l2.sqlite"
         self.l3_path = self.dir / "shared-l3.sqlite"
@@ -161,6 +162,7 @@ class Session:
                 slots=spec.slots, context_files=spec.context_files,
                 gate=self.gate, profile=self.profile,
                 max_author_attempts=self.max_author_attempts,
+                hooks=self.hooks,
             )
         except Exception as exc:
             return AgentOutcome(spec.name, False, [], 0, 0, 0, None, None,

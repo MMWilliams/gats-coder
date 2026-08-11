@@ -198,7 +198,8 @@ def _run_attempts(args, root, cfg_file, backend, gate, profile,
     session = Session(
         root / ".ledger" / "sessions" / f"{args.name}-attempts",
         cfg=_plan_config(args, cfg_file), backend=backend,
-        gate=gate, profile=profile, max_author_attempts=author_budget)
+        gate=gate, profile=profile, max_author_attempts=author_budget,
+        hooks=_hooks_of(cfg_file))
     specs = [AgentSpec(
         name=f"attempt-{i + 1}", repo_root=root,
         test_cmd=_test_cmd(args, cfg_file), task_text=args.task,
@@ -297,8 +298,7 @@ def cmd_run(args) -> int:
             slots=slots,
             context_files=args.context.split(",") if args.context else None,
             push=args.push, pr=args.pr, resume=args.resume,
-            hooks=cfg_file.get("hooks")
-            if isinstance(cfg_file.get("hooks"), list) else None,
+            hooks=_hooks_of(cfg_file),
             progress=None if quiet else progress,
         )
     entries = Journal.read(str(journal_path))
@@ -439,8 +439,7 @@ def _chat_runner(root: Path, args, cfg_file: dict, backend):
             l2_path=str(root / ".ledger" / "l2.sqlite"),
             l3_cache_path=str(root / ".ledger" / "l3.sqlite"),
             slots=[str(s) for s in cfg_now.get("slots", ["a", "b"])],
-            hooks=cfg_now.get("hooks")
-            if isinstance(cfg_now.get("hooks"), list) else None,
+            hooks=_hooks_of(cfg_now),
             resume=resume, progress=progress,
         )
         entries = Journal.read(str(journal_path))
@@ -611,6 +610,10 @@ def cmd_review(args) -> int:
     return 0
 
 
+def _hooks_of(cfg: dict) -> list | None:
+    return cfg.get("hooks") if isinstance(cfg.get("hooks"), list) else None
+
+
 def cmd_session(args) -> int:
     spec_path = Path(args.spec)
     if not spec_path.exists():
@@ -621,6 +624,11 @@ def cmd_session(args) -> int:
         return _fail(f"{spec_path}: invalid JSON ({exc})")
     if not isinstance(raw, list):
         return _fail("spec must be a JSON list of agent objects")
+
+    root = Path(args.repo).resolve()
+    cfg_file = _config(root)
+    default_test = _test_cmd(args, cfg_file)
+    default_slots = [str(s) for s in cfg_file.get("slots", ["a", "b"])]
 
     specs = []
     for item in raw:
@@ -634,9 +642,9 @@ def cmd_session(args) -> int:
             specs.append(AgentSpec(
                 name=item["name"],
                 repo_root=Path(item.get("repo", args.repo)).resolve(),
-                test_cmd=item.get("test", DEFAULT_TEST_CMD),
+                test_cmd=item.get("test", default_test),
                 task_text=item.get("task"),
-                slots=item.get("slots", ["a", "b"]),
+                slots=item.get("slots", default_slots),
                 context_files=item.get("context", []),
                 backend=agent_backend,
             ))
@@ -644,11 +652,19 @@ def cmd_session(args) -> int:
             return _fail(f"bad agent entry {item!r}: {exc}")
 
     try:
-        backend = _backend(args)
+        backend = _backend(args, cfg_file)
     except RuntimeError as exc:
         return _fail(str(exc))
-    session = Session(args.out, cfg=PlanConfig(budget=args.budget),
-                      backend=backend)
+    # Sessions are episodes too: the same profile, policy rules and hooks
+    # apply. Approving everything here regardless of config would make
+    # `deny` rules mean one thing for `run` and another for `session`.
+    gate, profile = _gate_and_profile(args, cfg_file)
+    session = Session(
+        args.out, cfg=_plan_config(args, cfg_file), backend=backend,
+        gate=gate, profile=profile, hooks=_hooks_of(cfg_file),
+        max_author_attempts=args.max_author_attempts
+        if args.max_author_attempts is not None
+        else int(cfg_file.get("max_author_attempts", DEFAULT_AUTHOR_ATTEMPTS)))
     outcomes = session.run_parallel(specs, max_workers=args.workers)
 
     width = max(len(o.name) for o in outcomes)
@@ -1064,7 +1080,21 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--repo", default=".", help="default repo for agents")
     p.add_argument("--out", default=".ledger/sessions/default")
     p.add_argument("--workers", type=int, default=4)
-    p.add_argument("--budget", type=int, default=10)
+    p.add_argument("--budget", type=int, default=None)
+    p.add_argument("--max-steps", dest="max_steps", type=int, default=None)
+    p.add_argument("--test", default=None, help="default test command")
+    p.add_argument("--profile", default=None, choices=sorted(GATED_RISKS),
+                   help="autonomy profile for every agent")
+    p.add_argument("--yes", action="store_true",
+                   help="pre-approve gated actions (parallel agents cannot "
+                        "share one terminal prompt)")
+    p.add_argument("--allow", default=None)
+    p.add_argument("--deny", default=None)
+    p.add_argument("--max-author-attempts", dest="max_author_attempts",
+                   type=int, default=None)
+    p.add_argument("--dangerously-skip-permissions",
+                   dest="dangerously_skip_permissions", action="store_true",
+                   help="bypass every gate, prompt, and policy rule")
     add_backend(p)
     p.set_defaults(fn=cmd_session)
 

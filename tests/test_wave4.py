@@ -18,6 +18,13 @@ FIX_DIFF = ("--- a/calc.py\n+++ b/calc.py\n@@ -1,2 +1,2 @@\n"
             " def add(a, b):\n-    return a - b\n+    return a + b\n")
 
 
+def _responder(prompt: str) -> str:
+    if "REPOSITORY FILES" in prompt:
+        return FIX_DIFF
+    return json.dumps({"goal": ["tests.pass:unit", "repo.clean"],
+                       "rationale": "green and committed"})
+
+
 # -- hooks -------------------------------------------------------------------
 
 @needs_git
@@ -147,6 +154,41 @@ def test_doctor_clean_config_passes_lint(repo, capsys):
 
 
 # -- per-agent session backends ----------------------------------------------
+
+@needs_git
+def test_session_honors_policy_and_hooks(repo, tmp_path, monkeypatch, capsys):
+    """A deny rule must mean the same thing for `session` as for `run` --
+    and configured hooks must fire there too."""
+    d = repo / ".ledger"
+    d.mkdir()
+    marker = tmp_path / "hook-ran.txt"
+    monkeypatch.setenv("HOOK_MARKER", str(marker))
+    (d / "config.json").write_text(json.dumps({
+        "test_cmd": TEST_CMD,
+        "policy": {"deny": ["Commit"]},
+        "hooks": [{"event": "post_action", "match": "*", "command": [
+            sys.executable, "-c",
+            "import os, pathlib; "
+            "pathlib.Path(os.environ['HOOK_MARKER']).open('a').write('x')"]}],
+    }), encoding="utf-8")
+    spec = tmp_path / "agents.json"
+    spec.write_text(json.dumps([
+        {"name": "a1", "repo": str(repo), "task": "fix the failing test"}]),
+        encoding="utf-8")
+
+    monkeypatch.setattr(cli, "_backend",
+                        lambda args, cfg=None: FakeBackend(_responder))
+    rc = cli.main(["session", str(spec), "--repo", str(repo),
+                   "--out", str(tmp_path / "sess"), "--yes", "--workers", "1"])
+
+    assert rc == 1                                    # Commit was denied
+    assert marker.exists(), "configured hooks must fire inside sessions"
+    journals = list((tmp_path / "sess").rglob("episode.jsonl"))
+    assert journals
+    entries = Journal.read(str(journals[0]))
+    denied = [e for e in entries if e["t"] == "GATE" and not e["approved"]]
+    assert denied and all(e["action"] == "Commit" for e in denied)
+
 
 @needs_git
 def test_session_per_agent_backend_override(repo, tmp_path):
