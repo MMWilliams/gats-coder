@@ -2,6 +2,7 @@
 the TUI editor state machine."""
 
 import json
+import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from types import SimpleNamespace
@@ -291,3 +292,82 @@ def test_banner_and_spinner_offline():
     assert tui.interactive() is False  # pytest capture is not a TTY
     with tui.spinner("working"):       # no-op off-TTY, must not raise
         pass
+
+
+# -- the framed input field --------------------------------------------------
+
+def _box_chars():
+    return ("╭", "╮", "╰", "╯", "│") if tui.ui.UNICODE \
+        else ("+", "+", "+", "+", "|")
+
+
+def test_frame_is_a_closed_box_of_uniform_width():
+    ed = tui.LineEditor()
+    _type(ed.state, "hello")
+    lines, _ = ed.frame()
+    tl, tr, bl, br, v = _box_chars()
+    plain = [tui.ui.plain(x) for x in lines]
+
+    assert len(plain) == 3
+    assert plain[0].startswith(tl) and plain[0].endswith(tr)
+    assert plain[1].startswith(v) and plain[1].endswith(v)   # closed sides
+    assert plain[2].startswith(bl) and plain[2].endswith(br)
+    widths = {len(p) for p in plain}
+    assert len(widths) == 1, f"ragged frame: {widths}"       # square box
+    assert "hello" in plain[1]
+    assert "session" in plain[0]
+
+
+def test_frame_cursor_column_tracks_the_caret():
+    ed = tui.LineEditor()
+    lines, col_empty = ed.frame()
+    _type(ed.state, "abc")
+    lines, col3 = ed.frame()
+    assert col3 == col_empty + 3
+    ed.state.handle("left")
+    _, col2 = ed.frame()
+    assert col2 == col3 - 1
+    # the caret sits exactly on the character it precedes
+    plain_mid = tui.ui.plain(lines[1])
+    assert plain_mid[col3 - 1 - 1] == "c"
+
+
+def test_frame_windows_long_input_to_keep_the_caret_visible():
+    ed = tui.LineEditor()
+    _type(ed.state, "x" * 400)
+    lines, col = ed.frame()
+    plain = [tui.ui.plain(x) for x in lines]
+    assert len({len(p) for p in plain}) == 1     # still a square box
+    assert 1 <= col <= len(plain[1])             # caret stays on screen
+
+
+def test_frame_shows_completions_in_the_footer():
+    ed = tui.LineEditor()
+    _type(ed.state, "/to")
+    lines, _ = ed.frame()
+    assert "/tools" in tui.ui.plain(lines[2])
+
+
+def test_frame_stays_square_with_many_completions(monkeypatch):
+    """A footer listing several commands must be trimmed to the frame, not
+    burst it -- the bug a visual check caught and uniform-width missed."""
+    import shutil as _sh
+    monkeypatch.setattr(_sh, "get_terminal_size",
+                        lambda *a: os.terminal_size((60, 24)))
+    ed = tui.LineEditor()
+    _type(ed.state, "/t")                    # matches /tools and /tree
+    lines, _ = ed.frame()
+    plain = [tui.ui.plain(x) for x in lines]
+    assert len({len(p) for p in plain}) == 1, [len(p) for p in plain]
+
+
+def test_hint_respects_its_budget():
+    s = tui.EditorState()
+    _type(s, "/t")
+    assert tui.ui.visible_len(s.hint(budget=12)) <= 12
+    assert tui.ui.visible_len(s.hint(budget=200)) <= 200
+
+
+def test_visible_len_ignores_ansi():
+    assert tui.ui.visible_len(tui.ui.accent("abc")) == 3
+    assert tui.ui.plain(tui.ui.bold("x")) == "x"

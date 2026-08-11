@@ -36,11 +36,21 @@ def interactive() -> bool:
         return False
 
 
+def frame_width() -> int:
+    """One width for every framed element, so the session reads as a
+    single panel rather than a pile of boxes."""
+    return min(max(40, shutil.get_terminal_size().columns) - 1, 96)
+
+
 def banner(repo: str, profile: str, backend_id: str) -> str:
     bar = "▌" if ui.UNICODE else "|"
+    dot = " · " if ui.UNICODE else " - "
+    line = "─" if ui.UNICODE else "-"
     head = (ui.accent(bar) + " " + ui.bold("LEDGER") + "  "
-            + ui.dim(f"{repo} · profile {profile} · {backend_id}"))
-    return head + "\n" + ui.rule()
+            + ui.dim(dot.join([repo, f"profile {profile}", backend_id])))
+    tip = ui.dim("ask about the repo, or say what to change "
+                 "— changes run as verified episodes")
+    return "\n".join([head, tip, ui.dim(line * frame_width())])
 
 
 # -- spinner -----------------------------------------------------------------
@@ -183,20 +193,29 @@ class EditorState:
             return text
         return None
 
-    def hint(self) -> str:
-        """The bottom-frame text: completions when relevant, key help else."""
+    def hint(self, budget: int = 10_000) -> str:
+        """The bottom-frame text: completions when relevant, key help else.
+        Never wider than `budget` visible columns -- the frame is only
+        square if its contents respect it."""
         m = self.matches()
         if m:
-            parts = []
-            for i, (c, d) in enumerate(m[:4]):
+            parts, used = [], 0
+            for i, (c, d) in enumerate(m):
                 cell = f"{c} {d}"
+                if used + len(cell) + (2 if parts else 0) > budget:
+                    if not parts:            # even one entry is too wide
+                        cell = cell[:max(1, budget)]
+                    else:
+                        break
+                used += len(cell) + (2 if parts else 0)
                 parts.append(ui.bold(cell)
                              if i == self.completion_i % len(m)
                              else ui.dim(cell))
             return "  ".join(parts)
-        return ui.dim("Tab completes /commands · ↑ history · Esc clears"
-                      if ui.UNICODE else
-                      "Tab completes /commands - up = history - Esc clears")
+        full = ("Tab completes /commands · ↑ history · Esc clears"
+                if ui.UNICODE else
+                "Tab completes /commands - up = history - Esc clears")
+        return ui.dim(full if len(full) <= budget else "Tab completes")
 
 
 # -- console layer -----------------------------------------------------------
@@ -271,31 +290,46 @@ class LineEditor:
     def __init__(self, commands=COMMANDS):
         self.state = EditorState(commands)
 
-    def _draw(self, first: bool) -> None:
-        cols = max(40, shutil.get_terminal_size().columns)
-        width = min(cols - 2, 96)
+    def frame(self, title: str = "session") -> tuple[list[str], int]:
+        """The three frame lines plus the cursor's 1-based screen column.
+        Pure string work -- no terminal required, so it is testable."""
+        width = frame_width()
         tl, tr, bl, br, h, v = ("╭", "╮", "╰", "╯", "─", "│") \
             if ui.UNICODE else ("+", "+", "+", "+", "-", "|")
         prompt = "❯ " if ui.UNICODE else "> "
-        inner = width - 4
-        buf = self.state.buffer
-        # keep the cursor visible: window the buffer if it overflows
-        start = max(0, self.state.cursor - (inner - len(prompt)))
-        shown = buf[start:start + inner - len(prompt)]
-        hint = self.state.hint()
 
+        # inner = columns between the two verticals, minus one pad each side
+        inner = width - 4
+        room = inner - len(prompt)
+        start = max(0, self.state.cursor - room + 1)
+        shown = self.state.buffer[start:start + room]
+
+        head = f"{tl}{h} {title} "
+        top = head + h * max(1, width - len(head) - 1) + tr
+
+        body_text = prompt + shown
+        pad = " " * max(0, inner - len(body_text))
+        mid = (ui.dim(v) + " " + ui.accent(prompt) + shown + pad + " "
+               + ui.dim(v))
+
+        hint = self.state.hint(budget=max(4, width - 6))
+        hint_room = max(0, width - 6 - ui.visible_len(hint))
+        foot = (ui.dim(bl + h) + " " + hint + " "
+                + ui.dim(h * hint_room + h + br))
+        # cursor: 1(border) + 1(pad) + prompt + offset into the window
+        col = 3 + len(prompt) + (self.state.cursor - start)
+        return [ui.dim(top), mid, foot], col
+
+    def _draw(self, first: bool) -> None:
+        lines, col = self.frame()
         out = sys.stdout
         if not first:
             # parked on the input line (frame line 2): top is ONE line up
             out.write("\r\x1b[1A")
-        top = ui.dim(tl + h + " session " + h * max(1, width - 12) + tr)
-        mid = (ui.dim(v) + " " + ui.accent(prompt) + shown
-               + "\x1b[K")
-        bot = ui.dim(bl + h) + " " + hint + "\x1b[K"
-        out.write(top + "\x1b[K\n" + mid + "\n" + bot)
+        out.write(lines[0] + "\x1b[K\n" + lines[1] + "\x1b[K\n"
+                  + lines[2] + "\x1b[K")
         # park the real cursor on the input line at the right column
-        col = 3 + len(prompt) + (self.state.cursor - start)
-        out.write(f"\x1b[1A\x1b[{col}G")
+        out.write(f"\x1b[1A\r\x1b[{col}G")
         out.flush()
 
     def read(self, _prompt: str = "") -> str:

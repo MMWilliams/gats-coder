@@ -222,7 +222,7 @@ def _run_change(conv: Conversation, runner, user_text: str, task: str,
 
 
 def repl(conv: Conversation, root: Path, *, input_fn=input,
-         output_fn=print, runner=None, busy=None) -> int:
+         output_fn=print, runner=None, busy=None, greet=True) -> int:
     """Interactive loop -- the one session for everything. `input_fn` /
     `output_fn` are injected so the loop is testable without a terminal;
     `runner` (task_text -> outcome dict) executes change episodes inline;
@@ -230,12 +230,13 @@ def repl(conv: Conversation, root: Path, *, input_fn=input,
     """
     from contextlib import nullcontext
     busy = busy or (lambda label: nullcontext())
-    if runner is not None:
-        output_fn("LEDGER. Ask about the repo, or just say what to change -- "
-                  "changes run as verified, journaled episodes right here. "
-                  "/help for commands.")
-    else:
-        output_fn("LEDGER chat. /help for commands, /exit to leave.")
+    if greet:  # the TUI banner already says this
+        if runner is not None:
+            output_fn("LEDGER. Ask about the repo, or just say what to "
+                      "change -- changes run as verified, journaled "
+                      "episodes right here. /help for commands.")
+        else:
+            output_fn("LEDGER chat. /help for commands, /exit to leave.")
     while True:
         try:
             line = input_fn("> ").strip()

@@ -527,7 +527,7 @@ def cmd_chat(args) -> int:
                              getattr(backend, "id", "?") + extra))
             editor = tui.LineEditor(tui.COMMANDS)
             return repl(conv, root, input_fn=editor.read,
-                        runner=runner, busy=tui.spinner)
+                        runner=runner, busy=tui.spinner, greet=False)
         return repl(conv, root, runner=runner)
     finally:
         if journal is not None:

@@ -135,21 +135,28 @@ def rule(title: str = "") -> str:
     return dim(f"{line}{line} ") + bold(title) + dim(f" {pad}")
 
 
+def plain(s: str) -> str:
+    """`s` with ANSI escapes stripped -- the layout truth for any padding
+    or width math, since escape bytes occupy no columns."""
+    out, i = [], 0
+    while i < len(s):
+        if s[i] == "\x1b":
+            j = s.find("m", i)
+            i = (j + 1) if j != -1 else len(s)
+        else:
+            out.append(s[i])
+            i += 1
+    return "".join(out)
+
+
+def visible_len(s: str) -> int:
+    return len(plain(s))
+
+
 def table(rows: list[list[str]], header: list[str] | None = None,
           highlight: int | None = None) -> str:
     """Aligned monospace table. Column widths come from the *plain* text so
     ANSI codes never skew the layout; `highlight` bolds one body row."""
-    def plain(s: str) -> str:
-        out, i = [], 0
-        while i < len(s):
-            if s[i] == "\x1b":
-                j = s.find("m", i)
-                i = (j + 1) if j != -1 else len(s)
-            else:
-                out.append(s[i])
-                i += 1
-        return "".join(out)
-
     all_rows = ([header] if header else []) + rows
     widths = [max(len(plain(r[c])) for r in all_rows)
               for c in range(len(all_rows[0]))]
