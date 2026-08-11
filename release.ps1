@@ -22,6 +22,15 @@ if ($pyproject -notmatch '(?m)^version\s*=\s*"([^"]+)"') {
 $version = $Matches[1]
 Write-Host "==> releasing ledger-agent $version"
 
+# Keep the journal-stamped AGENT_VERSION in lockstep with the package.
+$initPath = Join-Path $repo 'ledger\__init__.py'
+$init = [System.IO.File]::ReadAllText($initPath)
+$synced = $init -replace 'AGENT_VERSION = "[^"]+"', "AGENT_VERSION = `"$version`""
+if ($synced -ne $init) {
+    [System.IO.File]::WriteAllText($initPath, $synced, $utf8NoBom)
+    Write-Host "    synced AGENT_VERSION -> $version"
+}
+
 Remove-Item -Recurse -Force (Join-Path $repo 'dist') -ErrorAction SilentlyContinue
 python -m pip wheel $repo --no-deps -w (Join-Path $repo 'dist')
 if ($LASTEXITCODE -ne 0) { throw 'wheel build failed' }

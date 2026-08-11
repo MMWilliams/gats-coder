@@ -6,4 +6,6 @@ persistent state-transition graph, UCB1 edge search, layered world model
 bit-exact replay, and a minimal sensor bank.
 """
 
-AGENT_VERSION = "0.1.0"
+# Stamped into every journal HEADER. release.ps1 syncs it from
+# pyproject.toml -- do not hand-edit out of step with the package version.
+AGENT_VERSION = "0.5.1"
