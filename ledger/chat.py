@@ -121,7 +121,14 @@ class Conversation:
         args = obj.get("arguments")
         return str(obj["tool"]), (args if isinstance(args, dict) else {})
 
-    def ask(self, user_text: str) -> str:
+    def ask(self, user_text: str, progress=None) -> str:
+        def say(text):
+            if progress is not None:
+                try:
+                    progress(text)
+                except Exception:
+                    pass
+
         if self.journal is not None:
             self.journal.append("CHAT_USER", text=user_text)
         pending = user_text
@@ -133,9 +140,11 @@ class Conversation:
             if call is None:
                 break
             name, args = call
+            say(f"calling tool {name}")
             if self.journal is not None:
                 self.journal.append("MCP_CALL", tool=name, arguments=args)
             result = self.tool_call(name, args)
+            say("thinking about the tool result")
             if self.journal is not None:
                 self.journal.append(
                     "MCP_RESULT", tool=name, chars=len(result),
@@ -211,8 +220,14 @@ def _run_change(conv: Conversation, runner, user_text: str, task: str,
             output_fn("not running it -- rephrase or use /do <task>")
             return
     try:
-        with busy("planning · authoring · verifying"):
-            outcome = runner(task)
+        with busy("starting the episode") as progress:
+            outcome = runner(task, progress=progress)
+    except KeyboardInterrupt:
+        # Ctrl+C stops the work, not the session -- and the journal written
+        # so far still verifies and replays.
+        output_fn("interrupted — the episode stopped; its journal so far "
+                  "is still valid")
+        return
     except Exception as exc:
         output_fn(f"episode failed to start: {exc}")
         return
@@ -228,8 +243,11 @@ def repl(conv: Conversation, root: Path, *, input_fn=input,
     `runner` (task_text -> outcome dict) executes change episodes inline;
     `busy(label)` is an optional progress context manager (the spinner).
     """
-    from contextlib import nullcontext
-    busy = busy or (lambda label: nullcontext())
+    # One implementation everywhere: the spinner yields a live Progress
+    # handle and simply renders nothing when the output is not a terminal,
+    # so callers always get a working handle.
+    if busy is None:
+        from .tui import spinner as busy
     if greet:  # the TUI banner already says this
         if runner is not None:
             output_fn("LEDGER. Ask about the repo, or just say what to "
@@ -298,16 +316,18 @@ def repl(conv: Conversation, root: Path, *, input_fn=input,
             output_fn(f"unknown command {line.split()[0]!r} -- /help for the list")
             continue
         if runner is not None:
-            with busy("routing"):
+            with busy("reading your request"):
                 intent, task = conv.classify(line)
             if intent == "change":
                 _run_change(conv, runner, line, task, input_fn, output_fn,
                             confirm=True, busy=busy)
                 continue
         try:
-            with busy("thinking"):
-                reply = conv.ask(line)
+            with busy("thinking") as progress:
+                reply = conv.ask(line, progress=progress)
             output_fn(reply)
+        except KeyboardInterrupt:
+            output_fn("interrupted")
         except Exception as exc:  # backend failures must not kill the session
             output_fn(f"backend error: {exc}")
     return 0

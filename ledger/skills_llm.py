@@ -244,6 +244,8 @@ class AuthorPatchSkill:
                                   f"({self.meter.spent}/{self.meter.limit})")
                     break
                 self.meter.charge()
+            ctx.say(f"authoring a patch for slot {self.slot}"
+                    + (f" (attempt {attempt + 1})" if attempt else ""))
             try:
                 response = self.backend.complete(self._prompt(ctx, failure))
             except Exception as exc:

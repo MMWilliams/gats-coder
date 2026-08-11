@@ -126,8 +126,10 @@ def test_classify_fails_safe():
 def test_repl_runs_episode_inline(tmp_path):
     ran, outputs = [], []
 
-    def runner(task):
+    def runner(task, progress=None):
         ran.append(task)
+        assert progress is not None, "the episode must get a progress handle"
+        progress("authoring a patch")          # phase reporting works
         return {"success": True, "plan": ["RunSuite"], "steps": 1,
                 "incidents": 0, "escalation": None, "journal": "j.jsonl",
                 "episode": "e", "resumed": False,
@@ -148,7 +150,7 @@ def test_repl_decline_skips_episode(tmp_path):
     inputs = iter(["please fix the bug", "n", "/exit"])
     repl(Conversation(backend=_router()), tmp_path,
          input_fn=lambda p: next(inputs), output_fn=outputs.append,
-         runner=lambda t: ran.append(t))
+         runner=lambda t, progress=None: ran.append(t))
     assert ran == []
     assert any("/do" in o for o in outputs)
 
@@ -156,7 +158,7 @@ def test_repl_decline_skips_episode(tmp_path):
 def test_repl_do_bypasses_router(tmp_path):
     ran = []
 
-    def runner(task):
+    def runner(task, progress=None):
         ran.append(task)
         return {"success": True, "plan": [], "steps": 0, "incidents": 0,
                 "escalation": None, "journal": "", "episode": "e",
@@ -177,7 +179,8 @@ def test_repl_chat_message_stays_chat(tmp_path):
     inputs = iter(["what is the planner?", "/exit"])
     repl(Conversation(backend=_router("it plans")), tmp_path,
          input_fn=lambda p: next(inputs), output_fn=outputs.append,
-         runner=lambda t: (_ for _ in ()).throw(AssertionError("no episode")))
+         runner=lambda t, progress=None: (_ for _ in ()).throw(
+             AssertionError("no episode")))
     assert any("it plans" in o for o in outputs)
 
 
@@ -371,3 +374,81 @@ def test_hint_respects_its_budget():
 def test_visible_len_ignores_ansi():
     assert tui.ui.visible_len(tui.ui.accent("abc")) == 3
     assert tui.ui.plain(tui.ui.bold("x")) == "x"
+
+
+# -- the working indicator ---------------------------------------------------
+
+def test_progress_line_names_the_phase_and_counts_time():
+    p = tui.Progress("starting the episode")
+    line = tui.ui.plain(p.line("*"))
+    assert line.startswith("* starting the episode")
+    assert "0s" in line and "ctrl+c to interrupt" in line
+
+    p("authoring a patch for slot a")          # phase switch mid-flight
+    assert "authoring a patch for slot a" in tui.ui.plain(p.line("*"))
+
+    p.started -= 75                            # long run -> m/s clock
+    assert "1m15s" in tui.ui.plain(p.line("*"))
+
+
+def test_spinner_yields_a_working_handle_offline():
+    with tui.spinner("thinking") as progress:
+        progress("running the unit suite")     # must not raise off-TTY
+        assert progress.label == "running the unit suite"
+
+
+def test_ctrl_c_stops_the_work_not_the_session(tmp_path):
+    """The indicator promises ctrl+c interrupts; that must be true, and the
+    session must survive it."""
+    outputs = []
+
+    def runner(task, progress=None):
+        raise KeyboardInterrupt
+
+    inputs = iter(["/do something long", "what is the planner?", "/exit"])
+    rc = repl(Conversation(backend=_router("it plans")), tmp_path,
+              input_fn=lambda p: next(inputs), output_fn=outputs.append,
+              runner=runner)
+    assert rc == 0                                   # session survived
+    assert any("interrupted" in o for o in outputs)
+    assert any("it plans" in o for o in outputs)     # still usable after
+
+
+@needs_git
+def test_episode_reports_its_phases(repo, tmp_path):
+    """The real plumbing: an episode narrates goal compilation, each step,
+    the suite run, and patch authoring."""
+    from ledger.executor import run_repo_episode
+
+    seen = []
+
+    def responder(prompt):
+        if "REPOSITORY FILES" in prompt:
+            return FIX_DIFF
+        return json.dumps({"goal": ["tests.pass:unit"], "rationale": "green"})
+
+    result, _, _ = run_repo_episode(
+        repo, tmp_path / "ep", None, TEST_CMD,
+        task_text="fix the failing test",
+        backend=FakeBackend(responder), slots=["a"],
+        progress=seen.append)
+
+    assert result.success, result.plan
+    assert any("compiling the goal" in s for s in seen)
+    assert any("authoring a patch for slot a" in s for s in seen)
+    assert any("running the unit suite" in s for s in seen)
+    assert any(s.startswith("step 0:") for s in seen)
+
+
+def test_progress_sink_failure_never_breaks_an_episode(tmp_path):
+    from ledger.executor import BlobStore, ExecContext
+    from ledger.sensors import ExpensiveResultCache
+
+    def broken(_text):
+        raise RuntimeError("display exploded")
+
+    ctx = ExecContext(worktree=tmp_path, blobs=BlobStore(tmp_path / "b"),
+                      test_cache=ExpensiveResultCache(),
+                      queue_dir=tmp_path / "q", applied_dir=tmp_path / "a",
+                      progress=broken)
+    ctx.say("anything")                         # swallowed, not raised

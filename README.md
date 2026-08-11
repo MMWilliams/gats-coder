@@ -11,7 +11,7 @@ incident rather than a state transition. Every episode replays bit-exact.
 
 ```
 pip install -e .[dev]
-pytest                      # 134 tests
+pytest                      # 147 tests
 python -m ledger.cli demo   # paper's 100-task suite: SR / optimality / calls / variance
 ```
 
@@ -100,7 +100,11 @@ Conversation itself never mutates the repo; only the planner does.
 
 On an interactive terminal the session gets the full TUI: a framed input
 field with live `/command` autocomplete (Tab completes and cycles), input
-history, and a spinner while the model or an episode works.
+history, and a **live working indicator** while the model or an episode
+runs — it names the phase it is actually in (`compiling the goal contract`,
+`authoring a patch for slot a`, `running the unit suite`, `step 3: Commit`),
+counts elapsed time, and Ctrl+C interrupts the work without ending the
+session. `ledger run` shows the same indicator (suppressed under `--json`).
 
 **MCP tools.** Configure servers in `.ledger/config.json` and the session
 can call their tools mid-conversation — every call is permission-gated

@@ -124,6 +124,16 @@ class ExecContext:
     # Most recent failing suite output (tail), deposited by RunSuiteSkill and
     # read by AuthorPatchSkill so the model patches against real evidence.
     suite_evidence: dict = field(default_factory=dict)
+    # Optional (text) -> None sink for live phase reporting. Skills call it
+    # so a UI can say what is happening *now* instead of "working...".
+    progress: object = None
+
+    def say(self, text: str) -> None:
+        if self.progress is not None:
+            try:
+                self.progress(text)
+            except Exception:
+                pass  # a broken display must never fail an episode
 
 
 class Skill(Protocol):
@@ -150,6 +160,7 @@ class RunSuiteSkill:
         self.suite = suite
 
     def run(self, ctx: ExecContext) -> SkillResult:
+        ctx.say(f"running the {self.suite} suite")
         proc, rec = _run_cmd(ctx, self.cmd)
         if proc.returncode == 0:
             props = {f"tests.pass:{self.suite}"}
@@ -375,6 +386,7 @@ class RepoExecutor:
         self.hooks = list(hooks or [])
         self.incidents = 0
         self.denials = 0
+        self.steps = 0
 
     # -- hooks (Claude Code / Kimi hook engine analog) -----------------------
     # Deterministic commands around actions, journaled like everything else.
@@ -453,6 +465,8 @@ class RepoExecutor:
             self.denials += 1
             return self.sensors.probe(self.ctx.worktree)
 
+        self.ctx.say(f"step {self.steps}: {action_name}")
+        self.steps += 1
         result = self.skills[action_name].run(self.ctx)
         if self.journal is not None:
             self.journal.append(
@@ -520,6 +534,7 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                      pr: bool = False,
                      resume: bool = False,
                      hooks: list[dict] | None = None,
+                     progress=None,
                      ) -> tuple[EpisodeResult, RepoExecutor, Path]:
     """End-to-end journaled episode on a real repo (M2/M3).
 
@@ -566,10 +581,18 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     if extra_actions:
         catalog = Catalog(list(catalog) + extra_actions)
 
+    def say(text: str) -> None:
+        if progress is not None:
+            try:
+                progress(text)
+            except Exception:
+                pass
+
     goal_extra: dict = {}
     if task_text is not None:
         if backend is None:
             raise ValueError("task_text requires an LLM backend")
+        say("compiling the goal contract")
         contract = compile_goal(task_text, catalog_vocabulary(catalog), backend)
         goal = contract.goal
         goal_extra = {"task_text": contract.task_text,
@@ -605,7 +628,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     ctx = ExecContext(worktree=worktree.path,
                       blobs=BlobStore(episode_dir / "blobs"),
                       test_cache=test_cache,
-                      queue_dir=queue_dir, applied_dir=applied_dir)
+                      queue_dir=queue_dir, applied_dir=applied_dir,
+                      progress=progress)
     skills: dict[str, Skill] = {
         "RunSuite": RunSuiteSkill(test_cmd),
         "Commit": CommitSkill("ledger: apply queued fix"),

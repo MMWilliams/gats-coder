@@ -279,22 +279,28 @@ def cmd_run(args) -> int:
         root / ".ledger" / "episodes" / args.name
     episode_dir.mkdir(parents=True, exist_ok=True)
 
+    from . import tui
     from .executor import run_repo_episode
     ledger_dir = root / ".ledger"
     ledger_dir.mkdir(exist_ok=True)
-    result, executor, journal_path = run_repo_episode(
-        root, episode_dir, None, _test_cmd(args, cfg_file),
-        cfg=_plan_config(args, cfg_file),
-        gate=gate, profile=profile, max_author_attempts=author_budget,
-        task_text=args.task, backend=backend,
-        l2_path=str(ledger_dir / "l2.sqlite"),
-        l3_cache_path=str(ledger_dir / "l3.sqlite"),
-        slots=slots,
-        context_files=args.context.split(",") if args.context else None,
-        push=args.push, pr=args.pr, resume=args.resume,
-        hooks=cfg_file.get("hooks")
-        if isinstance(cfg_file.get("hooks"), list) else None,
-    )
+    # An episode is a long, silent stretch of work; say what it is doing.
+    # --json stays byte-clean: the spinner is suppressed there.
+    quiet = args.json or not tui.interactive()
+    with tui.spinner("starting the episode") as progress:
+        result, executor, journal_path = run_repo_episode(
+            root, episode_dir, None, _test_cmd(args, cfg_file),
+            cfg=_plan_config(args, cfg_file),
+            gate=gate, profile=profile, max_author_attempts=author_budget,
+            task_text=args.task, backend=backend,
+            l2_path=str(ledger_dir / "l2.sqlite"),
+            l3_cache_path=str(ledger_dir / "l3.sqlite"),
+            slots=slots,
+            context_files=args.context.split(",") if args.context else None,
+            push=args.push, pr=args.pr, resume=args.resume,
+            hooks=cfg_file.get("hooks")
+            if isinstance(cfg_file.get("hooks"), list) else None,
+            progress=None if quiet else progress,
+        )
     entries = Journal.read(str(journal_path))
     header = entries[0] if entries and entries[0]["t"] == "HEADER" else {}
     esc = next((e for e in reversed(entries)
@@ -409,7 +415,7 @@ def _chat_runner(root: Path, args, cfg_file: dict, backend):
     automatic; the planner and gates work exactly as in `ledger run`."""
     from .executor import run_repo_episode
 
-    def runner(task_text: str) -> dict:
+    def runner(task_text: str, progress=None) -> dict:
         cfg_now = dict(cfg_file)
         cfg_path = root / ".ledger" / "config.json"
         if not cfg_path.is_file():
@@ -435,7 +441,7 @@ def _chat_runner(root: Path, args, cfg_file: dict, backend):
             slots=[str(s) for s in cfg_now.get("slots", ["a", "b"])],
             hooks=cfg_now.get("hooks")
             if isinstance(cfg_now.get("hooks"), list) else None,
-            resume=resume,
+            resume=resume, progress=progress,
         )
         entries = Journal.read(str(journal_path))
         esc = next((e for e in reversed(entries)

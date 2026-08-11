@@ -13,6 +13,7 @@ import itertools
 import shutil
 import sys
 import threading
+import time
 from contextlib import contextmanager
 
 from . import ui
@@ -59,27 +60,55 @@ _FRAMES_U = "⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏"
 _FRAMES_A = "|/-\\"
 
 
+class Progress:
+    """The live status a long call reports through. Callers hold it and call
+    it as they move between phases; the spinner thread renders whatever it
+    currently says, so the line always names real work in progress."""
+
+    def __init__(self, label: str):
+        self.label = label
+        self.started = time.monotonic()
+
+    def __call__(self, text: str) -> None:
+        """Switch the displayed phase (usable directly as a callback)."""
+        self.label = text
+
+    update = __call__
+
+    def elapsed(self) -> float:
+        return time.monotonic() - self.started
+
+    def line(self, frame: str) -> str:
+        secs = self.elapsed()
+        clock = f"{secs:.0f}s" if secs < 60 \
+            else f"{int(secs // 60)}m{int(secs % 60):02d}s"
+        return (f"{ui.accent(frame)} {self.label} "
+                f"{ui.dim(clock)}{ui.dim(' · ctrl+c to interrupt')}")
+
+
 @contextmanager
 def spinner(label: str):
-    """Animated 'working' indicator around a blocking call; silent off-TTY."""
+    """Animated 'working' indicator around a blocking call. Yields a
+    Progress handle so the caller can rename the phase mid-flight. Silent
+    off-TTY (yields a handle that does nothing visible)."""
+    handle = Progress(label)
     if not interactive():
-        yield
+        yield handle
         return
-    frames = _FRAMES_U if ui.UNICODE else _FRAMES_A
+    frames = itertools.cycle(_FRAMES_U if ui.UNICODE else _FRAMES_A)
     stop = threading.Event()
 
     def spin():
-        for f in itertools.cycle(frames):
-            if stop.wait(0.08):
-                break
-            sys.stdout.write(f"\r{ui.accent(f)} {ui.dim(label)}\x1b[K")
+        while not stop.wait(0.08):
+            sys.stdout.write("\r" + handle.line(next(frames)) + "\x1b[K")
             sys.stdout.flush()
 
     t = threading.Thread(target=spin, daemon=True)
     sys.stdout.write("\x1b[?25l")  # hide cursor
+    sys.stdout.flush()
     t.start()
     try:
-        yield
+        yield handle
     finally:
         stop.set()
         t.join(timeout=0.5)

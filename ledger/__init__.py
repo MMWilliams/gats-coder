@@ -8,4 +8,4 @@ bit-exact replay, and a minimal sensor bank.
 
 # Stamped into every journal HEADER. release.ps1 syncs it from
 # pyproject.toml -- do not hand-edit out of step with the package version.
-AGENT_VERSION = "0.7.2"
+AGENT_VERSION = "0.7.4"
