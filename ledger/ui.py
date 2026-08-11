@@ -1,0 +1,180 @@
+"""Terminal styling, stdlib-only (the package has zero dependencies and
+keeps it that way).
+
+Color is a *presentation* concern: it activates only on an interactive
+terminal, so piped output, CI logs, and tests see exactly the plain text
+they always did. Honors NO_COLOR (https://no-color.org), TERM=dumb, and
+LEDGER_COLOR=0/1 as an explicit override.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+
+_CODES = {
+    "bold": "1", "dim": "2", "italic": "3",
+    "red": "31", "green": "32", "yellow": "33", "blue": "34",
+    "magenta": "35", "cyan": "36", "white": "37", "gray": "90",
+    "bright_red": "91", "bright_green": "92", "bright_yellow": "93",
+    "bright_cyan": "96",
+}
+
+
+def _enable_windows_vt() -> bool:
+    if os.name != "nt":
+        return True
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.GetStdHandle(-11)  # STD_OUTPUT_HANDLE
+        mode = ctypes.c_uint32()
+        if not kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+            return False
+        # ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004
+        return bool(kernel32.SetConsoleMode(handle, mode.value | 0x0004))
+    except Exception:
+        return False
+
+
+def _detect_color() -> bool:
+    override = os.environ.get("LEDGER_COLOR")
+    if override == "0":
+        return False
+    if override == "1":
+        return _enable_windows_vt() or True
+    if os.environ.get("NO_COLOR") is not None:
+        return False
+    if os.environ.get("TERM") == "dumb":
+        return False
+    try:
+        if not sys.stdout.isatty():
+            return False
+    except (AttributeError, ValueError):
+        return False
+    return _enable_windows_vt()
+
+
+def _detect_unicode() -> bool:
+    enc = getattr(sys.stdout, "encoding", "") or ""
+    return "utf" in enc.lower()
+
+
+COLOR = _detect_color()
+UNICODE = _detect_unicode()
+
+# Glyphs degrade to ASCII when the console encoding can't carry them.
+OK = "✓" if UNICODE else "+"          # check mark
+FAIL = "✗" if UNICODE else "x"        # ballot x
+DOT = "●" if UNICODE else "*"         # filled circle
+ARROW = "→" if UNICODE else "->"      # right arrow
+CHOSEN = "◀" if UNICODE else "<=="    # left-pointing triangle
+
+
+def style(text: str, *names: str) -> str:
+    """Wrap text in ANSI styles when color is active; identity otherwise."""
+    if not COLOR or not names:
+        return text
+    codes = ";".join(_CODES[n] for n in names if n in _CODES)
+    return f"\x1b[{codes}m{text}\x1b[0m" if codes else text
+
+
+def ok(text: str) -> str:
+    return style(text, "bright_green")
+
+
+def bad(text: str) -> str:
+    return style(text, "bright_red")
+
+
+def warn(text: str) -> str:
+    return style(text, "bright_yellow")
+
+
+def accent(text: str) -> str:
+    return style(text, "bright_cyan")
+
+
+def dim(text: str) -> str:
+    return style(text, "gray")
+
+
+def bold(text: str) -> str:
+    return style(text, "bold")
+
+
+def headline(success: bool, good_text: str, bad_text: str) -> str:
+    """The one-line verdict every command leads with."""
+    if success:
+        return f"{ok(OK)} {bold(good_text)}"
+    return f"{bad(FAIL)} {bold(bad_text)}"
+
+
+def plan_chain(plan: list[str]) -> str:
+    """A plan as a colored action chain: families accented, slots dimmed."""
+    if not plan:
+        return dim("(empty)")
+    parts = []
+    for action in plan:
+        family, _, slot = action.partition(":")
+        parts.append(accent(family) + (dim(":" + slot) if slot else ""))
+    return f" {dim(ARROW)} ".join(parts)
+
+
+def kv(label: str, value: str, width: int = 11) -> str:
+    """Aligned key-value line with a dimmed label."""
+    return f"  {dim(label.ljust(width))} {value}"
+
+
+def rule(title: str = "") -> str:
+    """A dimmed section rule, optionally titled."""
+    line = "─" if UNICODE else "-"
+    if not title:
+        return dim(line * 44)
+    pad = line * max(2, 42 - len(title))
+    return dim(f"{line}{line} ") + bold(title) + dim(f" {pad}")
+
+
+def table(rows: list[list[str]], header: list[str] | None = None,
+          highlight: int | None = None) -> str:
+    """Aligned monospace table. Column widths come from the *plain* text so
+    ANSI codes never skew the layout; `highlight` bolds one body row."""
+    def plain(s: str) -> str:
+        out, i = [], 0
+        while i < len(s):
+            if s[i] == "\x1b":
+                j = s.find("m", i)
+                i = (j + 1) if j != -1 else len(s)
+            else:
+                out.append(s[i])
+                i += 1
+        return "".join(out)
+
+    all_rows = ([header] if header else []) + rows
+    widths = [max(len(plain(r[c])) for r in all_rows)
+              for c in range(len(all_rows[0]))]
+
+    def render(r: list[str], is_header: bool, hl: bool) -> str:
+        cells = []
+        for c, cell in enumerate(r):
+            pad = " " * (widths[c] - len(plain(cell)))
+            cells.append(cell + pad)
+        text = "  " + "  ".join(cells).rstrip()
+        if is_header:
+            return dim(plain(text))
+        return style(plain(text), "bold") if hl and COLOR else text
+
+    lines = []
+    if header:
+        lines.append(render(header, True, False))
+    for i, r in enumerate(rows):
+        lines.append(render(r, False, i == highlight))
+    return "\n".join(lines)
+
+
+def next_steps(*commands: str) -> str:
+    """A 'what to do next' block -- the helpful part of helpful output."""
+    lines = [dim("next:")]
+    for c in commands:
+        lines.append(f"  {dim(DOT)} {c}")
+    return "\n".join(lines)

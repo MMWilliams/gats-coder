@@ -24,8 +24,6 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 - [ ] **MCP client** surfaced as contracted sensors/actions (never a free
       tool loop).
 - [ ] **GitHub Action wrapper** around `ledger run --json` + PR auto-review.
-- [ ] **`ledger vis`** — static HTML render of a journal (plan, UCB tables,
-      gates/hooks, incidents).
 - [ ] HTTP hook type; nested-dir instruction files.
 - [ ] **L2 merge across agents.** Currently seeded read-only and not merged
       back, so parallel agents share structure but not learned dynamics.
@@ -44,6 +42,20 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       AAMAS full paper: **Oct 8, 2026**.
 
 ---
+
+## Done (2026-08-10, sixth pass — v0.6.0 UI)
+
+- [x] **Terminal UI** (`ledger/ui.py`, stdlib-only) — verdict headlines
+      (✓/✗), colored plan chains, aligned tables (ANSI-safe widths), PASS/
+      WARN badges, dimmed chrome, escalation-aware `next:` hints on every
+      command incl. exact resume commands. Color only on interactive
+      terminals (Windows VT enabled via ctypes); NO_COLOR / LEDGER_COLOR /
+      TERM=dumb honored; piped output and --json byte-identical to before.
+- [x] **`ledger vis`** — journal → one self-contained dark HTML report:
+      badges (outcome/chain/profile/goal), stat strip, step timeline with
+      GATE/HOOK/EXEC/OBSERVE rows, expandable decision tables, state diffs
+      (+/- prop chips), incident + escalation banners, all HTML-escaped, no
+      external assets, no JS. Tests 103 → 110.
 
 ## Done (2026-08-10, fifth pass — v0.5.0 from the Claude Code + Kimi study)
 

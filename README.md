@@ -11,7 +11,7 @@ incident rather than a state transition. Every episode replays bit-exact.
 
 ```
 pip install -e .[dev]
-pytest                      # 103 tests
+pytest                      # 110 tests
 python -m ledger.cli demo   # paper's 100-task suite: SR / optimality / calls / variance
 ```
 
@@ -128,11 +128,21 @@ learned dynamics.
 ```
 ledger status <journal>       # goal, plan, incidents, divergences, chain health
 ledger why <journal> <step>   # the UCB table that actually produced the choice
+ledger vis <journal>          # one beautiful self-contained HTML report
 ledger incidents <journal>    # claims the sensors refused to confirm
 ledger replay <journal>       # bit-exact planner replay
 ledger verify-chain <journal> # tamper-evidence
 ledger stats <graph.sqlite>   # nodes, edges, dead ends, layer breakdown
 ```
+
+Terminal output is styled on interactive terminals (verdict headlines,
+colored plan chains, aligned decision tables, escalation-aware `next:`
+hints) and degrades to exactly the old plain text when piped — CI logs,
+`--json`, and scripts are unaffected. Honors `NO_COLOR` / `LEDGER_COLOR`.
+`ledger vis` renders any episode journal into a single dark-themed HTML
+file — timeline of every PLAN/GATE/HOOK/EXEC/OBSERVE entry, expandable
+decision tables, state diffs, incident and escalation banners — with no
+external assets, so it works from disk and in CI artifacts forever.
 
 `why` reports the decision inputs — Q, N, UCB, world-model layer and
 confidence per arm — not a model's after-the-fact explanation of itself.

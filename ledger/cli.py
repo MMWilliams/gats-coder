@@ -20,7 +20,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import AGENT_VERSION
+from . import AGENT_VERSION, ui
 from .chat import Conversation, repl
 from .executor import GATED_RISKS, PolicyGate, attended_gate, tty_approver
 from .graph import TransitionGraph
@@ -136,7 +136,7 @@ def _gate_and_profile(args, cfg: dict):
 
 
 def _fail(msg: str) -> int:
-    print(f"error: {msg}", file=sys.stderr)
+    print(f"{ui.bad('error:')} {msg}", file=sys.stderr)
     return 1
 
 
@@ -162,8 +162,12 @@ def cmd_init(args) -> int:
     gitignore = d / ".gitignore"
     if not gitignore.exists():
         gitignore.write_text("episodes/\nsessions/\n*.sqlite\n", encoding="utf-8")
-    print(f"initialized {cfg_path}")
-    print("next: ledger run \"describe the change you want\"")
+    print(f"{ui.ok(ui.OK)} initialized {ui.dim(str(cfg_path))}")
+    print()
+    print(ui.next_steps(
+        f"ledger doctor    {ui.dim('# check git, claude, and this config')}",
+        'ledger run "describe the change you want"',
+        f"ledger chat    {ui.dim('# just talk about the repo first')}"))
     return 0
 
 
@@ -193,6 +197,30 @@ def _run_attempts(args, root, cfg_file, backend, gate, profile,
     ranked = sorted(outcomes,
                     key=lambda o: (not o.success, o.steps, o.name))
     winner = ranked[0]
+    if not args.json:
+        print(ui.headline(winner.success,
+                          f"{winner.name} wins",
+                          "no attempt reached the goal"))
+        print()
+        for o in ranked:
+            mark = ui.ok(ui.OK) if o.success else ui.bad(ui.FAIL)
+            detail = o.error or (f"{o.steps} steps · "
+                                 f"{o.incidents} incidents")
+            crown = ui.warn(" « winner") if o is winner and o.success else ""
+            print(f"  {mark} {ui.bold(o.name)}  {ui.dim(detail)}{crown}")
+        print()
+        if winner.success:
+            print(ui.kv("plan", ui.plan_chain(winner.plan)))
+            print(ui.kv("branch", f"ledger/{winner.name}"))
+            print(ui.kv("journal", ui.dim(str(winner.journal_path))))
+        print(ui.kv("session", ui.dim(str(session.journal_path))))
+        if winner.success:
+            print()
+            print(ui.next_steps(
+                f"ledger status {winner.journal_path}",
+                f"git -C {root} branch --list ledger/*"
+                f"    {ui.dim('# the attempt branches')}"))
+        return 0 if winner.success else 1
     if args.json:
         print(json.dumps({
             "agent_version": AGENT_VERSION,
@@ -207,19 +235,6 @@ def _run_attempts(args, root, cfg_file, backend, gate, profile,
             "session_journal": str(session.journal_path),
         }))
         return 0 if winner.success else 1
-    for o in ranked:
-        mark = "ok  " if o.success else "FAIL"
-        detail = o.error or f"{o.steps} steps, {o.incidents} incidents"
-        print(f"  {mark} {o.name}  {detail}")
-    if winner.success:
-        print(f"\nwinner:  {winner.name} "
-              f"({winner.steps} steps: {' -> '.join(winner.plan)})")
-        print(f"branch:  ledger/{winner.name} (in its episode worktree)")
-        print(f"journal: {winner.journal_path}")
-    else:
-        print("\nno attempt reached the goal")
-    print(f"session journal: {session.journal_path}")
-    return 0 if winner.success else 1
 
 
 def cmd_run(args) -> int:
@@ -267,11 +282,11 @@ def cmd_run(args) -> int:
         hooks=cfg_file.get("hooks")
         if isinstance(cfg_file.get("hooks"), list) else None,
     )
+    entries = Journal.read(str(journal_path))
+    header = entries[0] if entries and entries[0]["t"] == "HEADER" else {}
+    esc = next((e for e in reversed(entries)
+                if e["t"] == "ESCALATION"), None)
     if args.json:
-        entries = Journal.read(str(journal_path))
-        header = entries[0] if entries and entries[0]["t"] == "HEADER" else {}
-        esc = next((e for e in reversed(entries)
-                    if e["t"] == "ESCALATION"), None)
         print(json.dumps({
             "agent_version": AGENT_VERSION,
             "task": args.task,
@@ -287,16 +302,46 @@ def cmd_run(args) -> int:
             "journal": str(journal_path),
         }))
         return 0 if result.success else 1
-    print(f"goal:      {'reached' if result.success else 'NOT reached'}")
-    print(f"plan:      {' -> '.join(result.plan) or '(empty)'}")
-    print(f"steps:     {result.steps}")
-    print(f"profile:   {profile}")
-    print(f"incidents: {executor.incidents}")
+
+    print(ui.headline(result.success, "goal reached", "goal NOT reached"))
+    print()
+    if header.get("goal"):
+        print(ui.kv("goal", " & ".join(header["goal"])))
+    print(ui.kv("plan", ui.plan_chain(result.plan)))
+    stats = (f"{result.steps} steps · {result.llm_planning_calls} LLM "
+             f"planning calls · profile {profile}")
+    print(ui.kv("run", stats))
+    checks = []
+    checks.append(ui.ok(f"{ui.OK} 0 incidents") if executor.incidents == 0
+                  else ui.bad(f"{ui.FAIL} {executor.incidents} incidents"))
     if executor.denials:
-        print(f"denials:   {executor.denials} (gated actions the human refused)")
-    print(f"LLM planning calls: {result.llm_planning_calls}")
-    print(f"journal:   {journal_path}")
-    print(f"audit:     ledger status {journal_path}")
+        checks.append(ui.warn(f"{executor.denials} denials"))
+    print(ui.kv("verify", "  ".join(checks)))
+    if esc is not None:
+        print(ui.kv("escalated", ui.bad(esc.get("reason", "?"))))
+    print(ui.kv("journal", ui.dim(str(journal_path))))
+    print()
+    if result.success:
+        print(ui.next_steps(
+            f"ledger status {journal_path}",
+            f"ledger why {journal_path} 0    {ui.dim('# the decision table')}",
+            f"ledger vis {journal_path}    {ui.dim('# HTML report')}"))
+    else:
+        reason = esc.get("reason") if esc else None
+        hints = [f"ledger status {journal_path}"]
+        if reason == "budget_exhausted":
+            hints.append(
+                f'ledger run "{args.task}" --name {args.name} --resume '
+                f"--max-author-attempts {author_budget * 2}"
+                f"    {ui.dim('# same episode, fresh budget')}")
+        elif reason == "gate_denied":
+            hints.append(f'ledger run "{args.task}" --name {args.name} '
+                         f"--resume --yes"
+                         f"    {ui.dim('# pre-approve the gated actions')}")
+        else:
+            hints.append(f"ledger why {journal_path} {max(result.steps - 1, 0)}"
+                         f"    {ui.dim('# why the last step was chosen')}")
+        print(ui.next_steps(*hints))
     return 0 if result.success else 1
 
 
@@ -380,6 +425,7 @@ def cmd_review(args) -> int:
                            backend=getattr(backend, "id", "?"))
     else:
         reply = backend.complete(prompt).strip()
+    print(ui.rule("review"))
     print(reply)
     return 0
 
@@ -423,15 +469,22 @@ def cmd_session(args) -> int:
     outcomes = session.run_parallel(specs, max_workers=args.workers)
 
     width = max(len(o.name) for o in outcomes)
-    print(f"{len(outcomes)} agents, {args.workers} workers\n")
+    succeeded = sum(1 for o in outcomes if o.success)
+    print(ui.headline(succeeded == len(outcomes),
+                      f"all {len(outcomes)} agents succeeded",
+                      f"{succeeded}/{len(outcomes)} agents succeeded"))
+    print()
     for o in outcomes:
-        mark = "ok  " if o.success else "FAIL"
-        detail = o.error or f"{o.steps} steps, {o.incidents} incidents"
-        print(f"  {mark} {o.name:<{width}}  {detail}")
-    print(f"\nshared graph: {session.graph_path}")
-    for k, v in session.shared_stats().items():
-        print(f"  {k}: {v}")
-    print(f"session journal: {session.journal_path}")
+        mark = ui.ok(ui.OK) if o.success else ui.bad(ui.FAIL)
+        detail = o.error or f"{o.steps} steps · {o.incidents} incidents"
+        print(f"  {mark} {ui.bold(o.name.ljust(width))}  {ui.dim(detail)}")
+    print()
+    stats = session.shared_stats()
+    print(ui.kv("graph", ui.dim(str(session.graph_path))))
+    print(ui.kv("pooled", ui.dim(
+        f"{stats.get('nodes', 0)} nodes · {stats.get('edges', 0)} edges · "
+        f"{stats.get('dead_ends', 0)} dead ends")))
+    print(ui.kv("journal", ui.dim(str(session.journal_path))))
     return 0 if all(o.success for o in outcomes) else 1
 
 
@@ -504,8 +557,13 @@ def cmd_doctor(args) -> int:
     width = max(len(name) for name, _, _ in checks)
     ok = True
     for name, detail, good in checks:
-        print(f"  {'PASS' if good else 'WARN'}  {name:<{width}}  {detail}")
+        badge = ui.ok(f"{ui.OK} PASS") if good else ui.warn(f"{ui.FAIL} WARN")
+        print(f"  {badge}  {name:<{width}}  {ui.dim(detail) if good else detail}")
         ok = ok and good
+    if ok:
+        print()
+        print(ui.dim("all checks passed — you're ready:") + " "
+              + ui.accent('ledger run "describe the change you want"'))
     return 0 if ok else 1
 
 
@@ -522,27 +580,40 @@ def cmd_status(args) -> int:
         counts[e["t"]] = counts.get(e["t"], 0) + 1
     chain_ok, chain_err = Journal.verify_chain(args.journal)
 
-    print(f"task:        {header.get('task_text') or header.get('task_id', '?')}")
+    print(ui.headline(bool(end.get("success")),
+                      "episode SUCCESS", "goal not reached"))
+    print()
+    print(ui.kv("task", str(header.get("task_text")
+                            or header.get("task_id", "?"))))
     if header.get("goal"):
-        print(f"goal:        {' & '.join(header['goal'])}")
-    print(f"outcome:     {'SUCCESS' if end.get('success') else 'not reached'}")
-    print(f"plan:        {' -> '.join(end.get('plan', [])) or '(empty)'}")
-    print(f"steps:       {end.get('steps', 0)}")
-    print(f"LLM planning calls: {end.get('llm_planning_calls', 0)}")
-    print(f"incidents:   {counts.get('INCIDENT', 0)}")
-    print(f"divergences: {sum(1 for e in entries if e['t'] == 'OBSERVE' and e.get('diverged'))}")
+        print(ui.kv("goal", " & ".join(header["goal"])))
+    print(ui.kv("plan", ui.plan_chain(end.get("plan", []))))
+    print(ui.kv("run", f"{end.get('steps', 0)} steps · "
+                       f"{end.get('llm_planning_calls', 0)} LLM planning "
+                       f"calls"))
+    incidents = counts.get("INCIDENT", 0)
+    divergences = sum(1 for e in entries
+                      if e["t"] == "OBSERVE" and e.get("diverged"))
     denials = sum(1 for e in entries
                   if e["t"] == "GATE" and not e.get("approved", True))
+    verify = [ui.ok(f"{ui.OK} 0 incidents") if incidents == 0
+              else ui.bad(f"{ui.FAIL} {incidents} incidents"),
+              ui.dim(f"{divergences} divergences")]
     if denials:
-        print(f"denials:     {denials}")
+        verify.append(ui.warn(f"{denials} denials"))
+    print(ui.kv("verify", "  ".join(verify)))
     esc = next((e for e in reversed(entries) if e["t"] == "ESCALATION"), None)
     if esc is not None:
-        print(f"escalation:  {esc.get('reason', '?')} "
-              f"(denials={esc.get('denials', 0)}, "
-              f"author_attempts={esc.get('author_attempts', 0)}"
-              f"/{esc.get('author_attempt_limit', 0)})")
-    print(f"chain:       {'intact' if chain_ok else f'BROKEN ({chain_err})'}")
-    print("entries:     " + ", ".join(f"{k}={v}" for k, v in sorted(counts.items())))
+        print(ui.kv("escalated",
+                    ui.bad(str(esc.get("reason", "?")))
+                    + ui.dim(f"  (denials={esc.get('denials', 0)}, "
+                             f"author_attempts={esc.get('author_attempts', 0)}"
+                             f"/{esc.get('author_attempt_limit', 0)})")))
+    chain = ui.ok(f"{ui.OK} intact") if chain_ok \
+        else ui.bad(f"{ui.FAIL} BROKEN ({chain_err})")
+    print(ui.kv("chain", chain))
+    print(ui.kv("entries", ui.dim(", ".join(
+        f"{k}={v}" for k, v in sorted(counts.items())))))
     return 0 if chain_ok else 1
 
 
@@ -550,13 +621,16 @@ def cmd_incidents(args) -> int:
     entries = Journal.read(args.journal)
     found = [e for e in entries if e["t"] == "INCIDENT"]
     if not found:
-        print("no incidents recorded")
+        print(f"{ui.ok(ui.OK)} no incidents recorded — every claim the "
+              "model made, the sensors confirmed")
         return 0
-    print(f"{len(found)} incident(s):\n")
+    print(ui.headline(False, "", f"{len(found)} incident(s)"))
+    print()
     for e in found:
-        print(f"  [{e['i']}] {e.get('type', '?')} during {e.get('action', '?')}")
+        print(f"  {ui.bad(ui.DOT)} [{e['i']}] {ui.bold(str(e.get('type', '?')))}"
+              f" during {ui.accent(str(e.get('action', '?')))}")
         for prop in e.get("claimed_not_observed", []):
-            print(f"        claimed but not observed: {prop}")
+            print(ui.dim("        claimed but not observed: ") + prop)
     return 1
 
 
@@ -583,30 +657,40 @@ def cmd_demo(args) -> int:
     )
     llm_calls = sum(r.llm_planning_calls for _, r in results)
     identical = all(a.plan == b.plan for (_, a), (_, b) in zip(runs[0], runs[1]))
-    print(f"tasks:                {n}")
-    print(f"success rate:         {successes}/{n} ({100.0 * successes / n:.1f}%)")
-    print(f"optimal plans:        {optimal}/{n}")
-    print(f"LLM planning calls:   {llm_calls}")
-    print(f"plan variance (2 runs): {'0 (identical)' if identical else 'NONZERO'}")
+    print(ui.kv("tasks", str(n), width=22))
+    print(ui.kv("success rate",
+                f"{successes}/{n} ({100.0 * successes / n:.1f}%)", width=22))
+    print(ui.kv("optimal plans", f"{optimal}/{n}", width=22))
+    print(ui.kv("LLM planning calls", str(llm_calls), width=22))
+    print(ui.kv("plan variance (2 runs)",
+                "0 (identical)" if identical else ui.bad("NONZERO"),
+                width=22))
     ok = successes == n and optimal == n and llm_calls == 0 and identical
-    print("M1 exit criterion:", "PASS" if ok else "FAIL")
+    print()
+    print("M1 exit criterion:",
+          ui.ok(f"{ui.OK} PASS") if ok else ui.bad(f"{ui.FAIL} FAIL"))
     return 0 if ok else 1
 
 
 def cmd_verify_chain(args) -> int:
     ok, err = Journal.verify_chain(args.journal)
-    print("chain OK" if ok else f"chain BROKEN: {err}")
-    return 0 if ok else 1
+    if ok:
+        print(f"{ui.ok(ui.OK)} chain OK — every hash links, nothing "
+              "has been altered")
+        return 0
+    print(f"{ui.bad(ui.FAIL)} chain BROKEN: {err}")
+    return 1
 
 
 def cmd_replay(args) -> int:
     result = run_replay(args.journal)
     if result.ok:
-        print(f"replay OK: {result.steps_compared} steps bit-exact")
+        print(f"{ui.ok(ui.OK)} replay OK — {result.steps_compared} steps "
+              "reproduced bit-exact")
         return 0
-    print("replay MISMATCH:")
+    print(f"{ui.bad(ui.FAIL)} replay MISMATCH:")
     for m in result.mismatches:
-        print(f"  - {m}")
+        print(f"  {ui.bad(ui.DOT)} {m}")
     return 1
 
 
@@ -621,20 +705,42 @@ def cmd_why(args) -> int:
         print(f"no PLAN entry for step {args.step}")
         return 1
     n_total = sum(row["n"] for row in plan["table"])
-    print(f"step {args.step} @ state {plan['state'][:12]}: chose {plan['chosen']!r}")
-    print(f"  predicted -> {plan['pred_state'][:12]} "
-          f"(layer {plan['wm']['layer']}, p={plan['wm']['p']})")
-    print(f"  arms considered ({plan['search_iters']} search iterations, "
-          f"{plan['llm_planning_calls']} LLM planning calls):")
-    for row in sorted(plan["table"], key=lambda r: -r["q"]):
+    print(f"{ui.bold(f'step {args.step}')} @ {ui.dim(plan['state'][:12])}: "
+          f"chose {ui.accent(plan['chosen'])}")
+    print(ui.dim(f"  predicted {ui.ARROW} {plan['pred_state'][:12]} "
+                 f"(layer {plan['wm']['layer']}, p={plan['wm']['p']}) · "
+                 f"{plan['search_iters']} search iterations · "
+                 f"{plan['llm_planning_calls']} LLM planning calls"))
+    print()
+    rows = []
+    ordered = sorted(plan["table"], key=lambda r: -r["q"])
+    chosen_i = None
+    for i, row in enumerate(ordered):
         if row["n"] > 0 and n_total > 0:
             ucb = row["q"] + c * math.sqrt(2.0 * math.log(n_total) / row["n"])
             ucb_s = f"{ucb:.3f}"
         else:
             ucb_s = "inf (unvisited)"
-        mark = " <== chosen" if row["a"] == plan["chosen"] else ""
-        print(f"    {row['a']:<28} N={row['n']:<3} Q={row['q']:.3f} "
-              f"UCB={ucb_s}{mark}")
+        mark = ""
+        if row["a"] == plan["chosen"]:
+            chosen_i = i
+            mark = f"{ui.CHOSEN} chosen"
+        rows.append([row["a"], str(row["n"]), f"{row['q']:.3f}",
+                     ucb_s, mark])
+    print(ui.table(rows, header=["arm", "N", "Q", "UCB", ""],
+                   highlight=chosen_i))
+    return 0
+
+
+def cmd_vis(args) -> int:
+    from .vis import render_file
+    journal = Path(args.journal)
+    if not journal.is_file():
+        return _fail(f"no such journal: {journal}")
+    out = Path(args.out) if args.out else journal.with_suffix(".html")
+    out.write_text(render_file(journal), encoding="utf-8")
+    print(f"{ui.ok(ui.OK)} wrote {ui.bold(str(out))}")
+    print(ui.dim("  open it in a browser — it is fully self-contained"))
     return 0
 
 
@@ -773,6 +879,13 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("journal")
     p.add_argument("step", type=int)
     p.set_defaults(fn=cmd_why)
+
+    p = sub.add_parser("vis", help="render a journal as a self-contained "
+                                   "HTML report")
+    p.add_argument("journal")
+    p.add_argument("-o", "--out", default=None,
+                   help="output path (default: journal path with .html)")
+    p.set_defaults(fn=cmd_vis)
 
     p = sub.add_parser("stats", help="show a persisted graph's statistics")
     p.add_argument("graph")

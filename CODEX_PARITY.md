@@ -154,7 +154,7 @@ Kimi Code CLI (the agent).
 | WebBridge (user's own browser via CDP) / Computer Use plugin | SCOPE | Not expressible as verifiable contracts yet. |
 | Native video input in the coding loop | SCOPE | Backend-dependent. |
 | Conversational MCP setup, plugin marketplace | GAP/SCOPE | With MCP. |
-| Session export / `kimi vis` run visualizer | PART | Journals are plain JSONL (exportable today); an HTML run visualizer is a natural `ledger vis`. |
+| Session export / `kimi vis` run visualizer | **HAVE (v0.6.0)** | `ledger vis`: any journal → one self-contained HTML report (timeline, decision tables, state diffs, gate/hook/incident/escalation markers). |
 | Open weights / protocol-agnostic backends | PART | `LLMBackend` protocol is model-agnostic; only the claude CLI backend is implemented — an OpenAI-compatible/local backend is a small add. |
 | doctor config validation | **HAVE (v0.5.0)** | |
 
@@ -173,11 +173,12 @@ Kimi Code CLI (the agent).
 11. Best-of-N — **HAVE (v0.5.0)**
 12. Extensibility (hooks ✓; skills/plugins ✗) — **PART**
 
-### Build order after v0.5.0
-1. OS sandbox for skill subprocesses (Job Objects / bwrap).
-2. OpenAI-compatible + local (Ollama) backends via `LLMBackend`.
-3. MCP client surfaced as contracted sensors/actions.
-4. GitHub Action wrapper (`ledger run --json` in CI) + PR auto-review.
-5. `ledger vis` — static HTML render of a journal (plan, UCB tables,
-   gates, incidents).
-6. HTTP hook type; nested-dir instruction files.
+### Build order after v0.5.0 — status as of v0.6.0
+1. OS sandbox for skill subprocesses (Job Objects / bwrap) — still open.
+2. OpenAI-compatible + local (Ollama) backends via `LLMBackend` — open.
+3. MCP client surfaced as contracted sensors/actions — open.
+4. GitHub Action wrapper (`ledger run --json` in CI) + PR auto-review — open.
+5. ~~`ledger vis`~~ — **SHIPPED v0.6.0**, plus full terminal styling
+   (verdict headlines, colored plan chains, aligned UCB tables,
+   escalation-aware next-step hints; plain off-TTY, NO_COLOR honored).
+6. HTTP hook type; nested-dir instruction files — open.
