@@ -126,11 +126,16 @@ class Session:
 
     def __init__(self, session_dir: Path | str, cfg: PlanConfig | None = None,
                  backend=None, gate=None, profile: str = "attended",
-                 max_author_attempts: int = 6, hooks: list[dict] | None = None):
+                 max_author_attempts: int = 6, hooks: list[dict] | None = None,
+                 share_graph: bool = True):
         self.dir = Path(session_dir)
         self.dir.mkdir(parents=True, exist_ok=True)
         self.cfg = cfg or PlanConfig()
         self.backend = backend
+        # share_graph=False is the COLD control arm: agents still merge their
+        # graphs into the shared store, but none of them start from it. That
+        # isolates "does pooled structure help" from every other variable.
+        self.share_graph = share_graph
         from .executor import attended_gate
         self.gate = gate or attended_gate
         self.profile = profile
@@ -163,6 +168,13 @@ class Session:
                 gate=self.gate, profile=self.profile,
                 max_author_attempts=self.max_author_attempts,
                 hooks=self.hooks,
+                # Close the pooling loop: agents merge INTO the shared graph
+                # after running, and now also start FROM it. Without this the
+                # pooled graph was write-only and a population learned nothing
+                # from itself.
+                seed_graph_path=(str(self.graph_path)
+                                 if self.share_graph and self.graph_path.exists()
+                                 else None),
             )
         except Exception as exc:
             return AgentOutcome(spec.name, False, [], 0, 0, 0, None, None,

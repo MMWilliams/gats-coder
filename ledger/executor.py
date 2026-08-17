@@ -535,6 +535,7 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                      resume: bool = False,
                      hooks: list[dict] | None = None,
                      progress=None,
+                     seed_graph_path: str | None = None,
                      ) -> tuple[EpisodeResult, RepoExecutor, Path]:
     """End-to-end journaled episode on a real repo (M2/M3).
 
@@ -671,8 +672,20 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
             # Warm start: the prior segment's transition graph -- learned
             # edges, UCB statistics, dead ends -- carries over.
             graph = TransitionGraph.load(str(graph_path))
+        elif seed_graph_path and Path(seed_graph_path).exists():
+            # POOLED start (paper SS3.3): begin from a graph other agents
+            # already verified. Distinct from --resume, which continues THIS
+            # episode; this inherits structure from a *population*.
+            #
+            # The seeded edges carry their UCB statistics, so an arm another
+            # agent already sampled starts visited rather than at +inf, and
+            # search spends its budget on what is genuinely unknown here.
+            # Determinism is unaffected: the seed is an input like any other,
+            # and replay pins it by recording the seed's stats in the HEADER.
+            graph = TransitionGraph.load(str(seed_graph_path))
         else:
             graph = TransitionGraph()
+        seeded = graph.stats()
         wm = LayeredWorldModel(catalog, l3=l3)
         if l2_path and Path(l2_path).exists():
             wm.l2.load(l2_path)
@@ -682,6 +695,7 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                           "profile": executor.profile,
                           "branch": worktree.branch,
                           "segment": segment, "resumed": bool(resume),
+                          "seeded_graph": seeded,
                           **goal_extra},
         )
         if not result.success:

@@ -52,6 +52,12 @@ def _git(root: Path, *args: str) -> str | None:
     return out.stdout.strip()
 
 
+#: Agent-generated working branches are named `ledger/<episode>`. The episode
+#: part is an identifier the agent invented, not a fact about the world.
+AGENT_BRANCH_PREFIX = "ledger/"
+AGENT_BRANCH_PROP = "repo.branch:ledger"
+
+
 def git_sensor() -> Sensor:
     def probe(root: Path) -> set:
         props = set()
@@ -61,10 +67,26 @@ def git_sensor() -> Sensor:
                 props.add("repo.clean")
             branch = _git(root, "rev-parse", "--abbrev-ref", "HEAD")
             if branch:
-                props.add(f"repo.branch:{branch}")
+                # ABSTRACTION (design SS4.1, fixes SS12.8). A branch named
+                # `ledger/alpha` and one named `ledger/beta` are the same
+                # SITUATION -- "on an agent working branch" -- differing only
+                # by an identifier the agent minted itself. Emitting the raw
+                # name put that identifier inside k(s), which made every
+                # episode's state keys unique and silently destroyed all
+                # cross-agent and cross-episode graph reuse: two agents on the
+                # same repo pursuing the same goal shared ZERO nodes.
+                #
+                # Real branches (main, develop, a user's feature branch) keep
+                # their names, because *those* distinctions are semantic. Only
+                # the agent's own scratch branches collapse to a constant.
+                # Same principle as bucketing continuous values: the
+                # abstraction must be coarse enough for states to merge.
+                props.add(AGENT_BRANCH_PROP
+                          if branch.startswith(AGENT_BRANCH_PREFIX)
+                          else f"repo.branch:{branch}")
         return props
 
-    return Sensor(name="git", version="1", cost_tier="instant", probe=probe)
+    return Sensor(name="git", version="2", cost_tier="instant", probe=probe)
 
 
 class ExpensiveResultCache:
