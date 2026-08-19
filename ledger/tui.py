@@ -86,20 +86,52 @@ class Progress:
                 f"{ui.dim(clock)}{ui.dim(' · ctrl+c to interrupt')}")
 
 
+# The live indicator, so anything that needs the terminal (a gate asking
+# permission) can make it stand aside. Without this the spinner repaints
+# over the question every 80ms and the session looks hung while it is
+# actually waiting for a keypress nobody can see.
+_ACTIVE: dict | None = None
+
+
+@contextmanager
+def paused():
+    """Suspend the working indicator so a prompt is visible and answerable."""
+    global _ACTIVE
+    record = _ACTIVE
+    if record is None:
+        yield
+        return
+    record["paused"] = True
+    sys.stdout.write("\r\x1b[K\x1b[?25h")     # clear the line, show cursor
+    sys.stdout.flush()
+    try:
+        yield
+    finally:
+        record["paused"] = False
+        if interactive():
+            sys.stdout.write("\x1b[?25l")
+            sys.stdout.flush()
+
+
 @contextmanager
 def spinner(label: str):
     """Animated 'working' indicator around a blocking call. Yields a
     Progress handle so the caller can rename the phase mid-flight. Silent
     off-TTY (yields a handle that does nothing visible)."""
+    global _ACTIVE
     handle = Progress(label)
     if not interactive():
         yield handle
         return
     frames = itertools.cycle(_FRAMES_U if ui.UNICODE else _FRAMES_A)
     stop = threading.Event()
+    record = {"paused": False}
+    previous, _ACTIVE = _ACTIVE, record
 
     def spin():
         while not stop.wait(0.08):
+            if record["paused"]:
+                continue
             sys.stdout.write("\r" + handle.line(next(frames)) + "\x1b[K")
             sys.stdout.flush()
 
@@ -112,6 +144,7 @@ def spinner(label: str):
     finally:
         stop.set()
         t.join(timeout=0.5)
+        _ACTIVE = previous
         sys.stdout.write("\r\x1b[K\x1b[?25h")  # clear line, show cursor
         sys.stdout.flush()
 

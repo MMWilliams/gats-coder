@@ -3,6 +3,7 @@ the TUI editor state machine."""
 
 import json
 import os
+import time
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from types import SimpleNamespace
@@ -389,6 +390,53 @@ def test_progress_line_names_the_phase_and_counts_time():
 
     p.started -= 75                            # long run -> m/s clock
     assert "1m15s" in tui.ui.plain(p.line("*"))
+
+
+def test_a_prompt_makes_the_indicator_stand_aside(monkeypatch):
+    """Regression: the spinner repainted every 80ms over the gate's
+    "allow X? [y/N]" question, so an episode waiting for a keypress looked
+    hung forever. Any prompt must be able to suspend it."""
+    monkeypatch.setattr(tui, "interactive", lambda: True)
+    written = []
+    monkeypatch.setattr(tui.sys.stdout, "write", written.append)
+    monkeypatch.setattr(tui.sys.stdout, "flush", lambda: None)
+
+    with tui.spinner("working"):
+        assert tui._ACTIVE is not None
+        with tui.paused():
+            assert tui._ACTIVE["paused"] is True     # renderer stands down
+            before = len(written)
+            time.sleep(0.25)                         # ~3 frames' worth
+            assert len(written) == before, "spinner drew over the prompt"
+        assert tui._ACTIVE["paused"] is False        # and resumes after
+    assert tui._ACTIVE is None                       # restored on exit
+
+
+def test_paused_without_a_spinner_is_a_noop():
+    with tui.paused():
+        pass                                          # must not raise
+
+
+def test_gate_prompt_suspends_the_indicator(monkeypatch):
+    """The approver itself must do the suspending -- not every caller."""
+    from ledger import executor
+    monkeypatch.setattr(executor.sys.stdin, "isatty", lambda: True)
+    seen = {}
+
+    def fake_input(prompt=""):
+        seen["prompt"] = prompt
+        seen["paused"] = tui._ACTIVE is not None and tui._ACTIVE["paused"]
+        return "y"
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    monkeypatch.setattr(tui, "interactive", lambda: True)
+    monkeypatch.setattr(tui.sys.stdout, "write", lambda s: None)
+    monkeypatch.setattr(tui.sys.stdout, "flush", lambda: None)
+
+    with tui.spinner("working"):
+        assert executor.tty_approver("AuthorPatch:a", "write") is True
+    assert "AuthorPatch:a" in seen["prompt"]
+    assert seen["paused"] is True
 
 
 def test_spinner_yields_a_working_handle_offline():

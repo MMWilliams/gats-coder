@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ledger-agent"
-version = "0.8.0"
+version = "0.8.1"
 description = "LEDGER - GATS-planned, audit-first autonomous coding agent: the LLM writes the code, deterministic search decides what happens next, sensors verify every claim, and every run replays bit-exact."
 readme = "README.md"
 license = { text = "MIT" }

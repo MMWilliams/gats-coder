@@ -288,12 +288,20 @@ GATED_RISKS = {
 
 def tty_approver(action_name: str, risk: str) -> bool:
     """Ask the human at the terminal. Without a terminal there is no human,
-    so the only safe answer is no."""
+    so the only safe answer is no.
+
+    The working indicator is suspended first: it repaints the line every
+    80ms, and a question it paints over is a question nobody can answer --
+    the session then looks hung while it waits forever.
+    """
     if not sys.stdin.isatty():
         return False
+    from . import tui, ui as _ui
     try:
-        resp = input(f"[gate] allow {action_name} (risk={risk})? [y/N] ")
-    except EOFError:
+        with tui.paused():
+            resp = input(_ui.warn(
+                f"[gate] allow {action_name} (risk={risk})? [y/N] "))
+    except (EOFError, OSError):
         return False
     return resp.strip().lower() in ("y", "yes")
 
