@@ -22,7 +22,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from . import AGENT_VERSION, ui
+from . import AGENT_VERSION, ui, voice
 from .chat import Conversation, repl
 from .executor import GATED_RISKS, PolicyGate, attended_gate, tty_approver
 from .graph import TransitionGraph
@@ -364,6 +364,71 @@ def cmd_run(args) -> int:
     return 0 if result.success else 1
 
 
+def _voice_session(args, cfg: dict, editor):
+    """Build the speech front end, or explain exactly what is missing."""
+    vcfg = cfg.get("voice") if isinstance(cfg.get("voice"), dict) else {}
+    if getattr(args, "dangerously_skip_permissions", False):
+        _fail("--voice cannot be combined with "
+              "--dangerously-skip-permissions: a mis-heard word must never "
+              "be able to approve an irreversible action")
+        return None
+    try:
+        stt = voice.WhisperCppSTT(model=vcfg.get("whisper_model"))
+    except RuntimeError as exc:
+        _fail(str(exc))
+        print(ui.dim("  run `ledger voice --setup` for the one-time "
+                     "download instructions"), file=sys.stderr)
+        return None
+    try:
+        recorder = voice.Recorder(device=vcfg.get("device"))
+    except RuntimeError as exc:
+        _fail(str(exc))
+        return None
+    tts = voice.resolve_tts(vcfg.get("tts", "auto"))
+    return voice.VoiceSession(
+        stt, tts, recorder, editor=editor,
+        speak_replies=bool(vcfg.get("speak", True)))
+
+
+SETUP_HELP = """One-time voice setup (everything runs locally):
+
+  1. ffmpeg           records the microphone
+       winget install ffmpeg      (macOS: brew install ffmpeg)
+
+  2. whisper.cpp      transcribes speech, offline
+       download a release build and a model, then put them at
+         ~/.ledger/whisper/          (whisper-cli binary)
+         ~/.ledger/whisper/models/   (ggml-base.en.bin)
+       https://github.com/ggml-org/whisper.cpp/releases
+       https://huggingface.co/ggerganov/whisper.cpp
+
+  3. piper            speaks, offline
+       pip install piper-tts
+       put a voice (.onnx + .onnx.json) in ~/.ledger/voices/
+       https://huggingface.co/rhasspy/piper-voices
+
+Override any path with LEDGER_WHISPER_BIN, LEDGER_WHISPER_MODEL,
+LEDGER_PIPER_BIN, LEDGER_PIPER_VOICE. Check with `ledger doctor`."""
+
+
+def cmd_voice(args) -> int:
+    """`ledger voice` == `ledger chat --voice`."""
+    if args.setup:
+        print(SETUP_HELP)
+        return 0
+    if args.devices:
+        devices = voice.list_input_devices()
+        if not devices:
+            print("no input devices reported (platform may not support "
+                  "enumeration; set voice.device in config)")
+            return 1
+        for d in devices:
+            print(f"  {d}")
+        return 0
+    args.voice = True
+    return cmd_chat(args)
+
+
 def _episode_outcome(episode_dir: Path) -> str:
     """'succeeded' | 'failed' | 'unfinished' from the latest journal
     segment (episode.jsonl, episode.r2.jsonl, ...)."""
@@ -532,13 +597,27 @@ def cmd_chat(args) -> int:
             if "colour" in reasons:
                 print(ui.dim(f"styled UI off ({reasons['colour']}) — "
                              "set LEDGER_COLOR=1 to force it on"))
+        editor = None
         if tui.interactive():
             profile = getattr(args, "profile", None) \
                 or cfg_file.get("profile", "attended")
             extra = f" · {len(conv.tools)} MCP tools" if conv.tools else ""
+            if getattr(args, "voice", False):
+                extra += " · voice"
             print(tui.banner(root.name, profile,
                              getattr(backend, "id", "?") + extra))
             editor = tui.LineEditor(tui.COMMANDS)
+
+        if getattr(args, "voice", False):
+            vs = _voice_session(args, cfg_file, editor)
+            if vs is None:
+                return 1
+            print(ui.dim(f"  voice: {vs.stt.id} listening · {vs.tts.id} "
+                         f"speaking · {voice.LISTEN_HINT}"))
+            return repl(conv, root, input_fn=vs.read, output_fn=vs.write,
+                        runner=runner, busy=tui.spinner, greet=False)
+
+        if editor is not None:
             return repl(conv, root, input_fn=editor.read,
                         runner=runner, busy=tui.spinner, greet=False)
         return repl(conv, root, runner=runner)
@@ -689,7 +768,7 @@ def cmd_session(args) -> int:
 
 _KNOWN_CONFIG_KEYS = frozenset({
     "test_cmd", "planner", "profile", "slots", "max_author_attempts",
-    "policy", "hooks", "backend", "mcp",
+    "policy", "hooks", "backend", "mcp", "voice",
 })
 
 
@@ -765,6 +844,7 @@ def cmd_doctor(args) -> int:
         else:
             checks.append(("config lint", "clean", True))
     checks.extend(ui.diagnostics())
+    checks.extend(voice.diagnostics())
     width = max(len(name) for name, _, _ in checks)
     ok = True
     for name, detail, good in checks:
@@ -1073,8 +1153,30 @@ def build_parser() -> argparse.ArgumentParser:
                    dest="dangerously_skip_permissions", action="store_true",
                    help="bypass every gate, prompt, and policy rule "
                         "(use only where a wrong action is cheap)")
+    p.add_argument("--voice", action="store_true",
+                   help="talk to it: local speech in and out "
+                        "(confirmations stay on the keyboard)")
     add_backend(p)
     p.set_defaults(fn=cmd_chat)
+
+    p = sub.add_parser("voice",
+                       help="the unified session, hands-free (chat --voice)")
+    p.add_argument("--repo", default=".")
+    p.add_argument("--ask", default=None, help="one-shot question, no REPL")
+    p.add_argument("--context", default=None)
+    p.add_argument("--journal", default=None)
+    p.add_argument("--profile", default=None, choices=sorted(GATED_RISKS))
+    p.add_argument("--yes", action="store_true")
+    p.add_argument("--max-author-attempts", dest="max_author_attempts",
+                   type=int, default=None)
+    p.add_argument("--dangerously-skip-permissions",
+                   dest="dangerously_skip_permissions", action="store_true")
+    p.add_argument("--setup", action="store_true",
+                   help="print the one-time local setup instructions")
+    p.add_argument("--devices", action="store_true",
+                   help="list microphones ffmpeg can record from")
+    add_backend(p)
+    p.set_defaults(fn=cmd_voice, voice=True)
 
     p = sub.add_parser("session",
                        help="run several agents in parallel on a shared graph")

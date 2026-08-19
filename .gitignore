@@ -13,4 +13,4 @@ essay/*.epub
 essay/_pdf_render*.html
 
 # experiment scratch: throwaway repos + git worktrees, regenerated on every run
-experiments/.work/
+experiments/.work*/

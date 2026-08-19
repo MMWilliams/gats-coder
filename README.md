@@ -11,7 +11,7 @@ incident rather than a state transition. Every episode replays bit-exact.
 
 ```
 pip install -e .[dev]
-pytest                      # 147 tests
+pytest                      # 170 tests
 python -m ledger.cli demo   # paper's 100-task suite: SR / optimality / calls / variance
 ```
 
@@ -115,6 +115,34 @@ can call their tools mid-conversation — every call is permission-gated
   "docs": {"command": ["python", "tools/docs_server.py"], "risk": "network"}
 }}
 ```
+
+## Talking to it
+
+```
+ledger voice                 # the unified session, hands-free
+ledger chat --voice          # same thing
+ledger voice --setup         # one-time local install instructions
+ledger voice --devices       # list microphones
+```
+
+Press Enter to talk, Enter again to stop; or just type — voice is additive,
+never a trap. Everything runs locally: `ffmpeg` records, `whisper.cpp`
+transcribes, `piper` speaks. No audio leaves the machine.
+
+Two deliberate limits. **Confirmations are keyboard-only** — a mis-heard
+"yes" must never be able to approve a push or a pull request, so gate
+questions hand the keyboard back and `--voice` refuses to combine with
+`--dangerously-skip-permissions`. And **code is never read aloud**: the
+terminal keeps the full detail while the spoken channel gets the verdict
+("episode fix-the-failing-test, goal reached, zero incidents").
+
+Configure in `.ledger/config.json`:
+
+```jsonc
+"voice": {"tts": "piper", "device": "Headset Microphone", "speak": true}
+```
+
+`ledger doctor` reports recorder, speech-to-text, speech, and microphone.
 
 ## Model backends
 
