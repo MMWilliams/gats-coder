@@ -34,14 +34,75 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 
 ## Research
 
-- [ ] **The multi-agent result AAMAS wants.** `ledger/session.py` is the shared
-      transition-graph story the paper lacks — pooled verified edges across a
-      population of agents. There is still no *experiment*. A measured result
-      here (does agent N+1 plan better because agents 1..N ran?) would close
-      the venue-fit gap flagged in [[gats-conference-submissions]].
-      AAMAS full paper: **Oct 8, 2026**.
+- [x] **The multi-agent result AAMAS wants.** DONE 2026-08-16.
+      `experiments/pooling_experiment.py` + `results/pooling.json`. 6 agents x
+      3 repeats, no LLM: cold 4 steps/1 divergence for every agent; warm pays
+      4/1 at k=1 then 3/0 for k=2..6. All reach goal, plan variance 0.
+      Required fixing `sensors.py` first — `repo.branch:ledger/<episode>` put an
+      agent-minted identifier inside k(s), so state-key overlap between two
+      agents on the same repo was ZERO. After the fix: 7 of 7.
+
+- [x] **Heterogeneous task family.** DONE 2026-08-19.
+      `experiments/hetero_experiment.py` + `results/hetero.json`. 3 task types
+      (depth 1/2/3 independent fixes), 9 agents x 3 repeats, rotated assignment.
+      Cold pays 1 divergence EVERY time. Warm splits EXACTLY on task-type
+      novelty: first-time type n=9 -> 1.00 div / 5.00 steps; already-pooled
+      n=18 -> 0.00 div / 4.00 steps. No agent deviated. Seeded edges saturate
+      at 31 once all 3 types are covered.
+      FINDING: pooling is amortized PER TASK TYPE, not globally, because
+      `patch.queued:<id>` / `patch.applied:<id>` are inside k(s). Population
+      benefit tracks coverage of the type space (coupon-collector), not
+      population size.
+
+- [ ] **NeurIPS "Who Verifies the Agents?" — Aug 29 23:59 AoE.** DRAFTED
+      2026-08-19 at `gats-submissions
+eurips-verifies\ledger_verify2026.tex`.
+      Compiles clean (0 errors, 0 undefined cites, 0 overfull), 7pp with refs
+      starting p6 = 5 content pages, inside the 4-9pp limit. PDF verified
+      anonymous (grepped for name/co-author/affiliations/handles: no leaks).
+      Title: "The Verifier Must Not Trust the Agent's Names: State Abstraction
+      as a Precondition for Shared Verification". Both experiments included.
+      Workshop: double-blind, non-archival, Sydney Dec 11-12; OpenReview venue
+      `NeurIPS.cc/2026/Workshop/Verify-Agents`; notification Sept 29.
+      REMAINING: (a) user must add co-author on OpenReview at submission time
+      (no MCP tool for this); (b) decide whether to build a supplementary zip
+      as was done for FAST; (c) submit.
+
+- [ ] **AI Engineer NYC — Sep 12.** Workshop (1-2h) + lightning talk drafted,
+      NOT submitted. Sessionize. Only remaining venue taking workshops.
+
+      AAMAS full paper: **Oct 8, 2026** (author registration Sept 17).
 
 ---
+
+
+## Done (2026-08-19 — v0.8.0-0.8.2 voice + hang fixes)
+
+- [x] **Voice sessions** (`ledger voice` / `chat --voice`). Terminal, not a
+      desktop app: the mic belongs to the process, and repl() already
+      injected input_fn/output_fn. Zero new pip deps — ffmpeg records,
+      whisper.cpp transcribes locally (~0.5s), piper speaks. Confirmations
+      are keyboard-only and --voice refuses --dangerously-skip-permissions;
+      code is never read aloud (spoken_summary strips paths/diffs/glyphs).
+- [x] **v0.8.1 — the spinner hid the gate question.** An attended episode
+      asked "allow AuthorPatch:a? [y/N]" and the working indicator
+      repainted over it every 80ms, so the session looked hung at 15
+      minutes while waiting for a keypress nobody could see. Journal proved
+      it: HEADER, PLAN, no GATE. tui.paused() + tty_approver suspends it.
+- [x] **v0.8.2 — orphaned model calls + stale worktrees.** A timed-out
+      claude call killed only the .CMD shim, leaving the model running
+      (observed: 16 min after its parent died) and holding the pipes the
+      recovery path waits on; now kills the whole tree. Deleting an episode
+      directory left the worktree registered in git and broke the next run;
+      Worktree.add now prunes and forces past stale registrations.
+
+### Open from this pass
+- [ ] Voice: hands-free VAD (currently push-to-talk), and a spoken
+      "shall I run it?" confirmation is deliberately NOT offered — consent
+      stays on the keyboard.
+- [ ] Orphan prevention on hard kill needs a Job Object (Windows) /
+      process group — the timeout path is fixed, an external SIGKILL of
+      LEDGER still leaves a grandchild. Ties into the OS-sandbox item.
 
 ## Done (2026-08-11, seventh pass — v0.7.0 unified session)
 
