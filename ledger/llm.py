@@ -18,6 +18,27 @@ import urllib.request
 from typing import Callable, Protocol
 
 
+def kill_process_tree(pid: int) -> None:
+    """Kill a process and everything it spawned.
+
+    Needed because a CLI backend may be a shell shim: killing the direct
+    child leaves the real worker running, detached, holding our pipes and
+    spending money.
+    """
+    if os.name == "nt":
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(pid)],
+                       capture_output=True)
+        return
+    import signal
+    try:
+        os.killpg(os.getpgid(pid), signal.SIGKILL)
+    except (ProcessLookupError, PermissionError, OSError):
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except OSError:
+            pass
+
+
 class LLMBackend(Protocol):
     id: str
 
@@ -65,12 +86,27 @@ class ClaudeCLIBackend:
         self.calls += 1
         # encoding pinned: claude emits UTF-8; text=True alone would decode
         # with the Windows locale codepage and mojibake non-ASCII output.
-        proc = subprocess.run(cmd, input=prompt, capture_output=True,
-                              text=True, encoding="utf-8", errors="replace",
-                              timeout=self._timeout)
+        proc = subprocess.Popen(
+            cmd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE, text=True, encoding="utf-8",
+            errors="replace")
+        try:
+            out, err = proc.communicate(prompt, timeout=self._timeout)
+        except subprocess.TimeoutExpired:
+            # The shim is cmd.exe and the model runs as its grandchild, so
+            # killing the direct child alone orphans a running model call
+            # (it keeps burning quota, and it holds the pipes this would
+            # otherwise block on). Take the whole tree down.
+            kill_process_tree(proc.pid)
+            try:
+                proc.communicate(timeout=15)
+            except Exception:
+                pass
+            raise RuntimeError(
+                f"claude CLI timed out after {self._timeout}s")
         if proc.returncode != 0:
-            raise RuntimeError(f"claude CLI failed: {proc.stderr.strip()[:500]}")
-        return proc.stdout
+            raise RuntimeError(f"claude CLI failed: {(err or '').strip()[:500]}")
+        return out
 
 
 def _post_json(url: str, headers: dict, payload: dict,

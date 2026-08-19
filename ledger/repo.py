@@ -56,7 +56,20 @@ class Worktree:
     def add(cls, repo_root: Path | str, dest: Path | str,
             branch: str) -> "Worktree":
         repo_root, dest = Path(repo_root), Path(dest)
-        git(repo_root, "worktree", "add", "--detach", str(dest), "HEAD")
+        # Episode directories get deleted -- by people tidying up, by a
+        # failed run, by rm -rf. Git still has the worktree registered, and
+        # a plain `add` then dies with "missing but already registered".
+        # Prune first, and force past any leftover registration: a stale
+        # entry is bookkeeping, not data.
+        git(repo_root, "worktree", "prune", check=False)
+        proc = git(repo_root, "worktree", "add", "--detach", str(dest),
+                   "HEAD", check=False)
+        if proc.returncode != 0:
+            proc = git(repo_root, "worktree", "add", "-f", "--detach",
+                       str(dest), "HEAD", check=False)
+            if proc.returncode != 0:
+                raise GitError("could not create the episode worktree: "
+                               + proc.stderr.strip())
         # -B: episode branches are disposable; re-running a demo reuses the name.
         git(dest, "checkout", "-B", branch)
         return cls(repo_root, dest, branch)

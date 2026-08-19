@@ -166,3 +166,18 @@ def test_create_pr_flow(repo, tmp_path, monkeypatch):
     ok, err = Journal.verify_chain(str(journal_path))
     assert ok, err
 
+
+
+@needs_git
+def test_worktree_survives_a_deleted_episode_directory(repo, tmp_path):
+    """Regression: deleting an episode directory left the worktree
+    registered in git, and the next run died with "missing but already
+    registered" instead of recovering."""
+    import shutil as _shutil
+    dest = tmp_path / "wt"
+    Worktree.add(repo, dest, branch="ledger/gone")
+    _shutil.rmtree(dest)                       # the tidy-up that broke it
+
+    again = Worktree.add(repo, dest, branch="ledger/gone")
+    assert again.path.is_dir()
+    assert (again.path / ".git").exists()
