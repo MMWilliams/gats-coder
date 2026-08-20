@@ -96,7 +96,20 @@ eurips-verifies\ledger_verify2026.tex`.
       directory left the worktree registered in git and broke the next run;
       Worktree.add now prunes and forces past stale registrations.
 
+- [x] **v0.8.3 — episode scratch was committable.** `ledger init` wrote
+      `.ledger/.gitignore`; a plain `ledger run` did not, so `git add -A`
+      swept an embedded worktree into the user's repo. Every episode path
+      now writes it.
+- [x] **v0.8.4 — re-running an episode name died** with "worktree already
+      exists". Reuse is a filesystem fact, not a flag; --resume only
+      controls journal segmenting and graph warm-start.
+
 ### Open from this pass
+- [ ] **Default per-call timeout is too low for "build me an app" tasks.**
+      600s fails a whole-3D-game diff every time; chess needed
+      `"backend": {"timeout": 1800}`. Consider raising the default, or
+      making the escalation hint say "raise backend.timeout" when every
+      author attempt died on timeout.
 - [ ] Voice: hands-free VAD (currently push-to-talk), and a spoken
       "shall I run it?" confirmation is deliberately NOT offered — consent
       stays on the keyboard.
