@@ -241,3 +241,35 @@ def test_a_resumed_episode_reports_a_stale_worktree(repo, tmp_path, capsys):
     assert header["worktree_commits_behind"] >= 1, (
         "the episode must record that it ran against an older tree")
     assert "behind HEAD" in capsys.readouterr().err
+
+
+def test_a_falsified_contract_stops_being_believed():
+    """Regression: a deterministic action whose contract is falsified must
+    stop being predicted as a success. ApplyPatch:b kept promising
+    patch.applied:b after its diff no longer applied, so the planner pruned
+    no self-loop, re-picked it, and burned fifteen of twenty steps failing
+    the same way. The divergence was recorded on every attempt and never
+    read back."""
+    from ledger.actions import Action, Catalog
+    from ledger.graph import TransitionGraph
+    from ledger.planner import useful_actions
+    from ledger.world_model import LayeredWorldModel
+
+    apply_b = Action(name="ApplyPatch:b", prec=frozenset({"patch.queued:b"}),
+                     add=frozenset({"patch.applied:b"}), delete=frozenset())
+    catalog = Catalog([apply_b])
+    wm = LayeredWorldModel(catalog)
+    graph = TransitionGraph()
+    s = frozenset({"patch.queued:b"})
+
+    assert "patch.applied:b" in wm.predict(s, "ApplyPatch:b").next_props
+    assert [a.name for a in useful_actions(s, catalog, graph, wm)] \
+        == ["ApplyPatch:b"]
+
+    # reality: the diff does not apply, so nothing changes
+    wm.record_outcome(s, "ApplyPatch:b", s)
+
+    pred = wm.predict(s, "ApplyPatch:b")
+    assert pred.next_props == s, "the falsified contract is still believed"
+    assert useful_actions(s, catalog, graph, wm) == [], (
+        "an action observed to do nothing must not stay selectable")

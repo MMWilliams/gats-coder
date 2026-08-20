@@ -239,6 +239,9 @@ class LayeredWorldModel:
             return Prediction(s, 0.0, "L1")
         if a is not None and a.effects_known:
             if a.deterministic:
+                observed = self._contradicted(s, action_name)
+                if observed is not None:
+                    return observed
                 return self.l1.predict(s, action_name)
             # Stochastic contract: learned per-state stats first (Eq. 5),
             # optimistic L1 prior before any observation.
@@ -252,6 +255,27 @@ class LayeredWorldModel:
         if pred is not None:
             return pred
         return Prediction(s, 0.0, "none")
+
+    def _contradicted(self, s: Props, action_name: str) -> Prediction | None:
+        """The observed effect of a deterministic action whose contract was
+        falsified here -- or None while the contract still holds.
+
+        A contract is a claim about reality, and reality gets the last word.
+        Without this, an ApplyPatch whose diff no longer applies kept
+        predicting success: the planner pruned no self-loop, re-selected it,
+        watched it fail, and did that fifteen times until the step cap. The
+        divergence was recorded to L2 on every one of them and never read.
+        For a deterministic action a single observation settles the effect
+        at this state, so it is returned at the contract's own confidence --
+        the effect was falsified, not the determinism.
+        """
+        if not self.l2.can_predict(s, action_name):
+            return None
+        observed = self.l2.predict(s, action_name)
+        contract = self.l1.predict(s, action_name)
+        if state_key(observed.next_props) == state_key(contract.next_props):
+            return None
+        return Prediction(observed.next_props, contract.p, "L2")
 
     def record_outcome(self, s: Props, action_name: str, s_next: Props) -> None:
         """Feed observed transitions to L2 (the divergence-loop learning hook)."""
