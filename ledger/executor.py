@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Callable, Protocol
 
 from .actions import Action, Catalog
-from .goal import catalog_vocabulary, compile_goal
+from .goal import compile_goal, goal_vocabulary
 from .graph import TransitionGraph
 from .journal import Journal
 from .planner import PlanConfig, EpisodeResult, Task, run_episode
@@ -620,7 +620,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         if backend is None:
             raise ValueError("task_text requires an LLM backend")
         say("compiling the goal contract")
-        contract = compile_goal(task_text, catalog_vocabulary(catalog), backend)
+        contract = compile_goal(task_text, goal_vocabulary(catalog),
+                                backend)
         goal = contract.goal
         goal_extra = {"task_text": contract.task_text,
                       "goal_rationale": contract.rationale,

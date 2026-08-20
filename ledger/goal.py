@@ -49,6 +49,21 @@ def catalog_vocabulary(catalog: Catalog) -> list[str]:
     return sorted(vocab)
 
 
+# Propositions that are LEDGER's own bookkeeping, not outcomes anyone asked
+# for. A compiled goal must never contain them: which patch slot happened to
+# carry the fix is an implementation detail, so "patch.applied:a" makes a
+# goal unsatisfiable the moment the planner uses slot b -- even with a green
+# suite. Explicit goals passed by a caller are unaffected.
+INTERNAL_PREFIXES = ("patch.queued:", "patch.applied:", "budget.",
+                     "repo.branch:")
+
+
+def goal_vocabulary(catalog: Catalog) -> list[str]:
+    """The propositions a goal may be written in: outcomes only."""
+    return [p for p in catalog_vocabulary(catalog)
+            if not p.startswith(INTERNAL_PREFIXES)]
+
+
 def compile_goal(task_text: str, vocabulary: list[str],
                  backend) -> GoalContract:
     prompt = GOAL_PROMPT.format(

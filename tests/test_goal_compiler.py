@@ -42,3 +42,28 @@ def test_unparseable_and_empty_rejected():
     with pytest.raises(GoalCompileError, match="empty"):
         compile_goal("Fix it.", VOCAB,
                      FakeBackend(json.dumps({"goal": []})))
+
+
+def test_a_goal_cannot_name_an_internal_slot():
+    """Regression: the compiler put `patch.applied:a` in a goal. Which slot
+    carried the fix is LEDGER's own bookkeeping -- the planner is free to
+    use slot b, and then a green suite still counts as failure."""
+    from ledger.goal import goal_vocabulary
+    from ledger.skills_llm import build_authoring_catalog
+
+    catalog = build_authoring_catalog(["a", "b"])
+    offered = goal_vocabulary(catalog)
+    assert "tests.pass:unit" in offered and "repo.clean" in offered
+    for hidden in ("patch.applied:a", "patch.queued:b", "budget.llm:ok"):
+        assert hidden not in offered, f"{hidden} must not be goal material"
+
+
+def test_a_compiler_that_invents_a_slot_prop_is_rejected():
+    from ledger.goal import GoalCompileError, compile_goal, goal_vocabulary
+    from ledger.skills_llm import build_authoring_catalog
+
+    catalog = build_authoring_catalog(["a"])
+    backend = FakeBackend(json.dumps(
+        {"goal": ["tests.pass:unit", "patch.applied:a"], "rationale": "x"}))
+    with pytest.raises(GoalCompileError):
+        compile_goal("fix it", goal_vocabulary(catalog), backend)
