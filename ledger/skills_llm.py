@@ -37,10 +37,25 @@ REPOSITORY FILES
 
 {extra}
 
-Reply with a single unified diff and NOTHING else -- no prose, no explanation,
-no code fence. The diff must apply cleanly with `git apply` from the
-repository root. Use paths relative to the root with the standard a/ and b/
-prefixes. Do not modify test files unless the task explicitly asks you to.
+Reply in ONE of these two formats and nothing else -- no prose, no
+explanation outside the blocks. Do not modify test files unless the task
+explicitly asks you to.
+
+FORMAT A -- complete files (use this when creating a file or rewriting most
+of one; it is the easier format to get right):
+
+FILE: path/relative/to/repo/root.js
+```
+<the complete contents of the file, exactly as it should end up>
+```
+
+Repeat the FILE block for each file you change. Give the WHOLE file every
+time, not an excerpt: whatever you write replaces the file.
+
+FORMAT B -- a unified diff, for a small edit to a large file:
+
+Standard `git apply` format with a/ and b/ prefixes and correct @@ hunk
+headers.
 """
 
 
@@ -208,6 +223,76 @@ def repair_hunk_counts(diff: str) -> str:
     return "\n".join(out) + "\n"
 
 
+_FILE_BLOCK = re.compile(
+    r"^FILE:[ \t]*(?P<path>[^\n`]+?)[ \t]*\n+```[^\n]*\n(?P<body>.*?)```",
+    re.MULTILINE | re.DOTALL)
+
+
+def extract_files(text: str) -> list[tuple[str, str]]:
+    """Parse `FILE: path` + fenced-content blocks into (path, content).
+
+    Writing a correct unified diff is a second skill on top of writing
+    correct code -- hunk arithmetic, exact context lines -- and it is where
+    smaller models fail while their actual code is fine. Letting them hand
+    back whole files moves that burden to us, where it is deterministic.
+    """
+    out: list[tuple[str, str]] = []
+    for m in _FILE_BLOCK.finditer(text):
+        raw = m.group("path").strip().strip("`").replace("\\", "/")
+        # Reject BEFORE normalising. Stripping "./" first would quietly
+        # turn "../../etc/passwd" into "etc/passwd" and hand an escape
+        # attempt back as a clean relative path.
+        if (not raw or raw.startswith("/") or raw.startswith("~")
+                or ".." in raw.split("/")
+                or re.match(r"^[A-Za-z]:", raw)):
+            continue                      # never write outside the worktree
+        path = raw
+        while path.startswith("./"):
+            path = path[2:]
+        if not path:
+            continue
+        body = m.group("body")
+        if not body.endswith("\n"):
+            body += "\n"
+        out.append((path, body))
+    return out
+
+
+def diff_from_files(root: Path, files: list[tuple[str, str]]) -> str:
+    """Build a unified diff from whole-file contents, deterministically.
+
+    The result still has to pass `git apply --check`; this only removes the
+    diff *format* from the model's job, not the verification.
+    """
+    import difflib
+
+    chunks: list[str] = []
+    for rel, new_text in files:
+        target = Path(root) / rel
+        if target.is_file():
+            old_text = target.read_text(encoding="utf-8", errors="replace")
+            old_lines = old_text.splitlines(keepends=True)
+            from_file = f"a/{rel}"
+        else:
+            old_lines = []
+            from_file = "/dev/null"
+        new_lines = new_text.splitlines(keepends=True)
+        if old_lines == new_lines:
+            continue                                   # nothing to change
+        body = list(difflib.unified_diff(
+            old_lines, new_lines, fromfile=from_file, tofile=f"b/{rel}", n=3))
+        if not body:
+            continue
+        header = f"diff --git a/{rel} b/{rel}\n"
+        if from_file == "/dev/null":
+            header += "new file mode 100644\n"
+        text = "".join(body)
+        if not text.endswith("\n"):
+            text += "\n"
+        chunks.append(header + text)
+    return "".join(chunks)
+
+
 @dataclass
 class PatchAttempt:
     ok: bool
@@ -299,9 +384,21 @@ class AuthorPatchSkill:
                 failure = ""
                 continue
             raw_sha = ctx.blobs.put(response)
-            diff = extract_diff(response)
+            # Whole files first: it is the format models get right, and the
+            # diff we build from them is correct by construction.
+            written = extract_files(response)
+            diff = None
+            if written:
+                diff = diff_from_files(ctx.worktree, written) or None
+                if diff:
+                    claims.append(
+                        "built the patch from "
+                        + ", ".join(rel for rel, _ in written))
             if diff is None:
-                failure = "response contained no unified diff"
+                diff = extract_diff(response)
+            if diff is None:
+                failure = ("response contained neither FILE: blocks nor a "
+                           "unified diff")
                 claims.append(f"attempt {attempt + 1}: {failure}")
                 commands.append({"cmd": "llm.author_patch", "exit": 1,
                                  "out": raw_sha})

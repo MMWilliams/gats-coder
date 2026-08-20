@@ -14,7 +14,8 @@ from ledger.replay import replay
 from ledger.sensors import ExpensiveResultCache
 from ledger.skills_llm import (AuthorPatchSkill, build_authoring_catalog,
                                repair_hunk_counts,
-                               extract_diff)
+                               diff_from_files, extract_diff,
+                               extract_files)
 
 FIX_DIFF = "".join(difflib.unified_diff(
     BUGGY.splitlines(keepends=True), FIXED.splitlines(keepends=True),
@@ -194,3 +195,70 @@ def test_a_miscounted_patch_is_repaired_and_queued(repo, tmp_path):
     assert result.ok, result.claims
     assert (ctx.queue_dir / "a.patch").exists()
     assert any("repaired" in str(c) for c in result.claims)
+
+
+# -- whole-file authoring ----------------------------------------------------
+
+FILE_RESPONSE = """Here is the module.
+
+FILE: calc.py
+```python
+def add(a, b):
+    return a + b
+```
+"""
+
+
+def test_extract_files_parses_blocks():
+    files = extract_files(FILE_RESPONSE)
+    assert files == [("calc.py", "def add(a, b):\n    return a + b\n")]
+
+
+def test_extract_files_refuses_to_escape_the_worktree():
+    """A hostile path is rejected, never repaired.
+
+    The first version normalised before validating, so `lstrip("./")` turned
+    "../../etc/passwd" into "etc/passwd" and the traversal check saw a clean
+    relative path -- the sanitiser defeated the guard.
+    """
+    for hostile in ("../../etc/passwd", "/etc/passwd", "~/.ssh/id_rsa",
+                    "C:/Windows/win.ini", "..\\..\\Windows\\win.ini",
+                    "src/../../out.txt"):
+        assert extract_files(f"FILE: {hostile}\n```\nx\n```") == [], hostile
+    # an ordinary path still works, with a leading ./ tidied away
+    assert extract_files("FILE: ./src/a.js\n```\nx\n```") == \
+        [("src/a.js", "x\n")]
+
+
+@needs_git
+def test_diff_from_files_rewrites_an_existing_file(repo):
+    diff = diff_from_files(repo, [("calc.py", FIXED)])
+    assert "--- a/calc.py" in diff and "+++ b/calc.py" in diff
+    assert "+    return a + b" in diff
+
+
+@needs_git
+def test_diff_from_files_creates_a_new_file(repo):
+    diff = diff_from_files(repo, [("brand/new.py", "print('hi')\n")])
+    assert "new file mode" in diff and "--- /dev/null" in diff
+
+
+@needs_git
+def test_no_diff_when_the_content_is_unchanged(repo):
+    same = (repo / "calc.py").read_text(encoding="utf-8")
+    assert diff_from_files(repo, [("calc.py", same)]) == ""
+
+
+@needs_git
+def test_whole_file_response_is_queued_as_a_patch(repo, tmp_path):
+    """The unlock for smaller models: they return the file they can write
+    correctly, and LEDGER constructs the diff -- which still has to pass
+    `git apply --check` before it is queued."""
+    ctx = _ctx(repo, tmp_path)
+    result = AuthorPatchSkill(
+        "a", FakeBackend(FILE_RESPONSE), "fix add()").run(ctx)
+
+    assert result.ok, result.claims
+    queued = (ctx.queue_dir / "a.patch").read_text(encoding="utf-8")
+    assert "calc.py" in queued
+    assert any("built the patch from" in str(c) for c in result.claims)
