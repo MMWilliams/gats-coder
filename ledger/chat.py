@@ -17,6 +17,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from . import ui
 from .journal import Journal
 from .skills_llm import project_instructions, read_files, repo_tree
 
@@ -225,7 +226,7 @@ def _run_change(conv: Conversation, runner, user_text: str, task: str,
     except KeyboardInterrupt:
         # Ctrl+C stops the work, not the session -- and the journal written
         # so far still verifies and replays.
-        output_fn("interrupted — the episode stopped; its journal so far "
+        output_fn(f"interrupted {ui.DASH} the episode stopped; its journal so far "
                   "is still valid")
         return
     except Exception as exc:

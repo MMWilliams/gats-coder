@@ -126,6 +126,10 @@ FAIL = "✗" if UNICODE else "x"        # ballot x
 DOT = "●" if UNICODE else "*"         # filled circle
 ARROW = "→" if UNICODE else "->"      # right arrow
 CHOSEN = "◀" if UNICODE else "<=="    # left-pointing triangle
+SEP = "·" if UNICODE else "-"         # inline separator
+DASH = "—" if UNICODE else "--"       # em dash
+UP = "↑" if UNICODE else "^"           # up arrow
+MARK = "«" if UNICODE else "<<"        # points back at a row
 
 
 def style(text: str, *names: str) -> str:

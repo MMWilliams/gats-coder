@@ -71,7 +71,8 @@ def goal_vocabulary(catalog: Catalog) -> list[str]:
 
 
 def compile_goal(task_text: str, vocabulary: list[str],
-                 backend, attempts: int = 3) -> GoalContract:
+                 backend, attempts: int = 3,
+                 initial: Props | None = None) -> GoalContract:
     """Compile the task into a goal contract, retrying a bad sample.
 
     Every other model call in an episode gets retries; this one used to get
@@ -79,6 +80,13 @@ def compile_goal(task_text: str, vocabulary: list[str],
     hallucinated proposition -- killed the whole episode before it began.
     Smaller models produce that sample often enough to matter, and the
     correction is cheap: say what was wrong and ask again.
+
+    `initial` is the state the episode starts in, and a goal already true
+    there is rejected. The compiler once returned bare `repo.clean` for a
+    "fix these two bugs" task: the tree was clean before anything ran, so
+    the episode finished in zero steps and reported success having done
+    nothing at all. An agent that verifies its own work cannot be allowed
+    to pick a criterion that was already met.
     """
     base = GOAL_PROMPT.format(
         task=task_text,
@@ -107,6 +115,13 @@ def compile_goal(task_text: str, vocabulary: list[str],
             last = complaint = (
                 f"these are not sensor propositions: {unknown}. "
                 "Choose only from the list above")
+            continue
+        if initial is not None and set(goal) <= set(initial):
+            last = complaint = (
+                f"every proposition in {sorted(goal)} is ALREADY TRUE before "
+                "any work has been done, so the task would be considered "
+                "complete immediately. Include the criteria that are "
+                "currently false -- the ones the work has to make true")
             continue
         return _contract(task_text, goal, obj, backend)
     raise GoalCompileError(f"{last} after {attempts} attempts")

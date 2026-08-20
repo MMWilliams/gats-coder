@@ -273,3 +273,41 @@ def test_a_falsified_contract_stops_being_believed():
     assert pred.next_props == s, "the falsified contract is still believed"
     assert useful_actions(s, catalog, graph, wm) == [], (
         "an action observed to do nothing must not stay selectable")
+
+
+def test_a_goal_already_true_is_not_a_goal():
+    """Regression: the compiler returned bare `repo.clean` for a two-bug fix.
+    The tree was clean before anything ran, so the episode reached its goal
+    in ZERO steps and reported success having done nothing. An agent that
+    verifies its own work must never accept a criterion already met."""
+    from ledger.goal import GoalCompileError, compile_goal
+
+    class Stubborn:
+        id = "stub"
+
+        def __init__(self):
+            self.prompts = []
+
+        def complete(self, prompt):
+            self.prompts.append(prompt)
+            return '{"goal": ["repo.clean"], "rationale": "clean tree"}'
+
+    vocab = ["repo.clean", "tests.pass:unit"]
+    backend = Stubborn()
+
+    # nothing to object to when the tree is dirty to begin with
+    ok = compile_goal("fix the bugs", vocab, backend,
+                      initial=frozenset({"tests.fail:unit"}))
+    assert ok.goal == frozenset({"repo.clean"})
+
+    backend = Stubborn()
+    try:
+        compile_goal("fix the bugs", vocab, backend,
+                     initial=frozenset({"repo.clean"}))
+    except GoalCompileError:
+        pass
+    else:
+        raise AssertionError("a goal true before any work began was accepted")
+    assert len(backend.prompts) == 3, "it must retry, not fail on the spot"
+    assert "ALREADY TRUE" in backend.prompts[1], (
+        "the retry has to say what was wrong with the previous answer")

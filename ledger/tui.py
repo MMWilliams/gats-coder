@@ -50,7 +50,7 @@ def banner(repo: str, profile: str, backend_id: str) -> str:
     head = (ui.accent(bar) + " " + ui.bold("LEDGER") + "  "
             + ui.dim(dot.join([repo, f"profile {profile}", backend_id])))
     tip = ui.dim("ask about the repo, or say what to change "
-                 "— changes run as verified episodes")
+                 f"{ui.DASH} changes run as verified episodes")
     return "\n".join([head, tip, ui.dim(line * frame_width())])
 
 
@@ -83,7 +83,7 @@ class Progress:
         clock = f"{secs:.0f}s" if secs < 60 \
             else f"{int(secs // 60)}m{int(secs % 60):02d}s"
         return (f"{ui.accent(frame)} {self.label} "
-                f"{ui.dim(clock)}{ui.dim(' · ctrl+c to interrupt')}")
+                f"{ui.dim(clock)}{ui.dim(f' {ui.SEP} ctrl+c to interrupt')}")
 
 
 # The live indicator, so anything that needs the terminal (a gate asking
@@ -274,7 +274,7 @@ class EditorState:
                              if i == self.completion_i % len(m)
                              else ui.dim(cell))
             return "  ".join(parts)
-        full = ("Tab completes /commands · ↑ history · Esc clears"
+        full = (f"Tab completes /commands {ui.SEP} {ui.UP} history {ui.SEP} Esc clears"
                 if ui.UNICODE else
                 "Tab completes /commands - up = history - Esc clears")
         return ui.dim(full if len(full) <= budget else "Tab completes")

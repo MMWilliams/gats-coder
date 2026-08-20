@@ -218,9 +218,9 @@ def _run_attempts(args, root, cfg_file, backend, gate, profile,
         print()
         for o in ranked:
             mark = ui.ok(ui.OK) if o.success else ui.bad(ui.FAIL)
-            detail = o.error or (f"{o.steps} steps · "
+            detail = o.error or (f"{o.steps} steps {ui.SEP} "
                                  f"{o.incidents} incidents")
-            crown = ui.warn(" « winner") if o is winner and o.success else ""
+            crown = ui.warn(f" {ui.MARK} winner") if o is winner and o.success else ""
             print(f"  {mark} {ui.bold(o.name)}  {ui.dim(detail)}{crown}")
         print()
         if winner.success:
@@ -336,8 +336,8 @@ def cmd_run(args) -> int:
     if header.get("goal"):
         print(ui.kv("goal", " & ".join(header["goal"])))
     print(ui.kv("plan", ui.plan_chain(result.plan)))
-    stats = (f"{result.steps} steps · {result.llm_planning_calls} LLM "
-             f"planning calls · profile {profile}")
+    stats = (f"{result.steps} steps {ui.SEP} {result.llm_planning_calls} LLM "
+             f"planning calls {ui.SEP} profile {profile}")
     print(ui.kv("run", stats))
     checks = []
     checks.append(ui.ok(f"{ui.OK} 0 incidents") if executor.incidents == 0
@@ -540,8 +540,8 @@ def _chat_runner(root: Path, args, cfg_file: dict, backend):
                  + (f", escalated: {reason}" if reason else "") + "]")
         styled = "\n".join(filter(None, [
             ui.headline(result.success,
-                        f"episode {name} — goal reached",
-                        f"episode {name} — goal NOT reached"),
+                        f"episode {name} {ui.DASH} goal reached",
+                        f"episode {name} {ui.DASH} goal NOT reached"),
             ui.kv("plan", ui.plan_chain(result.plan)),
             ui.kv("verify",
                   (ui.ok(f"{ui.OK} 0 incidents") if executor.incidents == 0
@@ -616,15 +616,15 @@ def cmd_chat(args) -> int:
             reasons = {label: detail for label, detail, ok
                        in ui.diagnostics() if not ok}
             if "colour" in reasons:
-                print(ui.dim(f"styled UI off ({reasons['colour']}) — "
+                print(ui.dim(f"styled UI off ({reasons['colour']}) {ui.DASH} "
                              "set LEDGER_COLOR=1 to force it on"))
         editor = None
         if tui.interactive():
             profile = getattr(args, "profile", None) \
                 or cfg_file.get("profile", "attended")
-            extra = f" · {len(conv.tools)} MCP tools" if conv.tools else ""
+            extra = f" {ui.SEP} {len(conv.tools)} MCP tools" if conv.tools else ""
             if getattr(args, "voice", False):
-                extra += " · voice"
+                extra += f" {ui.SEP} voice"
             print(tui.banner(root.name, profile,
                              getattr(backend, "id", "?") + extra))
             editor = tui.LineEditor(tui.COMMANDS)
@@ -633,8 +633,8 @@ def cmd_chat(args) -> int:
             vs = _voice_session(args, cfg_file, editor)
             if vs is None:
                 return 1
-            print(ui.dim(f"  voice: {vs.stt.id} listening · {vs.tts.id} "
-                         f"speaking · {voice.LISTEN_HINT}"))
+            print(ui.dim(f"  voice: {vs.stt.id} listening {ui.SEP} {vs.tts.id} "
+                         f"speaking {ui.SEP} {voice.LISTEN_HINT}"))
             return repl(conv, root, input_fn=vs.read, output_fn=vs.write,
                         runner=runner, busy=tui.spinner, greet=False)
 
@@ -775,13 +775,13 @@ def cmd_session(args) -> int:
     print()
     for o in outcomes:
         mark = ui.ok(ui.OK) if o.success else ui.bad(ui.FAIL)
-        detail = o.error or f"{o.steps} steps · {o.incidents} incidents"
+        detail = o.error or f"{o.steps} steps {ui.SEP} {o.incidents} incidents"
         print(f"  {mark} {ui.bold(o.name.ljust(width))}  {ui.dim(detail)}")
     print()
     stats = session.shared_stats()
     print(ui.kv("graph", ui.dim(str(session.graph_path))))
     print(ui.kv("pooled", ui.dim(
-        f"{stats.get('nodes', 0)} nodes · {stats.get('edges', 0)} edges · "
+        f"{stats.get('nodes', 0)} nodes {ui.SEP} {stats.get('edges', 0)} edges {ui.SEP} "
         f"{stats.get('dead_ends', 0)} dead ends")))
     print(ui.kv("journal", ui.dim(str(session.journal_path))))
     return 0 if all(o.success for o in outcomes) else 1
@@ -874,7 +874,7 @@ def cmd_doctor(args) -> int:
         ok = ok and good
     if ok:
         print()
-        print(ui.dim("all checks passed — you're ready:") + " "
+        print(ui.dim(f"all checks passed {ui.DASH} you're ready:") + " "
               + ui.accent('ledger run "describe the change you want"'))
     return 0 if ok else 1
 
@@ -901,7 +901,7 @@ def cmd_status(args) -> int:
     if header.get("goal"):
         print(ui.kv("goal", " & ".join(header["goal"])))
     print(ui.kv("plan", ui.plan_chain(end.get("plan", []))))
-    print(ui.kv("run", f"{end.get('steps', 0)} steps · "
+    print(ui.kv("run", f"{end.get('steps', 0)} steps {ui.SEP} "
                        f"{end.get('llm_planning_calls', 0)} LLM planning "
                        f"calls"))
     incidents = counts.get("INCIDENT", 0)
@@ -934,7 +934,7 @@ def cmd_incidents(args) -> int:
     entries = Journal.read(args.journal)
     found = [e for e in entries if e["t"] == "INCIDENT"]
     if not found:
-        print(f"{ui.ok(ui.OK)} no incidents recorded — every claim the "
+        print(f"{ui.ok(ui.OK)} no incidents recorded {ui.DASH} every claim the "
               "model made, the sensors confirmed")
         return 0
     print(ui.headline(False, "", f"{len(found)} incident(s)"))
@@ -988,7 +988,7 @@ def cmd_demo(args) -> int:
 def cmd_verify_chain(args) -> int:
     ok, err = Journal.verify_chain(args.journal)
     if ok:
-        print(f"{ui.ok(ui.OK)} chain OK — every hash links, nothing "
+        print(f"{ui.ok(ui.OK)} chain OK {ui.DASH} every hash links, nothing "
               "has been altered")
         return 0
     print(f"{ui.bad(ui.FAIL)} chain BROKEN: {err}")
@@ -998,7 +998,7 @@ def cmd_verify_chain(args) -> int:
 def cmd_replay(args) -> int:
     result = run_replay(args.journal)
     if result.ok:
-        print(f"{ui.ok(ui.OK)} replay OK — {result.steps_compared} steps "
+        print(f"{ui.ok(ui.OK)} replay OK {ui.DASH} {result.steps_compared} steps "
               "reproduced bit-exact")
         return 0
     print(f"{ui.bad(ui.FAIL)} replay MISMATCH:")
@@ -1021,8 +1021,8 @@ def cmd_why(args) -> int:
     print(f"{ui.bold(f'step {args.step}')} @ {ui.dim(plan['state'][:12])}: "
           f"chose {ui.accent(plan['chosen'])}")
     print(ui.dim(f"  predicted {ui.ARROW} {plan['pred_state'][:12]} "
-                 f"(layer {plan['wm']['layer']}, p={plan['wm']['p']}) · "
-                 f"{plan['search_iters']} search iterations · "
+                 f"(layer {plan['wm']['layer']}, p={plan['wm']['p']}) {ui.SEP} "
+                 f"{plan['search_iters']} search iterations {ui.SEP} "
                  f"{plan['llm_planning_calls']} LLM planning calls"))
     print()
     rows = []
@@ -1053,7 +1053,7 @@ def cmd_vis(args) -> int:
     out = Path(args.out) if args.out else journal.with_suffix(".html")
     out.write_text(render_file(journal), encoding="utf-8")
     print(f"{ui.ok(ui.OK)} wrote {ui.bold(str(out))}")
-    print(ui.dim("  open it in a browser — it is fully self-contained"))
+    print(ui.dim(f"  open it in a browser {ui.DASH} it is fully self-contained"))
     return 0
 
 

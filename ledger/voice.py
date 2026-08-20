@@ -384,7 +384,7 @@ class VoiceSession:
             if empties >= MAX_EMPTY_LISTENS:
                 self.listening = False
                 self.output(ui.warn(
-                    "  voice input is not producing anything — switching to "
+                    f"  voice input is not producing anything {ui.DASH} switching to "
                     "typing. Check `ledger doctor`, then restart to retry."))
                 return ""
 

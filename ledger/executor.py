@@ -622,31 +622,6 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                 pass
 
     goal_extra: dict = {}
-    if task_text is not None:
-        if backend is None:
-            raise ValueError("task_text requires an LLM backend")
-        say("compiling the goal contract")
-        try:
-            contract = compile_goal(task_text, goal_vocabulary(catalog),
-                                    backend)
-        except GoalCompileError:
-            raise
-        except RuntimeError as exc:
-            # A dead backend here is a configuration problem, not a bug in
-            # the episode. Say which backend failed and how to switch,
-            # instead of a traceback through the planner.
-            raise BackendUnavailable(
-                f"the {getattr(backend, 'id', 'configured')} backend failed "
-                f"before the episode began: {exc}\n"
-                "  try another one, e.g. --backend ollama --model "
-                "<local-model>, --backend anthropic (ANTHROPIC_API_KEY), "
-                "or --backend openai --model <model>") from exc
-        goal = contract.goal
-        goal_extra = {"task_text": contract.task_text,
-                      "goal_rationale": contract.rationale,
-                      "goal_backend": contract.backend_id}
-    if goal is None:
-        raise ValueError("either goal or task_text must be provided")
 
     worktree_dir = episode_dir / "worktree"
     # An existing worktree must be re-entered, never re-created: git refuses
@@ -724,7 +699,33 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         executor = RepoExecutor(ctx, catalog, skills, sensors,
                                 journal=journal, gate=gate, profile=profile,
                                 hooks=hooks)
-        task = Task("repo-episode", sensors.probe(worktree.path), goal, catalog)
+        initial = sensors.probe(worktree.path)
+        if task_text is not None:
+            if backend is None:
+                raise ValueError("task_text requires an LLM backend")
+            say("compiling the goal contract")
+            try:
+                contract = compile_goal(task_text, goal_vocabulary(catalog),
+                                        backend, initial=initial)
+            except GoalCompileError:
+                raise
+            except RuntimeError as exc:
+                # A dead backend here is a configuration problem, not a bug in
+                # the episode. Say which backend failed and how to switch,
+                # instead of a traceback through the planner.
+                raise BackendUnavailable(
+                    f"the {getattr(backend, 'id', 'configured')} backend failed "
+                    f"before the episode began: {exc}\n"
+                    "  try another one, e.g. --backend ollama --model "
+                    "<local-model>, --backend anthropic (ANTHROPIC_API_KEY), "
+                    "or --backend openai --model <model>") from exc
+            goal = contract.goal
+            goal_extra = {"task_text": contract.task_text,
+                          "goal_rationale": contract.rationale,
+                          "goal_backend": contract.backend_id}
+        if goal is None:
+            raise ValueError("either goal or task_text must be provided")
+        task = Task("repo-episode", initial, goal, catalog)
         graph_path = episode_dir / "graph.sqlite"
         if resume and graph_path.exists():
             # Warm start: the prior segment's transition graph -- learned
