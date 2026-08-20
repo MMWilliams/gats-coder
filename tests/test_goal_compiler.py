@@ -67,3 +67,16 @@ def test_a_compiler_that_invents_a_slot_prop_is_rejected():
         {"goal": ["tests.pass:unit", "patch.applied:a"], "rationale": "x"}))
     with pytest.raises(GoalCompileError):
         compile_goal("fix it", goal_vocabulary(catalog), backend)
+
+
+def test_a_goal_cannot_demand_failing_tests():
+    """Regression: the compiler produced `tests.fail_count:unit:1-5 AND
+    tests.pass:unit` -- red and green simultaneously. A failure state is
+    never an outcome anyone wants."""
+    from ledger.goal import goal_vocabulary
+    from ledger.skills_llm import build_authoring_catalog
+
+    offered = goal_vocabulary(build_authoring_catalog(["a"]))
+    assert "tests.pass:unit" in offered
+    assert not any(p.startswith("tests.fail_count:") for p in offered), (
+        "a goal must never ask for failing tests")

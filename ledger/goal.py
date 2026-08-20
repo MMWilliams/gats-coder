@@ -55,7 +55,13 @@ def catalog_vocabulary(catalog: Catalog) -> list[str]:
 # goal unsatisfiable the moment the planner uses slot b -- even with a green
 # suite. Explicit goals passed by a caller are unaffected.
 INTERNAL_PREFIXES = ("patch.queued:", "patch.applied:", "budget.",
-                     "repo.branch:")
+                     "repo.branch:",
+                     # A failure state is never something to aim for. Left
+                     # in the vocabulary the compiler wrote
+                     # "tests.fail_count:unit:1-5 AND tests.pass:unit" --
+                     # a goal demanding the suite be red and green at once,
+                     # unsatisfiable no matter how good the code is.
+                     "tests.fail_count:")
 
 
 def goal_vocabulary(catalog: Catalog) -> list[str]:
