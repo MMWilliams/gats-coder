@@ -156,7 +156,11 @@ def test_policy_rules_deny_wins_over_yes(tmp_path):
     assert gate("RunSuite", "exec")            # --yes approves the rest
 
 
-def test_missing_or_bad_config_is_empty(tmp_path):
+def test_missing_or_bad_config_is_empty(tmp_path, monkeypatch):
+    # Point HOME at an empty directory: _config layers ~/.ledger/config.json
+    # under the repo's, so without this the result depends on whatever the
+    # developer running the suite happens to have configured.
+    monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: tmp_path))
     assert cli._config(tmp_path) == {}
     _write_cfg(tmp_path, {})
     (tmp_path / ".ledger" / "config.json").write_text("{not json",

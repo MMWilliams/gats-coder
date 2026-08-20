@@ -134,9 +134,16 @@ class AnthropicAPIBackend:
                  api_key: str | None = None,
                  base_url: str | None = None, timeout: int = 180,
                  max_tokens: int = 8192):
-        self._key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+        # Environment first (an exported key is a deliberate override for
+        # this shell), then whatever `ledger setup` stored. Before the store
+        # existed, the only way to configure this was an environment
+        # variable that vanished with the terminal.
+        from .credentials import get as _stored_key
+        self._key = api_key or _stored_key("anthropic")
         if not self._key:
-            raise RuntimeError("ANTHROPIC_API_KEY is not set")
+            raise RuntimeError(
+                "no Anthropic key: set ANTHROPIC_API_KEY, or run "
+                "`ledger setup --key anthropic`")
         self._base = (base_url or "https://api.anthropic.com").rstrip("/")
         self._model = model
         self._timeout = timeout
@@ -166,8 +173,8 @@ class OpenAIAPIBackend:
     def __init__(self, model: str, api_key: str | None = None,
                  base_url: str = "https://api.openai.com/v1",
                  timeout: int = 180, id_prefix: str = "openai"):
-        self._key = api_key if api_key is not None \
-            else os.environ.get("OPENAI_API_KEY")
+        from .credentials import get as _stored_key
+        self._key = api_key if api_key is not None else _stored_key("openai")
         self._base = base_url.rstrip("/")
         self._model = model
         self._timeout = timeout

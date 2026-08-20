@@ -880,6 +880,44 @@ def _validate_config(path: Path) -> list[str]:
     return problems
 
 
+def cmd_setup(args) -> int:
+    from . import credentials, wizard
+
+    if args.list_keys:
+        held = credentials.stored()
+        if not held:
+            print(ui.dim("no stored keys "
+                         f"({credentials.path()} is absent or empty)"))
+        for provider, masked in sorted(held.items()):
+            env = credentials.ENV_VAR.get(provider, "")
+            live = os.environ.get(env) if env else None
+            note = ui.dim(f"  ({env} is set and wins)") if live else ""
+            print(f"  {provider:<12} {masked}{note}")
+        return 0
+
+    if args.forget:
+        gone = credentials.forget(args.forget)
+        print(f"forgot {args.forget}" if gone
+              else f"no stored key for {args.forget}")
+        return 0 if gone else 1
+
+    if args.key is not None:
+        import getpass
+        provider = args.key if isinstance(args.key, str) else "anthropic"
+        # Read it rather than take it as an argument: a key on the command
+        # line lands in shell history and in the process list, where it
+        # outlives the terminal.
+        key = getpass.getpass(f"paste your {provider} key (hidden): ").strip()
+        if not key:
+            print("nothing entered", file=sys.stderr)
+            return 1
+        path = credentials.put(provider, key)
+        print(f"{ui.OK} saved to {path} {ui.dim('(owner-readable only)')}")
+        return 0
+
+    return wizard.run(want_voice=args.voice)
+
+
 def cmd_doctor(args) -> int:
     checks = []
     git = shutil.which("git")
@@ -1289,6 +1327,22 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("doctor", help="check the local environment")
     p.add_argument("--repo", default=".")
     p.set_defaults(fn=cmd_doctor)
+
+    p = sub.add_parser(
+        "setup", help="guided first-time setup: model backend, keys, speech")
+    p.add_argument("--voice", dest="voice", action="store_true", default=None,
+                   help="set up speech without being asked")
+    p.add_argument("--no-voice", dest="voice", action="store_false",
+                   help="skip the speech section")
+    p.add_argument("--key", nargs="?", const=True, default=None,
+                   metavar="PROVIDER",
+                   help="just store an API key for PROVIDER and exit "
+                        "(anthropic, openai, deepseek, groq)")
+    p.add_argument("--forget", default=None, metavar="PROVIDER",
+                   help="delete a stored API key")
+    p.add_argument("--list-keys", dest="list_keys", action="store_true",
+                   help="show which providers have a stored key, masked")
+    p.set_defaults(fn=cmd_setup)
 
     p = sub.add_parser("status", help="summarize an episode journal")
     p.add_argument("journal")
