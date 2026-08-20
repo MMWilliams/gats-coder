@@ -83,6 +83,33 @@ eurips-verifies\ledger_verify2026.tex`.
 
 
 
+
+## Done (2026-08-19 night — v0.9.0/0.9.1, making local models usable)
+
+- [x] **v0.9.0 whole-file authoring.** Writing a valid unified diff is a
+      second skill on top of writing code, and it is where small models
+      fail while their code is fine. The prompt now offers `FILE: path` +
+      fenced content, and LEDGER builds the diff with difflib — correct by
+      construction. Verification is unchanged: the built diff still has to
+      pass `git apply --check`.
+      Security note: my first draft normalised the path before validating,
+      so `lstrip("./")` turned `../../etc/passwd` into a clean relative
+      path. Rejection now happens on the raw path (unix, windows drive,
+      `~`, backslash, embedded traversal all covered by test).
+- [x] **v0.9.1 goal-compiler retries.** It was the only model call without
+      them; one malformed sample killed an episode before it began. Retries
+      now say what was wrong (unparseable / empty / which props are not in
+      the vocabulary), and a real give-up is a clean error, not a traceback.
+
+### Open
+- [ ] citysprint: sim at 6/8 executed race tests; three.js city layer not
+      started. Blocked on model quality (local 30B) while claude.exe is a
+      broken 500-byte stub from a bad npm auto-update.
+- [ ] Default per-call timeout (600s) too low for whole-app tasks.
+- [ ] A "does this contract describe a working product?" review pass —
+      would have caught the missing chess opponent and the black screen
+      before three episodes were spent.
+
 ## Done (2026-08-19 late — v0.8.5-0.8.8, all found by building real apps)
 
 - [x] **v0.8.5** a SUCCESSFUL run printed a stale `escalated: no_path` from
