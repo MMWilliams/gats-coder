@@ -525,6 +525,23 @@ def build_coding_catalog(patch_ids: list[str], suite: str = "unit") -> Catalog:
     return Catalog(actions)
 
 
+def _protect_scratch(repo_root: Path) -> None:
+    """Keep episode scratch out of the user's history.
+
+    Episodes write worktrees, blobs and sqlite into .ledger/. A single
+    `git add -A` would otherwise sweep an embedded worktree into their
+    repository, which is confusing to undo. `ledger init` wrote this file;
+    an episode started without init did not, so write it here where every
+    path goes through.
+    """
+    d = repo_root / ".ledger"
+    d.mkdir(exist_ok=True)
+    ignore = d / ".gitignore"
+    if not ignore.exists():
+        ignore.write_text("episodes/\nsessions/\n*.sqlite\n",
+                          encoding="utf-8")
+
+
 def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                      goal: Props | None, test_cmd: list[str],
                      cfg: PlanConfig | None = None,
@@ -558,6 +575,7 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     """
     repo_root, episode_dir = Path(repo_root), Path(episode_dir)
     cfg = cfg or PlanConfig()
+    _protect_scratch(repo_root)
     queue_dir = episode_dir / "queue"
     applied_dir = episode_dir / "applied"
     queue_dir.mkdir(parents=True, exist_ok=True)

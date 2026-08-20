@@ -181,3 +181,19 @@ def test_worktree_survives_a_deleted_episode_directory(repo, tmp_path):
     again = Worktree.add(repo, dest, branch="ledger/gone")
     assert again.path.is_dir()
     assert (again.path / ".git").exists()
+
+
+@needs_git
+def test_episode_scratch_is_never_committable(repo, tmp_path):
+    """An episode writes worktrees and blobs into .ledger/. If that is not
+    ignored, one `git add -A` sweeps an embedded git repo into the user's
+    history. `ledger init` wrote the ignore file; an episode started
+    without init must too."""
+    assert not (repo / ".ledger" / ".gitignore").exists()
+    queue_fix(tmp_path / "ep")
+    run_repo_episode(repo, tmp_path / "ep", GOAL, TEST_CMD)
+
+    ignore = repo / ".ledger" / ".gitignore"
+    assert ignore.is_file()
+    body = ignore.read_text(encoding="utf-8")
+    assert "episodes/" in body and "sessions/" in body
