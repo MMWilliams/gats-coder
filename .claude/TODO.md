@@ -26,6 +26,24 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
   published pinned URL starts 404ing after a release. Deliberate, but worth
   remembering before handing anyone a version-pinned command.
 
+## Done (2026-08-20 — v0.9.5, launch what you built)
+
+- [x] **`ledger run --launch`.** An episode that ends with "goal reached"
+      and a journal path is a claim the human still has to go and check by
+      hand; the point of finishing a build is to look at it. On success
+      LEDGER now starts it and opens a browser. `--launch "<cmd>"` for an
+      explicit command, `--no-launch` to override config.
+      Detection only serves files or runs a script the project already
+      declares: an npm dev/start/serve script, else index.html over http on
+      a free port. NEVER file:// — ES modules are blocked on that origin, so
+      a double-clicked page is blank and looks exactly like a failed build.
+      Fires only on success, with a test asserting the call stays inside the
+      success branch so a refactor cannot quietly move it.
+- [x] **`~/.ledger/config.json`**, layered under the repo config one key
+      deep — same shape as the existing AGENTS.md layering. Without it
+      "launch anything you build" would have to be restated per project.
+      Nested blocks merge key by key. Now set to `{"launch": true}`.
+
 ## Done (2026-08-20 — v0.9.4 shipped)
 
 - [x] **Released 0.9.4 to kyberos.ai and put LEDGER on the home page**: its
