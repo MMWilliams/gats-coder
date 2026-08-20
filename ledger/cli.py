@@ -301,7 +301,7 @@ def cmd_run(args) -> int:
             hooks=_hooks_of(cfg_file),
             progress=None if quiet else progress,
         )
-    entries = Journal.read(str(journal_path))
+    entries = _current_run(Journal.read(str(journal_path)))
     header = entries[0] if entries and entries[0]["t"] == "HEADER" else {}
     esc = next((e for e in reversed(entries)
                 if e["t"] == "ESCALATION"), None)
@@ -362,6 +362,18 @@ def cmd_run(args) -> int:
                          f"    {ui.dim('# why the last step was chosen')}")
         print(ui.next_steps(*hints))
     return 0 if result.success else 1
+
+
+def _current_run(entries: list) -> list:
+    """Just this run's entries.
+
+    A journal accumulates every run of an episode (resume appends a new
+    segment, a re-run appends to the same file). Scanning the whole file
+    makes a SUCCESSFUL run report a stale escalation from an earlier
+    attempt, which is worse than saying nothing.
+    """
+    starts = [i for i, e in enumerate(entries) if e.get("t") == "HEADER"]
+    return entries[starts[-1]:] if starts else entries
 
 
 def _voice_session(args, cfg: dict, editor):
@@ -507,7 +519,7 @@ def _chat_runner(root: Path, args, cfg_file: dict, backend):
             hooks=_hooks_of(cfg_now),
             resume=resume, progress=progress,
         )
-        entries = Journal.read(str(journal_path))
+        entries = _current_run(Journal.read(str(journal_path)))
         esc = next((e for e in reversed(entries)
                     if e["t"] == "ESCALATION"), None)
         reason = esc.get("reason") if esc else None
@@ -861,9 +873,10 @@ def cmd_doctor(args) -> int:
 # -- audit commands ----------------------------------------------------------
 
 def cmd_status(args) -> int:
-    entries = Journal.read(args.journal)
-    if not entries:
+    all_entries = Journal.read(args.journal)
+    if not all_entries:
         return _fail("empty journal")
+    entries = _current_run(all_entries)
     header = entries[0] if entries[0]["t"] == "HEADER" else {}
     end = next((e for e in reversed(entries) if e["t"] == "END"), {})
     counts: dict[str, int] = {}

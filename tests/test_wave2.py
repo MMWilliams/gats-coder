@@ -130,3 +130,26 @@ def test_run_json_output(repo, monkeypatch, capsys):
     assert sorted(out["goal"]) == sorted(GOAL)
     assert out["journal"].endswith("episode.jsonl")
 
+
+
+def test_a_successful_run_does_not_report_an_old_escalation(tmp_path):
+    """Regression: journals accumulate runs, and the summary scanned the
+    whole file -- so a run that REACHED its goal printed a stale
+    "escalated: no_path" from an earlier failed attempt."""
+    j = tmp_path / "episode.jsonl"
+    with Journal(str(j)) as journal:                 # run 1: failed
+        journal.append("HEADER", task_id="t", goal=["tests.pass:unit"])
+        journal.append("END", success=False, plan=[], steps=0,
+                       llm_planning_calls=0)
+        journal.append("ESCALATION", reason="no_path", denials=0,
+                       author_attempts=0, author_attempt_limit=6)
+    with Journal(str(j)) as journal:                 # run 2: succeeded
+        journal.append("HEADER", task_id="t", goal=["tests.pass:unit"])
+        journal.append("END", success=True, plan=["RunSuite"], steps=1,
+                       llm_planning_calls=0)
+
+    entries = Journal.read(str(j))
+    assert any(e["t"] == "ESCALATION" for e in entries)      # still on file
+    current = cli._current_run(entries)
+    assert not any(e["t"] == "ESCALATION" for e in current)  # not this run
+    assert current[-1]["success"] is True
