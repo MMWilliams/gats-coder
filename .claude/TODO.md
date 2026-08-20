@@ -64,9 +64,15 @@ eurips-verifies\ledger_verify2026.tex`.
       as a Precondition for Shared Verification". Both experiments included.
       Workshop: double-blind, non-archival, Sydney Dec 11-12; OpenReview venue
       `NeurIPS.cc/2026/Workshop/Verify-Agents`; notification Sept 29.
+      Supplementary DONE 2026-08-19:
+      `neurips-verifies\supplementary\ledger_supplementary.zip` (97 KB, 31
+      files) - ledger package + both experiment scripts + pre-generated
+      results JSON + test_graph_seeding.py + anonymous README. Verified clean:
+      no name/handle/path leaks, all __pycache__ stripped (.pyc embeds the
+      author's absolute build path - that was a real leak vector).
       REMAINING: (a) user must add co-author on OpenReview at submission time
-      (no MCP tool for this); (b) decide whether to build a supplementary zip
-      as was done for FAST; (c) submit.
+      (no MCP tool for this); (b) submit at
+      `NeurIPS.cc/2026/Workshop/Verify-Agents` by Aug 29 23:59 AoE.
 
 - [ ] **AI Engineer NYC — Sep 12.** Workshop (1-2h) + lightning talk drafted,
       NOT submitted. Sessionize. Only remaining venue taking workshops.
@@ -75,6 +81,34 @@ eurips-verifies\ledger_verify2026.tex`.
 
 ---
 
+
+
+## Done (2026-08-19 late — v0.8.5-0.8.8, all found by building real apps)
+
+- [x] **v0.8.5** a SUCCESSFUL run printed a stale `escalated: no_path` from
+      an earlier attempt; summaries now slice from the last HEADER.
+- [x] **v0.8.6** the goal compiler put `patch.applied:a` in a goal. Which
+      slot carries a fix is bookkeeping; the planner used slot b, the suite
+      went green, and the episode still "failed".
+- [x] **v0.8.7** hunk-count repair. A local model wrote a correct 273-line
+      file and declared 342 lines; git called the whole patch corrupt and
+      four attempts were binned. Counts are recomputed from the body and
+      re-checked -- `git apply --check` still gates everything. Verified on
+      the real rejected patch. Also: an unreachable backend now reports
+      cleanly instead of tracing through the planner.
+- [x] **v0.8.8** the compiler wrote `tests.fail_count:unit:1-5 AND
+      tests.pass:unit` -- red and green at once, unsatisfiable. Failure
+      states are no longer goal material.
+
+### Open
+- [ ] **Editing an existing file is where small models fail.** Miscounted
+      hunks are repairable; mismatched context lines are not safely
+      auto-correctable. A "write the whole file" authoring mode (build the
+      diff ourselves with difflib) would remove the format from the
+      model's job entirely. This is the single biggest unlock for local
+      models.
+- [ ] Default per-call timeout (600s) is too low for whole-app tasks.
+- [ ] citysprint: sim at 6/8 executed race tests; three.js layer not built.
 
 ## Done (2026-08-19 — v0.8.0-0.8.2 voice + hang fixes)
 
