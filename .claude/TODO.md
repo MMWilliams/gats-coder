@@ -84,6 +84,42 @@ eurips-verifies\ledger_verify2026.tex`.
 
 
 
+## Done (2026-08-19 night — v0.9.2/0.9.3, found by building the race game)
+
+- [x] **v0.9.2 stale worktree.** A resumed episode kept its original
+      worktree. The spec had moved on (8 tests there, 11 on main), so the
+      episode verified against the superseded contract and reported "goal
+      reached" for work nobody would accept. It now measures the gap,
+      warns on stderr and in the spoken summary, and records
+      `worktree_commits_behind` in the journal header. Silently passing an
+      old spec is worse than failing.
+- [x] **v0.9.2 `python -m ledger`.** The console script lands in a Scripts
+      directory usually not on PATH; the failure reads "ledger is not
+      recognized", i.e. as though the install never happened — exactly what
+      happened to the user. `__main__.py` needs only the interpreter that
+      did the installing.
+- [x] **v0.9.3 reality outranks a falsified contract.** A deterministic
+      action's contract was believed unconditionally, so an ApplyPatch whose
+      diff no longer applied kept predicting success — no self-loop to
+      prune, re-selected, failed, fifteen times to the step cap. Every
+      divergence was recorded to L2 and never read back. `predict()` now
+      returns the observed effect when a deterministic contract has been
+      falsified at that state. Both published experiments re-run to the
+      same numbers, so the NeurIPS results stand.
+
+### Open
+- [ ] citysprint: race sim being fixed (lap logic + speed/circuit scale);
+      three.js city layer not started.
+- [ ] Default per-call timeout (600s) too low for whole-app tasks.
+- [ ] A "does this contract describe a working product?" review pass —
+      would have caught the missing chess opponent and the black screen.
+- [ ] **My specs keep sitting one level below what matters.** Four times
+      now: file-mentions-Renderer vs pixels drawn; HUD colour vs board
+      area; rules work vs an opponent exists; lap counter vs circuit
+      driven. And this round the spec was internally contradictory — a
+      90s lap demanded on a 240s circuit — which cost a whole episode.
+      Check satisfiability of a contract before spending a budget on it.
+
 ## Done (2026-08-19 night — v0.9.0/0.9.1, making local models usable)
 
 - [x] **v0.9.0 whole-file authoring.** Writing a valid unified diff is a
