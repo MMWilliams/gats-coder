@@ -84,6 +84,26 @@ eurips-verifies\ledger_verify2026.tex`.
 
 
 
+## Done (2026-08-19 night — v0.9.2-0.9.4, found by building the race game)
+
+- [x] **v0.9.4 a goal already true is not a goal.** Asked to fix two named
+      bugs, the compiler returned bare `repo.clean`. The tree was clean
+      before anything ran, so the episode reached its goal in ZERO steps
+      and reported success having done nothing. Worst possible failure for
+      an audit-first agent: the report was untrue and the journal proving
+      it was internally consistent. Root cause: compilation ran BEFORE the
+      worktree existed, so it had never seen the starting state. It now
+      runs after the initial probe and rejects an already-satisfied goal,
+      retrying with a complaint that says so.
+- [x] **v0.9.4 glyphs escaping the ASCII fallback.** ui.py degrades ✓/✗
+      and the box set when the console can't carry them, but 44 lines
+      across five modules printed a bare `·` or em dash past that gate.
+      Redirected output on Windows is cp1252: those were written lossily,
+      and any character cp1252 lacks would have raised UnicodeEncodeError
+      and killed the command AFTER the work was done. All gated now, with
+      an AST test that checks per statement, not per line (the box-drawing
+      gate sits on a continuation line).
+
 ## Done (2026-08-19 night — v0.9.2/0.9.3, found by building the race game)
 
 - [x] **v0.9.2 stale worktree.** A resumed episode kept its original
