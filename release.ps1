@@ -3,7 +3,7 @@
 # Automates the four-step release chore: reads the version from
 # pyproject.toml, builds the wheel, copies it to <site>\public\ledger,
 # and rewrites latest.json (version/wheel/sha256/released) plus the
-# WHEEL constant in src\landing\Ledger.jsx. Commit and deploy the site
+# WHEEL constant in src\landing\ledgerRelease.js. Commit and deploy the site
 # yourself afterwards.
 #
 #   .\release.ps1                 # site defaults to C:\Users\reese\kyberos
@@ -55,7 +55,9 @@ $meta.sha256 = $sha
 $meta.released = Get-Date -Format 'yyyy-MM-dd'
 [System.IO.File]::WriteAllText($latestPath, (($meta | ConvertTo-Json) + "`n"), $utf8NoBom)
 
-$jsx = Join-Path $Site 'src\landing\Ledger.jsx'
+# The wheel URL lives in one module that both the product page and the home
+# page import; a copy per page is how a stale version survives a release.
+$jsx = Join-Path $Site 'src\landing\ledgerRelease.js'
 $content = [System.IO.File]::ReadAllText($jsx)
 $updated = $content -replace 'ledger_agent-[\d.]+-py3-none-any\.whl', $wheel.Name
 if ($updated -eq $content -and $content -notmatch [regex]::Escape($wheel.Name)) {
@@ -66,5 +68,5 @@ if ($updated -eq $content -and $content -notmatch [regex]::Escape($wheel.Name)) 
 Write-Host ''
 Write-Host "==> published $($wheel.Name)"
 Write-Host "    sha256 $sha"
-Write-Host "    updated latest.json + Ledger.jsx"
+Write-Host "    updated latest.json + ledgerRelease.js"
 Write-Host '    next: commit + push both repos (site deploy publishes the wheel)'
