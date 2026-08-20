@@ -168,6 +168,46 @@ def extract_diff(text: str) -> str | None:
     return candidate if candidate.endswith("\n") else candidate + "\n"
 
 
+
+_HUNK = re.compile(r"^@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@(.*)$")
+
+
+def repair_hunk_counts(diff: str) -> str:
+    """Recompute @@ hunk line counts from the hunk body.
+
+    Models routinely miscount them -- a 273-line file announced as 342 --
+    and git then reads past the end and calls the whole patch corrupt even
+    though every line of content is correct. The counts are a pure function
+    of the body, so recomputing them trusts nothing: the result still has
+    to survive `git apply --check` exactly as before.
+    """
+    lines = diff.splitlines()
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        m = _HUNK.match(lines[i])
+        if not m:
+            out.append(lines[i])
+            i += 1
+            continue
+        old_start, new_start, tail = m.group(1), m.group(2), m.group(3)
+        body, j = [], i + 1
+        while j < len(lines):
+            ln = lines[j]
+            if ln.startswith("@@") or ln.startswith("diff --git"):
+                break
+            body.append(ln)
+            j += 1
+        while body and body[-1].strip() == "":
+            body.pop()                       # trailing blank is not content
+        old = sum(1 for ln in body if ln[:1] in (" ", "-"))
+        new = sum(1 for ln in body if ln[:1] in (" ", "+"))
+        out.append(f"@@ -{old_start},{old} +{new_start},{new} @@{tail}")
+        out.extend(body)
+        i = j
+    return "\n".join(out) + "\n"
+
+
 @dataclass
 class PatchAttempt:
     ok: bool
@@ -267,6 +307,15 @@ class AuthorPatchSkill:
                                  "out": raw_sha})
                 continue
             checked = self._validate(ctx, diff)
+            if not checked.ok:
+                # The content may be sound and only the hunk arithmetic
+                # wrong; recompute it and let git judge again.
+                repaired = repair_hunk_counts(diff)
+                if repaired != diff:
+                    retry = self._validate(ctx, repaired)
+                    if retry.ok:
+                        diff, checked = repaired, retry
+                        claims.append("repaired the patch's hunk counts")
             commands.append({
                 "cmd": f"git apply --check ({self.slot}, attempt {attempt + 1})",
                 "exit": 0 if checked.ok else 1,

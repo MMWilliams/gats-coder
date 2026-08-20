@@ -38,6 +38,12 @@ class GateDenied(RuntimeError):
     pass
 
 
+class BackendUnavailable(RuntimeError):
+    """The model backend could not be reached at all. Distinct from a
+    backend that answers badly: nothing can start, so the caller should
+    say so plainly rather than print a stack trace."""
+
+
 class BudgetMeter:
     """Per-episode spend counter for a metered resource (design SS12.3).
 
@@ -620,8 +626,19 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         if backend is None:
             raise ValueError("task_text requires an LLM backend")
         say("compiling the goal contract")
-        contract = compile_goal(task_text, goal_vocabulary(catalog),
-                                backend)
+        try:
+            contract = compile_goal(task_text, goal_vocabulary(catalog),
+                                    backend)
+        except RuntimeError as exc:
+            # A dead backend here is a configuration problem, not a bug in
+            # the episode. Say which backend failed and how to switch,
+            # instead of a traceback through the planner.
+            raise BackendUnavailable(
+                f"the {getattr(backend, 'id', 'configured')} backend failed "
+                f"before the episode began: {exc}\n"
+                "  try another one, e.g. --backend ollama --model "
+                "<local-model>, --backend anthropic (ANTHROPIC_API_KEY), "
+                "or --backend openai --model <model>") from exc
         goal = contract.goal
         goal_extra = {"task_text": contract.task_text,
                       "goal_rationale": contract.rationale,

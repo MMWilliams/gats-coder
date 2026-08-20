@@ -281,13 +281,14 @@ def cmd_run(args) -> int:
     episode_dir.mkdir(parents=True, exist_ok=True)
 
     from . import tui
-    from .executor import run_repo_episode
+    from .executor import BackendUnavailable, run_repo_episode
     ledger_dir = root / ".ledger"
     ledger_dir.mkdir(exist_ok=True)
     # An episode is a long, silent stretch of work; say what it is doing.
     # --json stays byte-clean: the spinner is suppressed there.
     quiet = args.json or not tui.interactive()
-    with tui.spinner("starting the episode") as progress:
+    try:
+      with tui.spinner("starting the episode") as progress:
         result, executor, journal_path = run_repo_episode(
             root, episode_dir, None, _test_cmd(args, cfg_file),
             cfg=_plan_config(args, cfg_file),
@@ -301,6 +302,8 @@ def cmd_run(args) -> int:
             hooks=_hooks_of(cfg_file),
             progress=None if quiet else progress,
         )
+    except BackendUnavailable as exc:
+        return _fail(str(exc))
     entries = _current_run(Journal.read(str(journal_path)))
     header = entries[0] if entries and entries[0]["t"] == "HEADER" else {}
     esc = next((e for e in reversed(entries)

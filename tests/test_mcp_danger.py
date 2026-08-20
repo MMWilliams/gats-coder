@@ -2,6 +2,8 @@
 
 import json
 import sys
+
+import pytest
 from types import SimpleNamespace
 
 from ledger.chat import Conversation
@@ -198,3 +200,38 @@ def test_raising_backend_escalates_instead_of_crashing(tmp_path):
     assert esc and esc[0]["reason"] == "budget_exhausted"
     ok, err = Journal.verify_chain(str(journal_path))
     assert ok, err
+
+
+def test_an_unreachable_backend_is_reported_not_traced(tmp_path):
+    """Regression: when the CLI backend broke, goal compilation raised
+    through the planner and printed a stack trace. A backend that cannot be
+    reached is a configuration problem -- say which one failed and how to
+    switch."""
+    import subprocess as sp
+    from ledger.executor import BackendUnavailable, run_repo_episode
+
+    repo = tmp_path / "r"
+    repo.mkdir()
+    sp.run(["git", "init", "-qb", "main", str(repo)], check=True,
+           capture_output=True)
+    (repo / "x.txt").write_text("hi", encoding="utf-8")
+    sp.run(["git", "-C", str(repo), "add", "-A"], check=True,
+           capture_output=True)
+    sp.run(["git", "-C", str(repo), "-c", "user.email=t@t",
+            "-c", "user.name=t", "commit", "-qm", "seed"], check=True,
+           capture_output=True)
+
+    class Dead:
+        id = "dead-backend"
+
+        def complete(self, prompt):
+            raise RuntimeError("claude CLI failed: not compatible")
+
+    with pytest.raises(BackendUnavailable) as caught:
+        run_repo_episode(repo, tmp_path / "ep", None,
+                         ["python", "-c", "pass"],
+                         task_text="do something", backend=Dead(),
+                         slots=["a"])
+    message = str(caught.value)
+    assert "dead-backend" in message
+    assert "--backend ollama" in message      # tells you the way out

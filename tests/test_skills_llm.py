@@ -13,6 +13,7 @@ from ledger.llm import FakeBackend
 from ledger.replay import replay
 from ledger.sensors import ExpensiveResultCache
 from ledger.skills_llm import (AuthorPatchSkill, build_authoring_catalog,
+                               repair_hunk_counts,
                                extract_diff)
 
 FIX_DIFF = "".join(difflib.unified_diff(
@@ -152,3 +153,44 @@ def test_ledger_authors_its_own_fix(repo, tmp_path):
     ok, err = Journal.verify_chain(str(journal_path))
     assert ok, err
     assert replay(str(journal_path)).ok
+
+
+NEW_FILE_MISCOUNTED = (
+    "diff --git a/new_mod.py b/new_mod.py\n"
+    "new file mode 100644\n"
+    "--- /dev/null\n"
+    "+++ b/new_mod.py\n"
+    "@@ -0,0 +1,999 @@\n"           # the model claimed 999; there are 3
+    "+def hello():\n"
+    "+    return 'hi'\n"
+    "+\n"
+)
+
+
+def test_repair_hunk_counts_fixes_the_arithmetic():
+    fixed = repair_hunk_counts(NEW_FILE_MISCOUNTED)
+    assert "@@ -0,0 +1,3 @@" in fixed   # a bare "+" is an added blank line
+    assert "def hello():" in fixed
+
+
+def test_repair_leaves_a_correct_diff_alone():
+    good = (
+        "--- a/calc.py\n+++ b/calc.py\n@@ -1,2 +1,2 @@\n"
+        " def add(a, b):\n-    return a - b\n+    return a + b\n")
+    assert repair_hunk_counts(good).strip() == good.strip()
+
+
+@needs_git
+def test_a_miscounted_patch_is_repaired_and_queued(repo, tmp_path):
+    """Regression: a local model wrote a complete, correct 273-line file but
+    announced 342 lines in the hunk header. git called the whole patch
+    corrupt and four authoring attempts were thrown away. The counts are
+    derivable from the body, so they get recomputed -- and the result still
+    has to pass `git apply --check`."""
+    ctx = _ctx(repo, tmp_path)
+    result = AuthorPatchSkill(
+        "a", FakeBackend(NEW_FILE_MISCOUNTED), "add a module").run(ctx)
+
+    assert result.ok, result.claims
+    assert (ctx.queue_dir / "a.patch").exists()
+    assert any("repaired" in str(c) for c in result.claims)
