@@ -23,7 +23,7 @@ from pathlib import Path
 from typing import Callable, Protocol
 
 from .actions import Action, Catalog
-from .goal import compile_goal, goal_vocabulary
+from .goal import GoalCompileError, compile_goal, goal_vocabulary
 from .graph import TransitionGraph
 from .journal import Journal
 from .planner import PlanConfig, EpisodeResult, Task, run_episode
@@ -629,6 +629,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         try:
             contract = compile_goal(task_text, goal_vocabulary(catalog),
                                     backend)
+        except GoalCompileError:
+            raise
         except RuntimeError as exc:
             # A dead backend here is a configuration problem, not a bug in
             # the episode. Say which backend failed and how to switch,

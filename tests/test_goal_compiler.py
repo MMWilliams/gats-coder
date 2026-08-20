@@ -80,3 +80,34 @@ def test_a_goal_cannot_demand_failing_tests():
     assert "tests.pass:unit" in offered
     assert not any(p.startswith("tests.fail_count:") for p in offered), (
         "a goal must never ask for failing tests")
+
+
+def test_a_bad_sample_is_retried_not_fatal():
+    """Regression: goal compilation was a single model call. One malformed
+    reply -- prose instead of JSON, a hallucinated proposition -- killed the
+    episode before it started, which smaller models trigger regularly."""
+    replies = iter([
+        "Sure! Here's my thinking about the goal...",          # no JSON
+        json.dumps({"goal": ["tests.definitely_pass"],         # invented
+                    "rationale": "x"}),
+        json.dumps({"goal": ["tests.pass:unit"], "rationale": "green"}),
+    ])
+    seen = []
+
+    def responder(prompt):
+        seen.append(prompt)
+        return next(replies)
+
+    contract = compile_goal("fix it", ["tests.pass:unit", "repo.clean"],
+                            FakeBackend(responder))
+    assert contract.goal == frozenset({"tests.pass:unit"})
+    assert len(seen) == 3
+    assert "not parseable JSON" in seen[1]        # told what was wrong
+    assert "tests.definitely_pass" in seen[2]     # and which prop was bogus
+
+
+def test_it_still_gives_up_eventually():
+    with pytest.raises(GoalCompileError) as caught:
+        compile_goal("fix it", ["tests.pass:unit"],
+                     FakeBackend("no json here at all"), attempts=2)
+    assert "after 2 attempts" in str(caught.value)

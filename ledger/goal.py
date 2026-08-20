@@ -71,22 +71,48 @@ def goal_vocabulary(catalog: Catalog) -> list[str]:
 
 
 def compile_goal(task_text: str, vocabulary: list[str],
-                 backend) -> GoalContract:
-    prompt = GOAL_PROMPT.format(
+                 backend, attempts: int = 3) -> GoalContract:
+    """Compile the task into a goal contract, retrying a bad sample.
+
+    Every other model call in an episode gets retries; this one used to get
+    a single shot, so one malformed reply -- prose around the JSON, a
+    hallucinated proposition -- killed the whole episode before it began.
+    Smaller models produce that sample often enough to matter, and the
+    correction is cheap: say what was wrong and ask again.
+    """
+    base = GOAL_PROMPT.format(
         task=task_text,
         vocab="\n".join(f"- {p}" for p in vocabulary),
     )
-    obj = extract_json(backend.complete(prompt))
-    if obj is None:
-        raise GoalCompileError("goal compiler returned no parseable JSON")
-    goal = [str(p) for p in obj.get("goal", ())]
-    if not goal:
-        raise GoalCompileError("goal compiler returned an empty goal")
-    unknown = sorted(set(goal) - set(vocabulary))
-    if unknown:
-        raise GoalCompileError(
-            f"goal contains propositions outside the sensor vocabulary: "
-            f"{unknown}")
+    complaint = ""
+    last = "goal compiler produced nothing usable"
+    for attempt in range(max(1, attempts)):
+        prompt = base if not complaint else (
+            base + "\n\nYour previous reply was rejected: " + complaint +
+            "\nReturn ONLY the JSON object -- no prose, no code fence.")
+        try:
+            reply = backend.complete(prompt)
+        except Exception as exc:               # a dead backend is not ours
+            raise
+        obj = extract_json(reply)
+        if obj is None:
+            last = complaint = "it was not parseable JSON"
+            continue
+        goal = [str(p) for p in obj.get("goal", ())]
+        if not goal:
+            last = complaint = "the goal was empty"
+            continue
+        unknown = sorted(set(goal) - set(vocabulary))
+        if unknown:
+            last = complaint = (
+                f"these are not sensor propositions: {unknown}. "
+                "Choose only from the list above")
+            continue
+        return _contract(task_text, goal, obj, backend)
+    raise GoalCompileError(f"{last} after {attempts} attempts")
+
+
+def _contract(task_text, goal, obj, backend) -> GoalContract:
     return GoalContract(
         task_text=task_text,
         goal=frozenset(goal),

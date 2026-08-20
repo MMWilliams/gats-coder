@@ -282,6 +282,7 @@ def cmd_run(args) -> int:
 
     from . import tui
     from .executor import BackendUnavailable, run_repo_episode
+    from .goal import GoalCompileError
     ledger_dir = root / ".ledger"
     ledger_dir.mkdir(exist_ok=True)
     # An episode is a long, silent stretch of work; say what it is doing.
@@ -304,6 +305,11 @@ def cmd_run(args) -> int:
         )
     except BackendUnavailable as exc:
         return _fail(str(exc))
+    except GoalCompileError as exc:
+        return _fail(
+            f"could not turn the task into a verifiable goal: {exc}\n"
+            "  say what 'done' looks like in terms the sensors can check "
+            "(a passing suite, a clean tree), or try a stronger model")
     entries = _current_run(Journal.read(str(journal_path)))
     header = entries[0] if entries and entries[0]["t"] == "HEADER" else {}
     esc = next((e for e in reversed(entries)
