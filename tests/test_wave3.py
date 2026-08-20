@@ -213,3 +213,31 @@ def test_rerunning_an_episode_name_reuses_its_worktree(repo, tmp_path):
     r2, _, _ = run_repo_episode(repo, episode_dir, GOAL, TEST_CMD)
     assert (episode_dir / "worktree" / ".git").exists()
     assert r2 is not None
+
+
+@needs_git
+def test_a_resumed_episode_reports_a_stale_worktree(repo, tmp_path, capsys):
+    """Regression: a resumed episode keeps its original worktree. When the
+    spec moved on -- tests tightened on main -- the episode verified against
+    the OLD contract and reported success for work that no longer satisfied
+    anyone. Silently passing an outdated spec is worse than failing."""
+    import subprocess as sp
+
+    episode_dir = tmp_path / "stale"
+    queue_fix(episode_dir)
+    run_repo_episode(repo, episode_dir, GOAL, TEST_CMD)
+
+    # the spec moves on in the repository, after the worktree was made
+    (repo / "NEWSPEC.md").write_text("tighter rules\n", encoding="utf-8")
+    sp.run(["git", "-C", str(repo), "add", "-A"], check=True,
+           capture_output=True)
+    sp.run(["git", "-C", str(repo), "-c", "user.email=t@t",
+            "-c", "user.name=t", "commit", "-qm", "tighten the spec"],
+           check=True, capture_output=True)
+
+    _, _, journal_path = run_repo_episode(repo, episode_dir, GOAL, TEST_CMD,
+                                          resume=True)
+    header = Journal.read(str(journal_path))[0]
+    assert header["worktree_commits_behind"] >= 1, (
+        "the episode must record that it ran against an older tree")
+    assert "behind HEAD" in capsys.readouterr().err

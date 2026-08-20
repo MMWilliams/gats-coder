@@ -653,8 +653,16 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     # to add one where a directory already stands. `resume` decides whether
     # the graph warms up and the journal segments -- not whether the
     # worktree can be reused, which is a fact about the filesystem.
+    stale_by = 0
     if (worktree_dir / ".git").exists():
         worktree = Worktree.reuse(repo_root, worktree_dir, branch=branch)
+        stale_by = worktree.commits_behind()
+        if stale_by:
+            say(f"warning: this episode's worktree is {stale_by} commit(s) "
+                "behind the repository")
+            print(f"warning: the episode worktree is {stale_by} commit(s) "
+                  "behind HEAD -- it will be verified against that older "
+                  "state, not your current tests", file=sys.stderr)
     else:
         worktree = Worktree.add(repo_root, worktree_dir, branch=branch)
     test_cache = ExpensiveResultCache()
@@ -745,6 +753,7 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                           "profile": executor.profile,
                           "branch": worktree.branch,
                           "segment": segment, "resumed": bool(resume),
+                          "worktree_commits_behind": stale_by,
                           "seeded_graph": seeded,
                           **goal_extra},
         )

@@ -88,5 +88,25 @@ class Worktree:
             git(dest, "checkout", "-B", branch)
         return cls(repo_root, dest, branch)
 
+    def commits_behind(self) -> int:
+        """How many commits the repository's HEAD is ahead of this worktree.
+
+        A resumed episode keeps the worktree it was created with. If the
+        spec moved on since -- new tests, a tightened contract -- the
+        episode would verify against the OLD one and report success for
+        work that no longer satisfies anybody. Silence there is worse than
+        failure, so the caller is told.
+        """
+        proc = git(self.repo_root, "rev-list", "--count",
+                   "HEAD", f"^{self.head()}", check=False)
+        try:
+            return int(proc.stdout.strip() or 0)
+        except ValueError:
+            return 0
+
+    def head(self) -> str:
+        return git(self.path, "rev-parse", "HEAD",
+                   check=False).stdout.strip() or "HEAD"
+
     def remove(self) -> None:
         git(self.repo_root, "worktree", "remove", "--force", str(self.path))

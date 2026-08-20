@@ -1,0 +1,1000 @@
+{
+  "config": {
+    "agents": 9,
+    "repeats": 3,
+    "types": 3,
+    "budget": 14,
+    "out": "experiments/results/hetero.json"
+  },
+  "runs": [
+    {
+      "repeat": 0,
+      "arm": "cold",
+      "agents": [
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 1,
+          "depth": 1,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 2,
+          "depth": 2,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 6,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 3,
+          "depth": 3,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 4,
+          "depth": 1,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 5,
+          "depth": 2,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 6,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 6,
+          "depth": 3,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 7,
+          "depth": 1,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 8,
+          "depth": 2,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 6,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 9,
+          "depth": 3,
+          "type_seen_before": true
+        }
+      ]
+    },
+    {
+      "repeat": 0,
+      "arm": "warm",
+      "agents": [
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 1,
+          "depth": 1,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 6,
+          "k": 2,
+          "depth": 2,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 6,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 16,
+          "k": 3,
+          "depth": 3,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 3,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 4,
+          "depth": 1,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 5,
+          "depth": 2,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 6,
+          "depth": 3,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 3,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 7,
+          "depth": 1,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 8,
+          "depth": 2,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 9,
+          "depth": 3,
+          "type_seen_before": true
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "arm": "cold",
+      "agents": [
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 1,
+          "depth": 2,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 6,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 2,
+          "depth": 3,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 3,
+          "depth": 1,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 4,
+          "depth": 2,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 6,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 5,
+          "depth": 3,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 6,
+          "depth": 1,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 7,
+          "depth": 2,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 6,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 8,
+          "depth": 3,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 9,
+          "depth": 1,
+          "type_seen_before": true
+        }
+      ]
+    },
+    {
+      "repeat": 1,
+      "arm": "warm",
+      "agents": [
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 1,
+          "depth": 2,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 6,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 10,
+          "k": 2,
+          "depth": 3,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 25,
+          "k": 3,
+          "depth": 1,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 4,
+          "depth": 2,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 5,
+          "depth": 3,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 3,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 6,
+          "depth": 1,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 7,
+          "depth": 2,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 8,
+          "depth": 3,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 3,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 9,
+          "depth": 1,
+          "type_seen_before": true
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "arm": "cold",
+      "agents": [
+        {
+          "success": true,
+          "steps": 6,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 1,
+          "depth": 3,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 2,
+          "depth": 1,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 3,
+          "depth": 2,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 6,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 4,
+          "depth": 3,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 5,
+          "depth": 1,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 6,
+          "depth": 2,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 6,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 7,
+          "depth": 3,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 8,
+          "depth": 1,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 9,
+          "depth": 2,
+          "type_seen_before": true
+        }
+      ]
+    },
+    {
+      "repeat": 2,
+      "arm": "warm",
+      "agents": [
+        {
+          "success": true,
+          "steps": 6,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 0,
+          "k": 1,
+          "depth": 3,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 15,
+          "k": 2,
+          "depth": 1,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "RunSuite",
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 1,
+          "seeded_edges": 21,
+          "k": 3,
+          "depth": 2,
+          "type_seen_before": false
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 4,
+          "depth": 3,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 3,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 5,
+          "depth": 1,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 6,
+          "depth": 2,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 5,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "ApplyPatch:fix-c",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 7,
+          "depth": 3,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 3,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 8,
+          "depth": 1,
+          "type_seen_before": true
+        },
+        {
+          "success": true,
+          "steps": 4,
+          "plan": [
+            "ApplyPatch:fix-a",
+            "ApplyPatch:fix-b",
+            "RunSuite",
+            "Commit"
+          ],
+          "divergences": 0,
+          "seeded_edges": 31,
+          "k": 9,
+          "depth": 2,
+          "type_seen_before": true
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "k1": {
+      "cold_steps": 5.0,
+      "cold_divergences": 1.0,
+      "cold_seeded_edges": 0.0,
+      "warm_steps": 5.0,
+      "warm_divergences": 1.0,
+      "warm_seeded_edges": 0.0
+    },
+    "k2": {
+      "cold_steps": 5.0,
+      "cold_divergences": 1.0,
+      "cold_seeded_edges": 0.0,
+      "warm_steps": 5.0,
+      "warm_divergences": 1.0,
+      "warm_seeded_edges": 10.333333333333334
+    },
+    "k3": {
+      "cold_steps": 5.0,
+      "cold_divergences": 1.0,
+      "cold_seeded_edges": 0.0,
+      "warm_steps": 5.0,
+      "warm_divergences": 1.0,
+      "warm_seeded_edges": 20.666666666666668
+    },
+    "k4": {
+      "cold_steps": 5.0,
+      "cold_divergences": 1.0,
+      "cold_seeded_edges": 0.0,
+      "warm_steps": 4.0,
+      "warm_divergences": 0.0,
+      "warm_seeded_edges": 31.0
+    },
+    "k5": {
+      "cold_steps": 5.0,
+      "cold_divergences": 1.0,
+      "cold_seeded_edges": 0.0,
+      "warm_steps": 4.0,
+      "warm_divergences": 0.0,
+      "warm_seeded_edges": 31.0
+    },
+    "k6": {
+      "cold_steps": 5.0,
+      "cold_divergences": 1.0,
+      "cold_seeded_edges": 0.0,
+      "warm_steps": 4.0,
+      "warm_divergences": 0.0,
+      "warm_seeded_edges": 31.0
+    },
+    "k7": {
+      "cold_steps": 5.0,
+      "cold_divergences": 1.0,
+      "cold_seeded_edges": 0.0,
+      "warm_steps": 4.0,
+      "warm_divergences": 0.0,
+      "warm_seeded_edges": 31.0
+    },
+    "k8": {
+      "cold_steps": 5.0,
+      "cold_divergences": 1.0,
+      "cold_seeded_edges": 0.0,
+      "warm_steps": 4.0,
+      "warm_divergences": 0.0,
+      "warm_seeded_edges": 31.0
+    },
+    "k9": {
+      "cold_steps": 5.0,
+      "cold_divergences": 1.0,
+      "cold_seeded_edges": 0.0,
+      "warm_steps": 4.0,
+      "warm_divergences": 0.0,
+      "warm_seeded_edges": 31.0
+    }
+  },
+  "by_type_novelty": {
+    "warm_first_time_type": {
+      "n": 9,
+      "divergences": 1.0,
+      "steps": 5.0
+    },
+    "warm_repeat_type": {
+      "n": 18,
+      "divergences": 0.0,
+      "steps": 4.0
+    }
+  },
+  "all_succeeded": true,
+  "distinct_plans_per_cell": {
+    "cold_k1": 3,
+    "cold_k2": 3,
+    "cold_k3": 3,
+    "cold_k4": 3,
+    "cold_k5": 3,
+    "cold_k6": 3,
+    "cold_k7": 3,
+    "cold_k8": 3,
+    "cold_k9": 3,
+    "warm_k1": 3,
+    "warm_k2": 3,
+    "warm_k3": 3,
+    "warm_k4": 3,
+    "warm_k5": 3,
+    "warm_k6": 3,
+    "warm_k7": 3,
+    "warm_k8": 3,
+    "warm_k9": 3
+  }
+}
