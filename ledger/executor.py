@@ -629,7 +629,11 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         raise ValueError("either goal or task_text must be provided")
 
     worktree_dir = episode_dir / "worktree"
-    if resume and (worktree_dir / ".git").exists():
+    # An existing worktree must be re-entered, never re-created: git refuses
+    # to add one where a directory already stands. `resume` decides whether
+    # the graph warms up and the journal segments -- not whether the
+    # worktree can be reused, which is a fact about the filesystem.
+    if (worktree_dir / ".git").exists():
         worktree = Worktree.reuse(repo_root, worktree_dir, branch=branch)
     else:
         worktree = Worktree.add(repo_root, worktree_dir, branch=branch)

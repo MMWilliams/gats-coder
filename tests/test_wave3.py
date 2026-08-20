@@ -197,3 +197,19 @@ def test_episode_scratch_is_never_committable(repo, tmp_path):
     assert ignore.is_file()
     body = ignore.read_text(encoding="utf-8")
     assert "episodes/" in body and "sessions/" in body
+
+
+@needs_git
+def test_rerunning_an_episode_name_reuses_its_worktree(repo, tmp_path):
+    """Regression: re-running the same episode name died with "worktree
+    already exists". An existing worktree is a fact about the filesystem --
+    it must be re-entered, whether or not --resume was asked for."""
+    episode_dir = tmp_path / "same-name"
+    queue_fix(episode_dir)
+    r1, _, _ = run_repo_episode(repo, episode_dir, GOAL, TEST_CMD)
+    assert r1.success
+
+    # no resume flag, same directory: must not raise
+    r2, _, _ = run_repo_episode(repo, episode_dir, GOAL, TEST_CMD)
+    assert (episode_dir / "worktree" / ".git").exists()
+    assert r2 is not None
