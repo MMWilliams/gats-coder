@@ -56,10 +56,7 @@ def _backend(args, cfg: dict | None = None):
         raise SystemExit(str(exc))
 
 
-def _config(root: Path) -> dict:
-    """`.ledger/config.json`, or {} when absent/unreadable. Flags win over
-    config; config wins over built-in defaults."""
-    p = Path(root) / ".ledger" / "config.json"
+def _read_config(p: Path) -> dict:
     if not p.is_file():
         return {}
     try:
@@ -67,6 +64,28 @@ def _config(root: Path) -> dict:
     except (OSError, json.JSONDecodeError):
         return {}
     return cfg if isinstance(cfg, dict) else {}
+
+
+def _config(root: Path) -> dict:
+    """`~/.ledger/config.json` then `.ledger/config.json`, layered.
+
+    Same shape as the AGENTS.md layering: the global file carries the
+    preferences that hold everywhere -- a default backend, whether to launch
+    what was built -- and the repo file overrides them per project. Flags win
+    over both; both win over built-in defaults.
+
+    Layered one key deep: nested blocks like "backend" merge key by key, so
+    setting a global model does not have to restate the base URL in every
+    repo, and a repo can override one field of it without copying the rest.
+    """
+    merged = _read_config(Path.home() / ".ledger" / "config.json")
+    local = _read_config(Path(root) / ".ledger" / "config.json")
+    for key, value in local.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = {**merged[key], **value}
+        else:
+            merged[key] = value
+    return merged
 
 
 def _test_cmd(args, cfg: dict | None = None) -> list[str]:
@@ -251,6 +270,34 @@ def _run_attempts(args, root, cfg_file, backend, gate, profile,
         return 0 if winner.success else 1
 
 
+def _launch_if_asked(args, cfg, repo_root):
+    """Start what was just built, when the run asked for it and succeeded.
+
+    Config `"launch"` may be true (detect), a command string, or absent.
+    `--launch` turns it on for one run, `--no-launch` off, and the flag wins
+    over config so a scripted run can always opt out.
+    """
+    want = getattr(args, "launch", None)
+    if want is False:                       # --no-launch
+        return None
+    setting = cfg.get("launch") if isinstance(cfg, dict) else None
+    if want is None and not setting:
+        return None
+    command = None
+    if isinstance(want, str):
+        command = want
+    elif isinstance(setting, str):
+        command = setting
+
+    from .launch import launch
+    started = launch(repo_root, command=command)
+    if started is None:
+        print(ui.dim("  nothing obvious to launch here (no index.html and no "
+                     "npm start script) -- pass --launch \"<command>\""),
+              file=sys.stderr)
+    return started
+
+
 def cmd_run(args) -> int:
     root = Path(args.repo).resolve()
     if not (root / ".git").exists():
@@ -350,10 +397,16 @@ def cmd_run(args) -> int:
     print(ui.kv("journal", ui.dim(str(journal_path))))
     print()
     if result.success:
+        started = _launch_if_asked(args, cfg, repo_root)
         print(ui.next_steps(
             f"ledger status {journal_path}",
             f"ledger why {journal_path} 0    {ui.dim('# the decision table')}",
             f"ledger vis {journal_path}    {ui.dim('# HTML report')}"))
+        if started is not None:
+            print()
+            print(ui.kv("launched", started.note))
+            if started.url:
+                print(ui.kv("open", started.url))
     else:
         reason = esc.get("reason") if esc else None
         hints = [f"ledger status {journal_path}"]
@@ -1095,6 +1148,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("run", help="run an agent episode against a repo")
     p.add_argument("task", help="what you want done, in plain English")
+    # Only fires when the goal is reached: launching a build already known
+    # to be broken buries the escalation under a browser window.
+    p.add_argument("--launch", nargs="?", const=True, default=None,
+                   metavar="CMD",
+                   help="on success, start what was built. With no argument, "
+                        "detect it (npm start script, or serve index.html "
+                        "and open a browser)")
+    p.add_argument("--no-launch", dest="launch", action="store_false",
+                   help="never launch, overriding config")
     p.add_argument("--repo", default=".")
     p.add_argument("--name", default="episode", help="episode name")
     p.add_argument("--out", default=None, help="episode directory")
