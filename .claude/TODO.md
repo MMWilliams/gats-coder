@@ -11,7 +11,31 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 - Run `.\release.ps1` from the repo root — reads the version from
   `pyproject.toml`, builds the wheel, copies it to `kyberos/public/ledger/`,
   rewrites `latest.json` (sha256 included) and the `WHEEL` constant in
-  `Ledger.jsx`. Then commit + push both repos.
+  `src/landing/ledgerRelease.js`. Then commit + push the kyberos repo
+  (gats-coder has no remote; it is local-only).
+- Run it from PowerShell **without** `2>&1`. Under `$ErrorActionPreference
+  = 'Stop'`, pip's upgrade notice on stderr is promoted to a terminating
+  error and the release dies at the wheel build having done nothing wrong.
+- The wheel URL lives in ONE module now (`ledgerRelease.js`), imported by
+  both `Ledger.jsx` and `Company.jsx`. Two hand-maintained copies is how a
+  home page ends up advertising a version the download link no longer serves.
+- Wheels are not byte-reproducible (zip timestamps), so `latest.json` and
+  the published `.whl` must be written in the same run — the installers
+  verify SHA-256 and refuse on a mismatch.
+- `release.ps1` deletes every wheel but the current one, so a previously
+  published pinned URL starts 404ing after a release. Deliberate, but worth
+  remembering before handing anyone a version-pinned command.
+
+## Done (2026-08-20 — v0.9.4 shipped)
+
+- [x] **Released 0.9.4 to kyberos.ai and put LEDGER on the home page**: its
+      own section between the GATS benchmark and the adversarial band, plus
+      an "Install LEDGER" link in the hero CTA row. Verified before pushing:
+      clean-venv install, `python -m ledger`, `ledger demo` 100/100, and
+      `latest.json`'s sha256 matching the published wheel.
+- [x] Home-page hero link points at `/ledger`, not `#ledger`: `.co` is a
+      fixed-position scroll container, so fragment navigation does not
+      reliably move it.
 - [ ] Decide on PyPI. Publishing `ledger-agent` would replace the version-pinned
       URL with a plain `pip install ledger-agent` and delete this whole section.
 
