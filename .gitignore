@@ -14,3 +14,6 @@ essay/_pdf_render*.html
 
 # experiment scratch: throwaway repos + git worktrees, regenerated on every run
 experiments/.work*/
+
+# episode scratch: worktrees and journals, never product source
+.ledger/
