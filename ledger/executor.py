@@ -561,6 +561,7 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                      context_files: list[str] | None = None,
                      profile: str = "attended",
                      max_author_attempts: int = 6,
+                     author_timeout: int | None = None,
                      push: bool = False,
                      pr: bool = False,
                      resume: bool = False,
@@ -674,9 +675,17 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     if pr:
         skills["CreatePR"] = CreatePRSkill(branch, title=task_text or branch)
     if slots:
+        # Authoring gets its own, longer deadline. Writing a whole
+        # application is not the same call as compiling a one-line goal
+        # contract, and one flat timeout cannot serve both: on a three.js
+        # game the CLI hit 600s eight times running and the episode spent
+        # its entire budget without a line of code being written.
+        from .llm import AUTHOR_TIMEOUT, with_timeout
+        author_backend = with_timeout(backend, author_timeout or AUTHOR_TIMEOUT)
         for slot in sorted(slots):
             skills[f"AuthorPatch:{slot}"] = AuthorPatchSkill(
-                slot, backend, task_text or "", context_files, meter=meter)
+                slot, author_backend, task_text or "", context_files,
+                meter=meter)
             skills[f"ApplyPatch:{slot}"] = ApplyPatchSkill(slot)
     skills.update(skill_overrides or {})
 

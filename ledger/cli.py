@@ -270,6 +270,25 @@ def _run_attempts(args, root, cfg_file, backend, gate, profile,
         return 0 if winner.success else 1
 
 
+def _all_attempts_timed_out(journal_path) -> bool:
+    """Did every authoring attempt in this run die on the clock?
+
+    Only true when there was at least one attempt and none of them produced
+    anything for a reason other than a timeout -- so a run that failed for
+    real reasons is never mislabelled as a deadline problem.
+    """
+    try:
+        entries = Journal.read(str(journal_path))
+    except Exception:
+        return False
+    claims = []
+    for e in entries:
+        if e.get("t") == "EXEC" and str(e.get("action", "")).startswith(
+                "AuthorPatch") and not e.get("ok"):
+            claims.extend(str(c) for c in e.get("claims", []))
+    return bool(claims) and all("timed out" in c for c in claims)
+
+
 def _launch_if_asked(args, cfg, repo_root):
     """Start what was just built, when the run asked for it and succeeded.
 
@@ -341,6 +360,9 @@ def cmd_run(args) -> int:
             root, episode_dir, None, _test_cmd(args, cfg_file),
             cfg=_plan_config(args, cfg_file),
             gate=gate, profile=profile, max_author_attempts=author_budget,
+            author_timeout=(getattr(args, "author_timeout", None)
+                            or (cfg_file.get("backend") or {}).get(
+                                "author_timeout")),
             task_text=args.task, backend=backend,
             l2_path=str(ledger_dir / "l2.sqlite"),
             l3_cache_path=str(ledger_dir / "l3.sqlite"),
@@ -410,6 +432,17 @@ def cmd_run(args) -> int:
     else:
         reason = esc.get("reason") if esc else None
         hints = [f"ledger status {journal_path}"]
+        # "budget exhausted" after every attempt died on the clock is a
+        # deadline problem wearing a budget problem's clothes: doubling the
+        # attempts just buys more timeouts. Say what actually needs changing.
+        if _all_attempts_timed_out(journal_path):
+            print(ui.warn(
+                "  every authoring attempt hit the backend timeout, so no "
+                "code was written at all."))
+            print(ui.dim(
+                "  raise it: --author-timeout 3600, or set "
+                '"backend": {"author_timeout": 3600} in .ledger/config.json'))
+            print()
         if reason == "budget_exhausted":
             hints.append(
                 f'ledger run "{args.task}" --name {args.name} --resume '
@@ -1216,6 +1249,11 @@ def build_parser() -> argparse.ArgumentParser:
                    type=int, default=None,
                    help="LLM patch-authoring budget for the episode "
                         f"(default: config, then {DEFAULT_AUTHOR_ATTEMPTS})")
+    p.add_argument("--author-timeout", dest="author_timeout", type=int,
+                   default=None, metavar="SECONDS",
+                   help="deadline for one authoring call. Writing a whole "
+                        "app takes far longer than compiling a goal, so this "
+                        "is separate from the backend timeout")
     p.add_argument("--push", action="store_true",
                    help="add a network-gated PushBranch action (pushes the "
                         "episode branch to origin; mention pushing in the "

@@ -120,3 +120,61 @@ def test_no_config_anywhere_is_still_empty(tmp_path, monkeypatch):
     from ledger.cli import _config
     monkeypatch.setattr("pathlib.Path.home", staticmethod(lambda: tmp_path))
     assert _config(tmp_path / "nowhere") == {}
+
+
+def test_authoring_gets_its_own_longer_deadline():
+    """Writing a whole application is not the same call as compiling a
+    one-line goal contract. One flat timeout served neither: on a three.js
+    game the CLI hit 600s eight times running and the episode spent its
+    whole budget without a line of code being written."""
+    from ledger.llm import AUTHOR_TIMEOUT, FakeBackend, with_timeout
+
+    base = FakeBackend("hi")
+    base._timeout = 600
+    longer = with_timeout(base, AUTHOR_TIMEOUT)
+    assert AUTHOR_TIMEOUT >= 1800
+    assert longer._timeout == AUTHOR_TIMEOUT
+    # a COPY: the same backend object is shared with the goal compiler and
+    # the planner's L3 layer, and a hung backend must not stall those for
+    # half an hour too
+    assert base._timeout == 600
+    assert longer is not base
+
+
+def test_a_backend_without_a_timeout_is_passed_through():
+    from ledger.llm import with_timeout
+    assert with_timeout(None, 1800) is None
+    sentinel = object()
+    assert with_timeout(sentinel, 1800) is sentinel
+
+
+def test_a_run_where_every_attempt_timed_out_is_reported_as_such(tmp_path):
+    """'budget exhausted' after every attempt died on the clock is a
+    deadline problem wearing a budget problem's clothes -- doubling the
+    attempts just buys more timeouts."""
+    from ledger.cli import _all_attempts_timed_out
+    from ledger.journal import Journal
+
+    p = tmp_path / "e.jsonl"
+    with Journal(str(p)) as j:
+        j.append("HEADER", version="t", task_id="t", initial=[], goal=[],
+                 catalog=[], catalog_hash="x", config={})
+        j.append("EXEC", action="AuthorPatch:a", ok=False,
+                 claims=["attempt 1: backend error: claude CLI timed out "
+                         "after 600s"])
+    assert _all_attempts_timed_out(p) is True
+
+    q = tmp_path / "f.jsonl"
+    with Journal(str(q)) as j:
+        j.append("HEADER", version="t", task_id="t", initial=[], goal=[],
+                 catalog=[], catalog_hash="x", config={})
+        j.append("EXEC", action="AuthorPatch:a", ok=False,
+                 claims=["attempt 1: diff did not apply"])
+    assert _all_attempts_timed_out(q) is False, (
+        "a real failure must not be mislabelled as a deadline problem")
+
+    empty = tmp_path / "g.jsonl"
+    with Journal(str(empty)) as j:
+        j.append("HEADER", version="t", task_id="t", initial=[], goal=[],
+                 catalog=[], catalog_hash="x", config={})
+    assert _all_attempts_timed_out(empty) is False

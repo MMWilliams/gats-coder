@@ -8,6 +8,7 @@ through the layered world model (L3, cached per Eq. 8) and the goal compiler
 
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
@@ -195,6 +196,28 @@ class OpenAIAPIBackend:
         if not choices:
             raise RuntimeError(f"no choices in response from {self._base}")
         return str((choices[0].get("message") or {}).get("content") or "")
+
+
+# Writing a whole application is not the same call as compiling a one-line
+# goal contract, and one flat deadline cannot serve both. Eight consecutive
+# "timed out after 600s" burned an entire episode's budget without a single
+# line of code being written, on a task a model needs fifteen minutes for.
+AUTHOR_TIMEOUT = 1800
+
+
+def with_timeout(backend, seconds: int):
+    """A shallow copy of a backend with a different deadline.
+
+    A copy rather than a mutation: the same backend object is shared with
+    the goal compiler and the planner's L3 layer, and a long authoring
+    deadline must not become a long deadline for everything else -- a hung
+    backend would then stall the run for half an hour before anyone noticed.
+    """
+    if backend is None or not hasattr(backend, "_timeout"):
+        return backend
+    clone = copy.copy(backend)
+    clone._timeout = int(seconds)
+    return clone
 
 
 def resolve_backend(kind: str, model: str | None = None,
