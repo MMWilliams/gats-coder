@@ -394,6 +394,9 @@ def cmd_run(args) -> int:
             author_timeout=(getattr(args, "author_timeout", None)
                             or (cfg_file.get("backend") or {}).get(
                                 "author_timeout")),
+            strategise=(getattr(args, "strategise", False)
+                        or bool(cfg_file.get("strategise"))),
+            research=getattr(args, "research", True),
             task_text=args.task, backend=backend,
             l2_path=str(ledger_dir / "l2.sqlite"),
             l3_cache_path=str(ledger_dir / "l3.sqlite"),
@@ -1287,6 +1290,15 @@ def build_parser() -> argparse.ArgumentParser:
                    help="deadline for one authoring call. Writing a whole "
                         "app takes far longer than compiling a goal, so this "
                         "is separate from the backend timeout")
+    p.add_argument("--strategise", "--strategize", dest="strategise",
+                   action="store_true",
+                   help="when nothing in the catalogue reaches the goal, "
+                        "propose new actions instead of giving up. Proposals "
+                        "must name sensor-verifiable effects and are gated "
+                        "at the risk they declare")
+    p.add_argument("--no-research", dest="research", action="store_false",
+                   default=True,
+                   help="do not search the web while strategising")
     p.add_argument("--push", action="store_true",
                    help="add a network-gated PushBranch action (pushes the "
                         "episode branch to origin; mention pushing in the "

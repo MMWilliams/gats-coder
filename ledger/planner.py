@@ -8,7 +8,7 @@ lexicographically by action name; BFS expands actions in name order.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Callable
 
 from . import AGENT_VERSION
@@ -213,7 +213,8 @@ EnvStep = Callable[[Props, str], Props]
 def run_episode(task: Task, graph: TransitionGraph, wm: LayeredWorldModel,
                 cfg: PlanConfig, env_step: EnvStep,
                 journal: Journal | None = None,
-                header_extra: dict | None = None) -> EpisodeResult:
+                header_extra: dict | None = None,
+                strategist: Callable | None = None) -> EpisodeResult:
     """Paper Alg. 2 with the verify-after-execute divergence arm (SS6.4).
 
     llm_planning_calls counts L3 invocations made during search -- the
@@ -244,6 +245,20 @@ def run_episode(task: Task, graph: TransitionGraph, wm: LayeredWorldModel,
             success = True
             break
         a_app = useful_actions(s, task.catalog, graph, wm)
+        if not a_app and strategist is not None:
+            # Alg. 2 line 6 is where the agent used to give up: nothing it
+            # can do reaches the goal. That is the wall between "I was told
+            # exactly how" and "work out how". The strategist proposes
+            # actions the catalogue does not have -- validated against the
+            # sensor vocabulary, gated by risk, and still only believed once
+            # an instrument confirms the effect.
+            grown = strategist(s, task.goal - s, task.catalog)
+            if grown:
+                task = replace(task, catalog=grown)
+                wm.catalog = grown
+                wm.l1.catalog = grown
+                value_cache.clear()
+                a_app = useful_actions(s, task.catalog, graph, wm)
         if not a_app:
             break  # Alg. 2 line 6: failure (journaled in END)
 

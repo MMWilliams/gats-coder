@@ -186,6 +186,46 @@ class RunSuiteSkill:
                            artifacts={"suite_output": rec["out"]})
 
 
+class ProposedSkill:
+    """Runs a command the strategist proposed (design SS14).
+
+    It reports what the proposal CLAIMED, which is exactly how every other
+    skill behaves: the claim is compared against what the sensors then see,
+    and a claim reality does not support is a divergence -- recorded to L2,
+    and thereafter disbelieved. A proposed action that does not work stops
+    being selected without anybody having to notice.
+
+    Run through the shell because these are ordinary command lines with
+    pipes and quoting, and the strategist is forbidden from proposing the
+    shapes that make that dangerous.
+    """
+
+    def __init__(self, name: str, command: str, claims: frozenset):
+        self.name = name
+        self.command = command
+        self.claimed = claims
+
+    def run(self, ctx: ExecContext) -> SkillResult:
+        ctx.say(f"{self.name}: {self.command}")
+        try:
+            proc = subprocess.run(self.command, cwd=ctx.worktree, shell=True,
+                                  capture_output=True, text=True, timeout=900)
+        except subprocess.SubprocessError as exc:
+            return SkillResult(ok=False, claimed_props=frozenset(),
+                               claims=[f"{self.name} could not run: {exc}"],
+                               commands=[])
+        out = ctx.blobs.put(redact_secrets(
+            (proc.stdout or "") + "\n--- stderr ---\n" + (proc.stderr or "")))
+        rec = {"cmd": self.command, "exit": proc.returncode, "out": out}
+        ok = proc.returncode == 0
+        return SkillResult(
+            ok=ok,
+            claimed_props=self.claimed if ok else frozenset(),
+            claims=[f"{self.name} "
+                    + ("succeeded" if ok else f"exited {proc.returncode}")],
+            commands=[rec])
+
+
 class ApplyPatchSkill:
     def __init__(self, patch_id: str):
         self.patch_id = patch_id
@@ -531,6 +571,77 @@ def build_coding_catalog(patch_ids: list[str], suite: str = "unit") -> Catalog:
     return Catalog(actions)
 
 
+def make_strategist(*, backend, task_text, sensors, skills, gate, journal,
+                    say, research_enabled=True, rounds=2):
+    """The callback the planner reaches for when it has run out of moves.
+
+    Returns a function (state, unmet, catalog) -> grown catalog or None.
+
+    Everything it adds is provisional. The propositions come from the sensor
+    vocabulary or the proposal is discarded; the command is gated at the
+    risk it declares; and the effect is believed only once an instrument
+    reports it. The model is asked what is POSSIBLE -- the instruments still
+    decide what is true.
+    """
+    from . import research as research_mod
+    from .strategy import propose, research_query
+
+    used = {"rounds": 0}
+
+    def strategist(state, unmet, catalog):
+        if used["rounds"] >= rounds or backend is None or not unmet:
+            return None
+        used["rounds"] += 1
+
+        vocabulary = set(state) | set(unmet)
+        for action in catalog:
+            vocabulary |= action.prec | action.add | action.delete
+
+        say("no move reaches the goal; looking for another way")
+        sources: list[str] = []
+        text = ""
+        if research_enabled:
+            query = research_query(task_text, unmet)
+            say(f"reading up on: {query}")
+            text, sources = research_mod.brief(query)
+            if journal is not None:
+                journal.append("RESEARCH", query=query, sources=sources,
+                               chars=len(text))
+
+        proposals, notes = propose(task_text, state, unmet, catalog,
+                                   vocabulary, backend, research_text=text)
+        if journal is not None:
+            journal.append("PROPOSE", unmet=sorted(unmet),
+                           accepted=[p.action.name for p in proposals],
+                           notes=notes, sources=sources)
+        if not proposals:
+            return None
+
+        allowed = []
+        for proposal in proposals:
+            # The same gate as everything else. A brand-new action is the
+            # moment a human most wants a say, so it is asked at the risk
+            # the proposal declared.
+            decision = gate(proposal.action.name, proposal.risk)
+            if journal is not None:
+                journal.append("GATE", action=proposal.action.name,
+                               risk=proposal.risk, allowed=bool(decision),
+                               reason="strategist proposal")
+            if not decision:
+                say(f"declined: {proposal.action.name}")
+                continue
+            skills[proposal.action.name] = ProposedSkill(
+                proposal.action.name, proposal.command, proposal.action.add)
+            allowed.append(proposal.action)
+            say(f"trying: {proposal.action.name} -- {proposal.why}")
+
+        if not allowed:
+            return None
+        return Catalog(list(catalog) + allowed)
+
+    return strategist
+
+
 def _protect_scratch(repo_root: Path) -> None:
     """Keep episode scratch out of the user's history.
 
@@ -562,6 +673,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                      profile: str = "attended",
                      max_author_attempts: int = 6,
                      author_timeout: int | None = None,
+                     strategise: bool = False,
+                     research: bool = True,
                      push: bool = False,
                      pr: bool = False,
                      resume: bool = False,
@@ -757,9 +870,17 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         wm = LayeredWorldModel(catalog, l3=l3)
         if l2_path and Path(l2_path).exists():
             wm.l2.load(l2_path)
+        strategist = None
+        if strategise and backend is not None:
+            strategist = make_strategist(
+                backend=backend, task_text=task_text or "", sensors=sensors,
+                skills=skills, gate=gate, journal=journal, say=say,
+                research_enabled=research)
         result = run_episode(
             task, graph, wm, cfg, executor.env_step, journal=journal,
+            strategist=strategist,
             header_extra={"sensor_set_hash": sensors.set_hash(),
+                          "strategist": bool(strategist),
                           "profile": executor.profile,
                           "branch": worktree.branch,
                           "segment": segment, "resumed": bool(resume),
