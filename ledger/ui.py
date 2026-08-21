@@ -132,6 +132,27 @@ UP = "↑" if UNICODE else "^"           # up arrow
 MARK = "«" if UNICODE else "<<"        # points back at a row
 
 
+def console_safe(text: str) -> str:
+    """Text from somewhere else, made safe for THIS console.
+
+    The glyph constants above are ours and degrade to ASCII, but model
+    output, file contents and command output can hold anything. Printing a
+    character the console cannot encode raises UnicodeEncodeError and kills
+    the command -- on Windows a redirected stdout is cp1252, which has no
+    check mark and no emoji. Losing a dash beats losing the run.
+
+    NOT called `plain`: that name is taken below for ANSI stripping, and
+    defining it twice made this function dead code the moment it was
+    written -- the later definition simply won.
+    """
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    try:
+        text.encode(encoding)
+        return text
+    except (UnicodeEncodeError, LookupError):
+        return text.encode(encoding, "replace").decode(encoding, "replace")
+
+
 def style(text: str, *names: str) -> str:
     """Wrap text in ANSI styles when color is active; identity otherwise."""
     if not COLOR or not names:

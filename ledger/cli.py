@@ -301,6 +301,37 @@ def _run_attempts(args, root, cfg_file, backend, gate, profile,
         return 0 if winner.success else 1
 
 
+def _product_options(args, cfg: dict) -> dict:
+    """Resolve the "product" config block and its flags.
+
+        "product": {
+          "kind": "game",              auto | none | game | web | cli |
+                                       service | library
+          "review": true,              the pre-flight "is this usable" pass
+          "require": ["controls", ...] only these dimensions
+        }
+
+    Auto-detection reads the task, so the common case needs no config at
+    all: "build a three.js racing game" is a game without anyone saying so.
+    """
+    from .product import detect_kind
+
+    block = cfg.get("product")
+    block = block if isinstance(block, dict) else {}
+    kind = getattr(args, "product_kind", None) or block.get("kind") or "auto"
+    if kind == "auto":
+        kind = detect_kind(getattr(args, "task", "") or "")
+    elif kind == "none":
+        kind = ""
+    review = getattr(args, "product_review", True)
+    if review and "review" in block:
+        review = bool(block["review"])
+    require = block.get("require")
+    return {"product_kind": kind or "",
+            "product_require": require if isinstance(require, list) else None,
+            "product_review": bool(review)}
+
+
 def _all_attempts_timed_out(journal_path) -> bool:
     """Did every authoring attempt in this run die on the clock?
 
@@ -397,6 +428,7 @@ def cmd_run(args) -> int:
             strategise=(getattr(args, "strategise", False)
                         or bool(cfg_file.get("strategise"))),
             research=getattr(args, "research", True),
+            **_product_options(args, cfg_file),
             task_text=args.task, backend=backend,
             l2_path=str(ledger_dir / "l2.sqlite"),
             l3_cache_path=str(ledger_dir / "l3.sqlite"),
@@ -453,7 +485,14 @@ def cmd_run(args) -> int:
     print(ui.kv("journal", ui.dim(str(journal_path))))
     print()
     if result.success:
-        started = _launch_if_asked(args, cfg, repo_root)
+        # The episode's WORKTREE, not the repo root. Everything the run just
+        # built lives in the worktree until somebody merges it, so launching
+        # the root started the version without the work in it -- or, as
+        # happened, found no index.html at all and said there was nothing to
+        # launch immediately after building a game.
+        built_in = episode_dir / "worktree"
+        started = _launch_if_asked(
+            args, cfg, built_in if built_in.is_dir() else repo_root)
         print(ui.next_steps(
             f"ledger status {journal_path}",
             f"ledger why {journal_path} 0    {ui.dim('# the decision table')}",
@@ -1299,6 +1338,15 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-research", dest="research", action="store_false",
                    default=True,
                    help="do not search the web while strategising")
+    p.add_argument("--kind", dest="product_kind", default=None,
+                   choices=["game", "web", "cli", "service", "library",
+                            "auto", "none"],
+                   help="what is being built. Its usability requirements go "
+                        "into the authoring prompt and are reviewed against "
+                        "the contract (default: auto-detect from the task)")
+    p.add_argument("--no-product-review", dest="product_review",
+                   action="store_false", default=True,
+                   help="skip the pre-flight 'is this usable' review")
     p.add_argument("--push", action="store_true",
                    help="add a network-gated PushBranch action (pushes the "
                         "episode branch to origin; mention pushing in the "

@@ -178,3 +178,19 @@ def test_a_run_where_every_attempt_timed_out_is_reported_as_such(tmp_path):
         j.append("HEADER", version="t", task_id="t", initial=[], goal=[],
                  catalog=[], catalog_hash="x", config={})
     assert _all_attempts_timed_out(empty) is False
+
+
+def test_the_launch_targets_the_episode_worktree(tmp_path, monkeypatch):
+    """An episode's work lives in its worktree until somebody merges it.
+    Launching the repo root started the version WITHOUT the work in it --
+    or, as happened, found no index.html and reported nothing to launch
+    immediately after building a working game."""
+    import inspect
+
+    from ledger import cli
+
+    src = inspect.getsource(cli.cmd_run)
+    call = src.split("_launch_if_asked(")[1][:200]
+    assert "built_in" in call or "worktree" in call, (
+        "the launch is still pointed at the repo root")
+    assert 'episode_dir / "worktree"' in src

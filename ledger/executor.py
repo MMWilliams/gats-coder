@@ -571,6 +571,23 @@ def build_coding_catalog(patch_ids: list[str], suite: str = "unit") -> Catalog:
     return Catalog(actions)
 
 
+def ui_warn_block(kind: str, concerns) -> str:
+    """The product review, rendered for a person about to spend a budget."""
+    from . import ui
+    lines = [ui.warn(f"  the contract does not guarantee {len(concerns)} "
+                     f"thing(s) that make {kind} software usable:")]
+    for c in concerns:
+        # ui.plain: this text came from the model and can hold anything a
+        # cp1252 console cannot encode, which would kill the command.
+        lines.append(f"    {ui.bold(c.dimension)}  {ui.console_safe(c.concern)}")
+        if c.check:
+            lines.append(ui.dim("      would be caught by: "
+                                + ui.console_safe(c.check)))
+    lines.append(ui.dim("    (advice, not a gate -- pass --no-product-review "
+                        "to skip)"))
+    return "\n".join(lines)
+
+
 def make_strategist(*, backend, task_text, sensors, skills, gate, journal,
                     say, research_enabled=True, rounds=2):
     """The callback the planner reaches for when it has run out of moves.
@@ -675,6 +692,9 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                      author_timeout: int | None = None,
                      strategise: bool = False,
                      research: bool = True,
+                     product_kind: str = "",
+                     product_require=None,
+                     product_review: bool = True,
                      push: bool = False,
                      pr: bool = False,
                      resume: bool = False,
@@ -798,7 +818,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         for slot in sorted(slots):
             skills[f"AuthorPatch:{slot}"] = AuthorPatchSkill(
                 slot, author_backend, task_text or "", context_files,
-                meter=meter)
+                meter=meter, product_kind=product_kind,
+                product_require=product_require)
             skills[f"ApplyPatch:{slot}"] = ApplyPatchSkill(slot)
     skills.update(skill_overrides or {})
 
@@ -870,6 +891,27 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         wm = LayeredWorldModel(catalog, l3=l3)
         if l2_path and Path(l2_path).exists():
             wm.l2.load(l2_path)
+        # Before any budget is spent: would satisfying this contract produce
+        # something a person can actually use? Every product failure in this
+        # project's history passed its tests -- a chess game with no
+        # opponent, a car whose steering was never read. Cheap to say now,
+        # expensive to discover after three episodes.
+        if product_review and product_kind and backend is not None:
+            from .product import review as product_review_fn
+            concerns = product_review_fn(
+                task_text or "", " & ".join(sorted(goal)), product_kind,
+                backend, product_require)
+            if concerns:
+                say(f"{len(concerns)} thing(s) the contract does not "
+                    "guarantee")
+                print(ui_warn_block(product_kind, concerns), file=sys.stderr)
+            if journal is not None:
+                journal.append(
+                    "PRODUCT_REVIEW", kind=product_kind,
+                    concerns=[{"dimension": c.dimension,
+                               "concern": c.concern, "check": c.check}
+                              for c in concerns])
+
         strategist = None
         if strategise and backend is not None:
             strategist = make_strategist(

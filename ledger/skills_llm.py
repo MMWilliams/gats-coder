@@ -312,16 +312,27 @@ class AuthorPatchSkill:
 
     def __init__(self, slot: str, backend, task_text: str,
                  context_files: list[str] | None = None,
-                 max_attempts: int = 2, meter=None):
+                 max_attempts: int = 2, meter=None,
+                 product_kind: str = "", product_require=None):
         self.slot = slot
         self.backend = backend
         self.task_text = task_text
         self.context_files = list(context_files or [])
         self.max_attempts = max_attempts
         self.meter = meter
+        self.product_kind = product_kind
+        self.product_require = list(product_require or []) or None
 
     def _prompt(self, ctx, failure: str = "") -> str:
         extra_parts = []
+        # What makes this KIND of software usable, in front of the model
+        # while it writes. Far cheaper than discovering afterwards that the
+        # steering input was stored on the car and read by nothing.
+        if self.product_kind:
+            from .product import prompt_block
+            block = prompt_block(self.product_kind, self.product_require)
+            if block:
+                extra_parts.append(block)
         instructions = project_instructions(ctx.worktree)
         if instructions:
             extra_parts.append("PROJECT INSTRUCTIONS (from the repository)\n"
