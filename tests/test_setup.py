@@ -231,3 +231,74 @@ def test_a_bare_ledger_greets_rather_than_erroring(capsys, monkeypatch):
     out = capsys.readouterr().out
     assert "ledger setup" in out, "an unconfigured machine must be sent to setup"
     assert "required" not in out.lower()
+
+
+# ------------------------------------------------------- whisper automation
+
+def test_a_truncated_model_download_is_discarded(home, monkeypatch):
+    """A captive portal or a cut transfer yields a file that is not a model.
+    Storing it means speech fails at the first thing someone says, long
+    after setup reported success."""
+    from ledger import whisper_setup as w
+
+    def fake_download(url, dest, echo=print):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"<!DOCTYPE html><html>sign in to the wifi")
+        return True
+
+    monkeypatch.setattr(w, "_download", fake_download)
+    assert w.fetch_model(echo=lambda *a: None) is False
+    assert not w.model_path().exists(), "the bad file was kept"
+
+
+def test_a_good_model_is_kept(home, monkeypatch):
+    from ledger import whisper_setup as w
+
+    def fake_download(url, dest, echo=print):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(b"ggml" + b"\0" * (1_000_001))
+        return True
+
+    monkeypatch.setattr(w, "_download", fake_download)
+    assert w.fetch_model(echo=lambda *a: None) is True
+    assert w.have_model() is True
+
+
+def test_a_zip_cannot_write_outside_the_whisper_directory(home, monkeypatch,
+                                                          tmp_path):
+    """extractall honours whatever paths are in the archive, including
+    absolute ones and ../.. -- so the entries are checked first."""
+    import zipfile
+    from ledger import whisper_setup as w
+
+    monkeypatch.setattr(w, "system", None, raising=False)
+    monkeypatch.setattr("ledger.setup.system", lambda: "windows")
+
+    archive = w.WHISPER_DIR / "whisper-bin-x64.zip"
+
+    def fake_download(url, dest, echo=print):
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        with zipfile.ZipFile(dest, "w") as zf:
+            zf.writestr("../../../evil.txt", "pwned")
+        return True
+
+    monkeypatch.setattr(w, "_download", fake_download)
+    monkeypatch.setattr(w, "have_binary", lambda: False)
+    assert w.fetch_binary(echo=lambda *a: None) is False
+    assert not (home.parent / "evil.txt").exists()
+    assert not (home / "evil.txt").exists()
+
+
+def test_macos_prefers_the_package_manager_over_a_loose_binary(home, monkeypatch):
+    """Homebrew ships whisper-cpp, so provenance is the manager's problem
+    rather than a zip downloaded from a releases page."""
+    from ledger import whisper_setup as w
+
+    monkeypatch.setattr("ledger.setup.system", lambda: "macos")
+    monkeypatch.setattr(w.shutil, "which", lambda n: "/opt/homebrew/bin/brew")
+    monkeypatch.setattr(w, "have_binary", lambda: False)
+    seen = {}
+    monkeypatch.setattr("ledger.setup.run_install",
+                        lambda cmd, echo=print: seen.setdefault("cmd", cmd) is None)
+    w.fetch_binary(echo=lambda *a: None)
+    assert seen["cmd"] == ["brew", "install", "whisper-cpp"]

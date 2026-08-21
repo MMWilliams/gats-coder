@@ -184,10 +184,16 @@ def run(echo=print, want_voice: bool | None = None) -> int:
     if do_voice:
         for dep in deps.voice():
             _offer(dep, echo)
-        echo(ui.dim("   whisper.cpp (speech-to-text) is a manual download: "
-                    "put whisper-cli in ~/.ledger/whisper/ and a model in "
-                    "~/.ledger/whisper/models/"))
-        echo(ui.dim("   https://github.com/ggml-org/whisper.cpp/releases"))
+        from . import whisper_setup
+        if whisper_setup.have_binary() and whisper_setup.have_model():
+            echo(f"  {ui.OK} whisper.cpp   {ui.dim('speech-to-text ready')}")
+        else:
+            echo(f"  {ui.FAIL} whisper.cpp   "
+                 f"{ui.dim('transcribes speech, offline')}")
+            echo(ui.dim("      about 150 MB: the whisper-cli program and an "
+                        "English model"))
+            if _yes("      download whisper.cpp now?", default=False):
+                whisper_setup.install(echo=echo)
 
     update = dict(chosen or {})
     echo("")
