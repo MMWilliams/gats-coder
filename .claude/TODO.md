@@ -26,6 +26,58 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
   published pinned URL starts 404ing after a release. Deliberate, but worth
   remembering before handing anyone a version-pinned command.
 
+## Done (2026-08-20/21 — v0.10.0 through v0.12.0)
+
+- [x] **v0.10.0 `ledger setup`.** One guided command: essentials, a model
+      backend (Claude CLI / API key / Ollama — any one is enough), optional
+      speech, preferences. Detects the platform's package manager and
+      offers to install what is missing. Keys go in
+      `~/.ledger/credentials.json` at 0600, never in the repo config, read
+      with getpass so they miss shell history; env vars still win.
+      Found building it: `present()` probed the bare name `claude`, but the
+      npm CLIs are .CMD shims and CreateProcess ignores PATHEXT without a
+      shell — a working install was reported missing.
+- [x] **v0.10.1 authoring gets its own deadline** (1800s default,
+      `--author-timeout`). One flat timeout served nothing: building the
+      REENTRY view, the CLI hit 600s EIGHT times and the episode spent its
+      whole budget without writing a line. Applied to a COPY of the backend
+      so a long authoring deadline is not also a long deadline for the goal
+      compiler. The escalation now says so instead of advising more attempts.
+- [x] **v0.10.2 the first run actually works.** A fresh install said
+      "claude CLI not found on PATH" and stopped; bare `ledger` was an
+      argparse error listing eighteen subcommands. Both fixed, and a real
+      bug with them: setup wrote `{backend: {id: ...}}` while the resolver
+      read `block["kind"]`, so setup wrote a config the resolver ignored.
+- [x] **v0.10.3 whisper.cpp installs itself.** Verified end to end. The
+      first version pinned a release URL and 404'd — upstream tags are
+      build numbers, so the asset is resolved from the releases API now.
+      Archive entries checked for traversal, model checked for its GGML
+      magic, download lands on a .part file. RELEASED to kyberos.ai.
+- [x] **v0.11.0 the strategist** (`--strategise`). At `no_path` the agent
+      diagnoses what the goal still needs, searches the web (documentation
+      changes), and proposes new actions with commands. Every proposition
+      must already be in the sensor vocabulary; effects must intersect what
+      is missing; the command is gated at its declared risk; proposals are
+      effects-unknown so the world model learns them from observation.
+      The shell guard first tested for the literal substring "curl | sh",
+      which catches none of the real forms.
+- [x] **v0.12.0 the usability pass.** Checklists for game/web/cli/service/
+      library go INTO the authoring prompt and are reviewed against the
+      contract before budget is spent. Run against the original chess
+      request it named all four of that session's real failures before a
+      line was written. Config: `"product": {kind, review, require}`,
+      `--kind`, `--no-product-review`.
+
+### Open
+- [ ] **The site still serves 0.10.3.** v0.11.0 and v0.12.0 are pushed to
+      the private repo but not released. `.elease.ps1` then commit+push
+      kyberos.
+- [ ] **The strategist has never fired in a live episode.** Unit-tested
+      only. Benchmark tasks 11 and 14 need a SAT solver and z3 is
+      deliberately NOT installed, so they are the intended end-to-end test.
+- [ ] whisper.cpp on Linux is untested (the asset exists; the code path has
+      not been run).
+
 ## Done (2026-08-20 — v0.9.5, launch what you built)
 
 - [x] **`ledger run --launch`.** An episode that ends with "goal reached"
