@@ -71,7 +71,16 @@ class ClaudeCLIBackend:
         # 600s: authoring a multi-file diff routinely outruns shorter caps.
         exe = shutil.which("claude")
         if exe is None:
-            raise RuntimeError("claude CLI not found on PATH")
+            # This is the first thing a new install says when nothing is
+            # configured, so it has to name the way out. "claude CLI not
+            # found on PATH" was a dead end: true, unhelpful, and silent
+            # about the two other ways to reach a model.
+            raise RuntimeError(
+                "no model backend configured (the claude CLI is not on "
+                "PATH).\n\n  run:  ledger setup\n\n"
+                "  It offers three ways, any one is enough: the Claude CLI "
+                "(uses your\n  existing subscription), an API key, or Ollama "
+                "for local models.")
         self._exe = exe
         self._model = model
         self._timeout = timeout

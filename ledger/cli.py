@@ -45,7 +45,11 @@ def _backend(args, cfg: dict | None = None):
     from .llm import resolve_backend
     block = (cfg or {}).get("backend")
     block = block if isinstance(block, dict) else {}
-    kind = getattr(args, "backend", None) or block.get("kind") or "claude"
+    # "id" and "kind" both accepted: `ledger setup` writes "id", older
+    # hand-written configs say "kind", and a config the resolver silently
+    # ignores is worse than one it rejects.
+    kind = (getattr(args, "backend", None) or block.get("id")
+            or block.get("kind") or "claude")
     model = getattr(args, "model", None) or block.get("model")
     base_url = getattr(args, "base_url", None) or block.get("base_url")
     timeout = block.get("timeout")
@@ -53,6 +57,33 @@ def _backend(args, cfg: dict | None = None):
         return resolve_backend(kind, model, base_url,
                                int(timeout) if timeout else None)
     except RuntimeError as exc:
+        # Nothing configured anywhere means this is a first run, not a
+        # broken one. Making someone read an error, find the setup command
+        # in it, quit, and type it again is three steps where one will do.
+        if not block and sys.stdin.isatty() and sys.stdout.isatty():
+            print(ui.warn("LEDGER has no model backend configured yet."))
+            try:
+                answer = input("run setup now? [Y/n] ").strip().lower()
+            except EOFError:
+                answer = "n"
+            if not answer or answer.startswith("y"):
+                from . import wizard
+                wizard.run()
+                # Re-resolve against what setup just wrote, so the command
+                # they originally typed carries on instead of making them
+                # type it a second time.
+                fresh = _config(Path(getattr(args, "repo", ".")).resolve())
+                new_block = fresh.get("backend")
+                new_block = new_block if isinstance(new_block, dict) else {}
+                if new_block:
+                    try:
+                        return resolve_backend(
+                            new_block.get("id") or new_block.get("kind")
+                            or "claude",
+                            new_block.get("model"), new_block.get("base_url"),
+                            None)
+                    except RuntimeError as retry_exc:
+                        raise SystemExit(str(retry_exc))
         raise SystemExit(str(exc))
 
 
@@ -1197,7 +1228,9 @@ def build_parser() -> argparse.ArgumentParser:
                     "sensors verify, the journal proves it.")
     ap.add_argument("-V", "--version", action="version",
                     version=f"ledger {AGENT_VERSION}")
-    sub = ap.add_subparsers(dest="cmd", required=True)
+    # Not required: a bare `ledger` prints a welcome instead of an
+    # argparse error listing eighteen subcommands.
+    sub = ap.add_subparsers(dest="cmd")
 
     def add_backend(p):
         p.add_argument("--backend", default=None,
@@ -1420,8 +1453,46 @@ def build_parser() -> argparse.ArgumentParser:
     return ap
 
 
+def _welcome() -> int:
+    """What a bare `ledger` says.
+
+    It used to be an argparse error -- a wall of eighteen subcommand names
+    under "the following arguments are required". That is the very first
+    thing a new install prints, and it read as a fault rather than a
+    greeting. Say the two commands that matter, and which one is next.
+    """
+    configured = bool(_config(Path(".").resolve()).get("backend"))
+    print()
+    print(ui.bold(f"LEDGER {AGENT_VERSION}") + ui.dim(
+        "  -- a coding agent that can't lie about what it did"))
+    print()
+    if not configured:
+        print("  Not set up yet. One command does it:")
+        print()
+        print("      " + ui.bold("ledger setup"))
+        print(ui.dim("      the Claude CLI, an API key, or a local model "
+                     "-- any one is enough"))
+    else:
+        # Padded on the plain text, not the styled string: ANSI escapes have
+        # length but no width, so ljust on a coloured string misaligns by
+        # exactly the number of invisible bytes in it.
+        for cmd, blurb in (
+                ("ledger chat", "ask, or describe a change -- one session "
+                                "for everything"),
+                ('ledger run "..."', "a single verified episode"),
+                ("ledger doctor", "check this machine")):
+            print("  " + ui.bold(cmd) + " " * (18 - len(cmd)) + ui.dim(blurb))
+    print()
+    print(ui.dim("  every command --help; full list: ledger -h"))
+    print()
+    return 0
+
+
 def main(argv=None) -> int:
-    args = build_parser().parse_args(argv)
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    if getattr(args, "cmd", None) is None:
+        return _welcome()
     return args.fn(args)
 
 

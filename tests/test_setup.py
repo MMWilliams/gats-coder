@@ -180,3 +180,54 @@ def test_a_windows_shim_is_probed_by_its_resolved_path(monkeypatch):
     assert claude.present() is not None
     assert seen["argv0"].endswith("claude.CMD"), (
         f"probed {seen['argv0']!r} rather than the resolved path")
+
+
+def test_setups_backend_id_is_actually_read_back(home, tmp_path):
+    """The wizard writes {"backend": {"id": ...}} and the resolver read
+    block["kind"] -- so setup wrote a config the resolver silently ignored
+    and the user was told to configure something they just had. Both keys
+    are accepted now."""
+    import types
+    from ledger import cli
+
+    repo = tmp_path / "r"
+    (repo / ".ledger").mkdir(parents=True)
+    (repo / ".ledger" / "config.json").write_text(
+        json.dumps({"backend": {"id": "none"}}), encoding="utf-8")
+    args = types.SimpleNamespace(backend=None, model=None, base_url=None,
+                                 repo=str(repo))
+    # kind "none" resolves to None rather than raising -- proof the block
+    # was read at all, since an ignored block would fall through to "claude"
+    assert cli._backend(args, cli._config(repo)) is None
+
+
+def test_a_missing_backend_names_the_way_out():
+    """This is the first thing a new install prints when nothing is set up.
+    "claude CLI not found on PATH" was true, unhelpful, and silent about the
+    two other ways to reach a model."""
+    from ledger.llm import ClaudeCLIBackend
+    import ledger.llm as llm
+
+    real = llm.shutil.which
+    llm.shutil.which = lambda _n: None
+    try:
+        with pytest.raises(RuntimeError) as excinfo:
+            ClaudeCLIBackend()
+    finally:
+        llm.shutil.which = real
+    message = str(excinfo.value)
+    assert "ledger setup" in message
+    assert "Ollama" in message or "API key" in message
+
+
+def test_a_bare_ledger_greets_rather_than_erroring(capsys, monkeypatch):
+    """It used to be an argparse error listing eighteen subcommands under
+    "the following arguments are required" -- the very first thing a new
+    install prints, reading as a fault rather than a greeting."""
+    from ledger.cli import main
+    monkeypatch.setattr("pathlib.Path.home",
+                        staticmethod(lambda: __import__("pathlib").Path("/nonexistent-home")))
+    assert main([]) == 0
+    out = capsys.readouterr().out
+    assert "ledger setup" in out, "an unconfigured machine must be sent to setup"
+    assert "required" not in out.lower()
