@@ -26,6 +26,42 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
   published pinned URL starts 404ing after a release. Deliberate, but worth
   remembering before handing anyone a version-pinned command.
 
+## Done (2026-08-23 — v0.13.0, an instrument for how it LOOKS)
+
+- [x] **`--design-review`.** Every sensor LEDGER had reported something a
+      program can decide, so every goal it could pursue was of that kind,
+      and builds came out correct and ugly — "beautiful" was not achievable
+      because it was not observable. It now screenshots the running build
+      in headless Chrome and has a local vision model score it against a
+      FIXED rubric (composition, lighting, materials, interface, finish),
+      adding `design.ok` to what the planner can reach for.
+      Measured: citysprint 3.0/10, REENTRY 3.6/10, the bench viewer 2.2/10,
+      lighting 2/10 across all three. I had called citysprint's graphics
+      good; the judge and the user agreed it was a prototype.
+- [x] **The refinement loop needs no new planning machinery.** With
+      `design.ok` in the goal and `ReviewDesign` in the catalogue,
+      AuthorPatch → ApplyPatch → ReviewDesign → AuthorPatch-with-critique
+      is just what UCB1 search does. The one-shot plan chains in the
+      benchmark were not a planner defect: the planner had nothing left to
+      reach for once the tests were green.
+- [x] Two rules keep a model's opinion safe in a control loop: `design.ok`
+      is its own proposition and NEVER substitutes for `tests.pass` (a
+      model's opinion is not execution evidence), and the written critique
+      goes into the authoring prompt as evidence exactly the way a failing
+      test's output does — the score gates, the complaints are what get
+      fixed.
+
+### Open
+- [ ] **A screenshot cannot tell a live HUD from a mock one.** The v0.12.0
+      usability review flagged this before the first design run: "a quiet,
+      well-aligned HUD wired to hardcoded placeholders photographs
+      identically to one that works." Currently defended only by the
+      composite goal (`design.ok AND tests.pass`), where the browser tests
+      require the view to change over time. Worth a dedicated check.
+- [ ] The rubric is one screenshot at one moment. It cannot see animation
+      quality, input feel, or framerate under load.
+- [ ] Vision review is slow (a 32B VLM per call), so it is opt-in.
+
 ## Done (2026-08-20/21 — v0.10.0 through v0.12.0)
 
 - [x] **v0.10.0 `ledger setup`.** One guided command: essentials, a model
@@ -70,7 +106,8 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 
 ### Open
 - [ ] **The site still serves 0.10.3.** v0.11.0 and v0.12.0 are pushed to
-      the private repo but not released. `.elease.ps1` then commit+push
+      the private repo but not released. `.
+elease.ps1` then commit+push
       kyberos.
 - [ ] **The strategist has never fired in a live episode.** Unit-tested
       only. Benchmark tasks 11 and 14 need a SAT solver and z3 is
