@@ -342,6 +342,11 @@ class AuthorPatchSkill:
         if evidence_tail:
             extra_parts.append("MOST RECENT FAILING TEST OUTPUT\n"
                                + evidence_tail)
+        # A visual critique is evidence of the same kind as a failing test:
+        # a specific, checkable complaint about the build that exists.
+        design = getattr(ctx, "design_evidence", "") or ""
+        if design:
+            extra_parts.append(design)
         files = self.context_files or select_context(
             ctx.worktree, self.task_text + "\n" + evidence_tail)
         if files:
@@ -444,6 +449,22 @@ class AuthorPatchSkill:
                 artifacts={"diff": ctx.blobs.put(diff), "raw_response": raw_sha},
             )
         return SkillResult(ok=False, claims=claims, commands=commands)
+
+
+def review_design_action() -> Action:
+    """The action that makes visual quality reachable by the planner.
+
+    Stochastic and effects-unknown on purpose: whether a build passes a
+    visual review is not a thing the contract can promise, so the planner
+    must learn it from observation. Once `design.ok` is in the goal, the
+    refinement loop falls straight out of the existing search --
+    AuthorPatch, ApplyPatch, ReviewDesign, and if the review fails the
+    critique is now sitting in the authoring evidence for the next attempt.
+    No new planning machinery: a new instrument and a new goal are enough.
+    """
+    return Action("ReviewDesign", prec=frozenset(),
+                  add=frozenset({"design.ok"}), delete=frozenset(),
+                  risk="exec", deterministic=False, effects_known=False)
 
 
 def build_authoring_catalog(slots: list[str], suite: str = "unit") -> Catalog:

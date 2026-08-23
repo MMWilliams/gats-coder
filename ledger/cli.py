@@ -429,6 +429,13 @@ def cmd_run(args) -> int:
                         or bool(cfg_file.get("strategise"))),
             research=getattr(args, "research", True),
             **_product_options(args, cfg_file),
+            design_review=(getattr(args, "design_review", False)
+                           or bool((cfg_file.get("design") or {}).get("review"))),
+            design_threshold=(getattr(args, "design_threshold", None)
+                              or (cfg_file.get("design") or {}).get("threshold")
+                              or 6.5),
+            design_model=(getattr(args, "design_model", None)
+                          or (cfg_file.get("design") or {}).get("model") or ""),
             task_text=args.task, backend=backend,
             l2_path=str(ledger_dir / "l2.sqlite"),
             l3_cache_path=str(ledger_dir / "l3.sqlite"),
@@ -1347,6 +1354,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--no-product-review", dest="product_review",
                    action="store_false", default=True,
                    help="skip the pre-flight 'is this usable' review")
+    p.add_argument("--design-review", dest="design_review",
+                   action="store_true",
+                   help="photograph the running build and have a vision "
+                        "model judge it against a rubric. Adds design.ok to "
+                        "the goal, so the planner iterates on how it LOOKS")
+    p.add_argument("--design-threshold", dest="design_threshold", type=float,
+                   default=6.5, metavar="N",
+                   help="mean rubric score out of 10 required (default 6.5)")
+    p.add_argument("--design-model", dest="design_model", default=None,
+                   metavar="MODEL",
+                   help="vision model for the review (default qwen3-vl:32b)")
     p.add_argument("--push", action="store_true",
                    help="add a network-gated PushBranch action (pushes the "
                         "episode branch to origin; mention pushing in the "

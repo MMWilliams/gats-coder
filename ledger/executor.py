@@ -28,8 +28,8 @@ from .graph import TransitionGraph
 from .journal import Journal
 from .planner import PlanConfig, EpisodeResult, Task, run_episode
 from .repo import Worktree, content_fingerprint, git
-from .sensors import (ExpensiveResultCache, SensorBank, dir_marker_sensor,
-                      git_sensor, test_status_sensor)
+from .sensors import (ExpensiveResultCache, SensorBank, design_sensor,
+                      dir_marker_sensor, git_sensor, test_status_sensor)
 from .state import Props
 from .world_model import L3Generative, LayeredWorldModel
 
@@ -130,6 +130,10 @@ class ExecContext:
     # Most recent failing suite output (tail), deposited by RunSuiteSkill and
     # read by AuthorPatchSkill so the model patches against real evidence.
     suite_evidence: dict = field(default_factory=dict)
+    # Most recent visual critique, deposited by ReviewDesignSkill. Carried
+    # the same way and for the same reason: a specific complaint about the
+    # lighting is evidence to author against, not decoration.
+    design_evidence: str = ""
     # Optional (text) -> None sink for live phase reporting. Skills call it
     # so a UI can say what is happening *now* instead of "working...".
     progress: object = None
@@ -184,6 +188,53 @@ class RunSuiteSkill:
                            claimed_props=frozenset(props),
                            claims=claims, commands=[rec],
                            artifacts={"suite_output": rec["out"]})
+
+
+class ReviewDesignSkill:
+    """Photograph the running build and have a vision model judge it.
+
+    Expensive, like RunSuite, and deposits into the same kind of cache so
+    the sensor reads a fact rather than re-running a model. Its written
+    critique lands in ctx.design_evidence, which the authoring prompt picks
+    up exactly the way it picks up a failing test's output -- because "the
+    scene has one ambient light so every surface is the same brightness" is
+    the same kind of actionable evidence as a stack trace, and considerably
+    more useful than a score.
+    """
+
+    def __init__(self, cache, threshold: float = 6.5,
+                 model: str = "", page: str = "index.html"):
+        self.cache = cache
+        self.threshold = threshold
+        self.model = model
+        self.page = page
+
+    def run(self, ctx: ExecContext) -> SkillResult:
+        from .vision import DEFAULT_MODEL, review
+        ctx.say("photographing the build and reviewing how it looks")
+        c = review(ctx.worktree, model=self.model or DEFAULT_MODEL,
+                   threshold=self.threshold, page=self.page)
+        fp = content_fingerprint(ctx.worktree)
+        if not c.assessed:
+            # Not assessed is not a failure: a machine with no vision model
+            # must not be unable to build anything.
+            self.cache.put(fp, set())
+            ctx.design_evidence = ""
+            return SkillResult(ok=False, claimed_props=frozenset(),
+                               claims=[f"visual review unavailable: {c.error}"],
+                               commands=[])
+        props = {"design.ok"} if c.ok else set()
+        self.cache.put(fp, props)
+        ctx.design_evidence = c.as_evidence()
+        blob = ctx.blobs.put(c.as_evidence())
+        return SkillResult(
+            ok=c.ok, claimed_props=frozenset(props),
+            claims=[f"visual review {c.mean:.1f}/10 "
+                    f"({'above' if c.ok else 'below'} the "
+                    f"{self.threshold} bar)"],
+            commands=[{"cmd": "vision.review", "exit": 0 if c.ok else 1,
+                       "out": blob}],
+            artifacts={"critique": blob})
 
 
 class ProposedSkill:
@@ -692,6 +743,9 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                      author_timeout: int | None = None,
                      strategise: bool = False,
                      research: bool = True,
+                     design_review: bool = False,
+                     design_threshold: float = 6.5,
+                     design_model: str = "",
                      product_kind: str = "",
                      product_require=None,
                      product_review: bool = True,
@@ -775,6 +829,7 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     else:
         worktree = Worktree.add(repo_root, worktree_dir, branch=branch)
     test_cache = ExpensiveResultCache()
+    design_cache = ExpensiveResultCache()
     sensor_list = [
         git_sensor(),
         test_status_sensor(test_cache, content_fingerprint),
@@ -792,6 +847,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     if pr:
         from .sensors import pr_sensor
         sensor_list.append(pr_sensor(branch))
+    if design_review:
+        sensor_list.append(design_sensor(design_cache, content_fingerprint))
     sensors = SensorBank(sensor_list)
     ctx = ExecContext(worktree=worktree.path,
                       blobs=BlobStore(episode_dir / "blobs"),
@@ -821,6 +878,11 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                 meter=meter, product_kind=product_kind,
                 product_require=product_require)
             skills[f"ApplyPatch:{slot}"] = ApplyPatchSkill(slot)
+    if design_review:
+        from .skills_llm import review_design_action
+        skills["ReviewDesign"] = ReviewDesignSkill(
+            design_cache, threshold=design_threshold, model=design_model)
+        catalog = Catalog(list(catalog) + [review_design_action()])
     skills.update(skill_overrides or {})
 
     l3 = None

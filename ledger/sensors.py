@@ -117,6 +117,32 @@ def test_status_sensor(cache: ExpensiveResultCache,
                   cost_tier="expensive", probe=probe)
 
 
+def design_sensor(cache: ExpensiveResultCache,
+                  fingerprint_fn: Callable[[Path], str]) -> Sensor:
+    """Emits `design.ok` when the last visual review of THIS content passed.
+
+    Same shape as the test sensor, and for the same reason: the skill that
+    paid for the expensive thing deposits the result, the sensor only
+    reads, and a cache miss emits nothing rather than guessing. Keyed by
+    content fingerprint, so changing a single line invalidates the verdict
+    -- a review of an older build must never be mistaken for a review of
+    this one.
+
+    Deliberately its own proposition. A model's opinion is not the same
+    kind of evidence as an executed test, so it is never allowed to stand
+    in for `tests.pass`: something beautiful that fails its tests has not
+    passed, and something correct that looks like a placeholder is not
+    finished.
+    """
+
+    def probe(root: Path) -> set:
+        cached = cache.get(fingerprint_fn(root))
+        return set(cached) if cached is not None else set()
+
+    return Sensor(name="design_review", version="1",
+                  cost_tier="expensive", probe=probe)
+
+
 def remote_branch_sensor(branch: str) -> Sensor:
     """Emits `repo.pushed:<branch>` iff origin actually has the branch --
     the push skill's claim is confirmed by asking the remote, never by
