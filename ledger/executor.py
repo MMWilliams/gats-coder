@@ -203,36 +203,67 @@ class ReviewDesignSkill:
     """
 
     def __init__(self, cache, threshold: float = 6.5,
-                 model: str = "", page: str = "index.html"):
+                 model: str = "", page: str = "index.html",
+                 baseline: "Path | None" = None):
         self.cache = cache
         self.threshold = threshold
         self.model = model
         self.page = page
+        # The screenshot this episode started from. design.ok asks whether
+        # the build has been IMPROVED, not whether it clears an absolute
+        # bar -- because measured against a known pair, absolute scores from
+        # every local vision model tried were compressed or inverted, while
+        # order-swapped pairwise ranking was reliable.
+        self.baseline = Path(baseline) if baseline else None
 
     def run(self, ctx: ExecContext) -> SkillResult:
-        from .vision import DEFAULT_MODEL, review
+        import tempfile
+
+        from .vision import DEFAULT_MODEL, compare, critique_image, screenshot
+        model = self.model or DEFAULT_MODEL
         ctx.say("photographing the build and reviewing how it looks")
-        c = review(ctx.worktree, model=self.model or DEFAULT_MODEL,
-                   threshold=self.threshold, page=self.page)
         fp = content_fingerprint(ctx.worktree)
-        if not c.assessed:
+
+        shot = Path(tempfile.mkdtemp(prefix="ledger-vision-")) / "now.png"
+        if not screenshot(ctx.worktree, shot, page=self.page):
             # Not assessed is not a failure: a machine with no vision model
-            # must not be unable to build anything.
+            # or no page must not be unable to build anything.
             self.cache.put(fp, set())
             ctx.design_evidence = ""
             return SkillResult(ok=False, claimed_props=frozenset(),
-                               claims=[f"visual review unavailable: {c.error}"],
+                               claims=["could not photograph the build"],
                                commands=[])
-        props = {"design.ok"} if c.ok else set()
+
+        # The critique is worth having whatever the score says -- a specific
+        # complaint about the lighting is what the next authoring attempt
+        # can act on. The SCORE is not used to gate anything.
+        critique = critique_image(shot, model=model, threshold=self.threshold)
+        ctx.design_evidence = critique.as_evidence()
+        blob = ctx.blobs.put(critique.as_evidence() or "(no critique)")
+
+        if self.baseline is None or not self.baseline.is_file():
+            # First look: remember it, and report no verdict. An episode has
+            # to improve on something, and there is nothing yet to improve on.
+            if self.baseline is not None:
+                self.baseline.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(shot, self.baseline)
+            self.cache.put(fp, set())
+            return SkillResult(
+                ok=False, claimed_props=frozenset(),
+                claims=["captured the starting appearance; nothing to "
+                        "compare against yet"],
+                commands=[{"cmd": "vision.baseline", "exit": 0, "out": blob}],
+                artifacts={"critique": blob})
+
+        verdict = compare(self.baseline, shot, model=model)
+        better = verdict.better == "after" and verdict.agreed
+        props = {"design.ok"} if better else set()
         self.cache.put(fp, props)
-        ctx.design_evidence = c.as_evidence()
-        blob = ctx.blobs.put(c.as_evidence())
         return SkillResult(
-            ok=c.ok, claimed_props=frozenset(props),
-            claims=[f"visual review {c.mean:.1f}/10 "
-                    f"({'above' if c.ok else 'below'} the "
-                    f"{self.threshold} bar)"],
-            commands=[{"cmd": "vision.review", "exit": 0 if c.ok else 1,
+            ok=better, claimed_props=frozenset(props),
+            claims=[f"visual comparison against the starting build: "
+                    f"{verdict.better} ({verdict.why})"],
+            commands=[{"cmd": "vision.compare", "exit": 0 if better else 1,
                        "out": blob}],
             artifacts={"critique": blob})
 
@@ -881,7 +912,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     if design_review:
         from .skills_llm import review_design_action
         skills["ReviewDesign"] = ReviewDesignSkill(
-            design_cache, threshold=design_threshold, model=design_model)
+            design_cache, threshold=design_threshold, model=design_model,
+            baseline=episode_dir / "design-baseline.png")
         catalog = Catalog(list(catalog) + [review_design_action()])
     skills.update(skill_overrides or {})
 

@@ -33,6 +33,7 @@ import os
 import shutil
 import socket
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.error
@@ -40,7 +41,14 @@ import urllib.request
 from dataclasses import dataclass, field
 from pathlib import Path
 
-DEFAULT_MODEL = "qwen3-vl:32b"
+# gemma4:31b, chosen by measurement rather than reputation. Asked the same
+# pair in both orders, qwen3-vl:32b and qwen2.5vl:7b answered "the second
+# one" every time -- including when both images were IDENTICAL -- so their
+# judgments carried no information at all. gemma4 ranked a known pair 3/3
+# correctly in both orderings and correctly called identical images the same.
+# Its ABSOLUTE scores are still worthless (it rates the better build 2.0 and
+# the worse one 2.2), which is why the gate below is pairwise.
+DEFAULT_MODEL = "gemma4:31b"
 OLLAMA = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
 
 # The rubric is part of the contract, not a mood. Each dimension is scored
@@ -143,12 +151,31 @@ def screenshot(root: Path | str, out: Path, *, wait_ms: int = 9000,
     if chrome is None:
         return False
     root = Path(root)
+    if not (root / page).is_file():
+        return False
     port = _free_port()
+    # sys.executable, not "python": an episode does not necessarily run with
+    # a `python` on PATH, and a server that never started photographs as a
+    # connection-refused page -- which is indistinguishable from an ugly one.
     server = subprocess.Popen(
-        ["python", "-m", "http.server", str(port), "--bind", "127.0.0.1"],
+        [sys.executable, "-m", "http.server", str(port), "--bind", "127.0.0.1"],
         cwd=str(root), stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     try:
-        time.sleep(1.5)
+        # Wait for the port to ACCEPT, rather than sleeping a fixed interval.
+        # 1.5s was enough on an idle machine and not enough while the episode
+        # was running its own test suite, so the review failed intermittently
+        # for reasons that had nothing to do with the build.
+        deadline = time.time() + 20
+        while time.time() < deadline:
+            try:
+                with socket.create_connection(("127.0.0.1", port), timeout=0.5):
+                    break
+            except OSError:
+                if server.poll() is not None:
+                    return False          # the server died; nothing to shoot
+                time.sleep(0.2)
+        else:
+            return False
         subprocess.run(
             [chrome, "--headless=new", "--disable-gpu", "--no-sandbox",
              "--no-first-run", "--hide-scrollbars",
@@ -209,6 +236,92 @@ def critique_image(path: Path, model: str = DEFAULT_MODEL,
                  summary=str(obj.get("summary") or "")[:300], assessed=True)
     c.ok = c.mean >= threshold
     return c
+
+
+COMPARE_PROMPT = """Two screenshots of the same application, before and \
+after a change. The FIRST image is labelled A, the SECOND is B.
+
+Which is better made? Judge only what is visible: lighting and shade, \
+surface texture and material variety, framing, and whether the interface is \
+legible and deliberate.
+
+Respond with ONLY a JSON object:
+{{"better": "A" | "B" | "same", "why": "<one sentence naming what differs>"}}"""
+
+
+@dataclass
+class Comparison:
+    better: str = "same"          # "before" | "after" | "same"
+    why: str = ""
+    agreed: bool = False          # both orderings gave the same answer
+    assessed: bool = False
+    error: str = ""
+
+
+def _ask_pair(first: Path, second: Path, model: str, timeout: int) -> str:
+    """One pairwise judgment. Returns 'A', 'B' or 'same'."""
+    payload = {
+        "model": model,
+        "prompt": COMPARE_PROMPT,
+        "images": [base64.b64encode(Path(p).read_bytes()).decode("ascii")
+                   for p in (first, second)],
+        "stream": False,
+        "options": {"temperature": 0.0},
+    }
+    req = urllib.request.Request(
+        f"{OLLAMA}/api/generate", method="POST",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"content-type": "application/json"})
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
+        body = json.loads(resp.read().decode("utf-8", errors="replace"))
+    from .llm import extract_json
+    obj = extract_json(body.get("response", "") or "")
+    if not isinstance(obj, dict):
+        return "same"
+    verdict = str(obj.get("better", "same")).strip().upper()
+    return verdict if verdict in ("A", "B") else "same"
+
+
+def compare(before: Path, after: Path, *, model: str = DEFAULT_MODEL,
+            timeout: int = 600) -> Comparison:
+    """Which of two builds looks better -- asked BOTH ways round.
+
+    Absolute scoring from this judge turned out to be unusable: measured on
+    a pair whose difference was night and day, it awarded 2.7 and 3.2, and
+    justified the low mark by asserting there was no directional light in a
+    scene containing two of them and thirteen shadow references. The
+    compressed scale made any fixed threshold either unreachable or
+    meaningless.
+
+    Ranking, though, it does reliably -- it got the same pair right three
+    times out of three. So the question asked here is the one it can answer.
+
+    Asked in both orders because position bias is the standard failure of a
+    pairwise judge: a model that simply prefers the second image would look
+    perfect on a test where the improved version is always second. If the
+    two orderings disagree, the honest answer is that they are
+    indistinguishable, not that one of them won.
+    """
+    for p in (before, after):
+        if not Path(p).is_file():
+            return Comparison(error=f"missing screenshot: {p}")
+    try:
+        forward = _ask_pair(before, after, model, timeout)   # A=before B=after
+        reverse = _ask_pair(after, before, model, timeout)   # A=after B=before
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError,
+            json.JSONDecodeError) as exc:
+        return Comparison(error=f"vision model unreachable: {exc}")
+
+    says_after = (forward == "B", reverse == "A")
+    says_before = (forward == "A", reverse == "B")
+    if all(says_after):
+        return Comparison(better="after", agreed=True, assessed=True,
+                          why="preferred in both orderings")
+    if all(says_before):
+        return Comparison(better="before", agreed=True, assessed=True,
+                          why="preferred in both orderings")
+    return Comparison(better="same", agreed=False, assessed=True,
+                      why=f"the two orderings disagreed ({forward}/{reverse})")
 
 
 def review(root: Path | str, *, model: str = DEFAULT_MODEL,

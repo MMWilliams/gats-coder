@@ -115,3 +115,89 @@ def test_the_sensor_reads_the_cache_and_never_guesses():
     assert sensor.probe(Path(".")) == set()      # miss -> silence, not False
     cache.put("fp", {"design.ok"})
     assert sensor.probe(Path(".")) == {"design.ok"}
+
+
+def test_a_missing_page_is_not_photographed(tmp_path):
+    """Serving a directory with no index.html photographs a directory
+    listing, which the judge would then score as a bad UI. Absence must be
+    reported as absence."""
+    from ledger.vision import screenshot
+    assert screenshot(tmp_path, tmp_path / "out.png") is False
+
+
+def test_the_server_is_waited_for_not_slept_on():
+    """A fixed sleep was enough on an idle machine and not enough while the
+    episode ran its own suite, so reviews failed intermittently for reasons
+    unrelated to the build."""
+    import inspect
+
+    from ledger import vision
+    src = inspect.getsource(vision.screenshot)
+    assert "create_connection" in src, "still sleeping instead of polling"
+    assert "sys.executable" in src, (
+        "spawning bare 'python' -- an episode need not have one on PATH")
+
+
+def test_the_pairwise_judge_is_asked_in_both_orders(tmp_path, monkeypatch):
+    """Position bias is the standard failure of a pairwise judge, and it is
+    not hypothetical: measured, qwen3-vl:32b and qwen2.5vl:7b answered "the
+    second image" every single time, INCLUDING when both images were
+    identical. Without the swap this looks like a perfect judge on any test
+    where the improved version happens to come second."""
+    from ledger import vision
+
+    a, b = tmp_path / "a.png", tmp_path / "b.png"
+    for p in (a, b):
+        p.write_bytes(b"\x89PNG" + b"0" * 4000)
+
+    asked = []
+
+    def always_second(first, second, model, timeout):
+        asked.append((first.name, second.name))
+        return "B"
+
+    monkeypatch.setattr(vision, "_ask_pair", always_second)
+    verdict = vision.compare(a, b)
+    assert len(asked) == 2, "the pair must be judged in both orders"
+    assert asked[0] != asked[1], "the second question must swap the images"
+    assert verdict.better == "same" and not verdict.agreed, (
+        "a judge that always says 'the second one' must yield no verdict")
+
+
+def test_agreement_in_both_orders_is_a_real_verdict(tmp_path, monkeypatch):
+    from ledger import vision
+
+    a, b = tmp_path / "a.png", tmp_path / "b.png"
+    for p in (a, b):
+        p.write_bytes(b"\x89PNG" + b"0" * 4000)
+
+    def prefers_b_by_content(first, second, model, timeout):
+        # picks whichever argument is b.png, wherever it sits
+        return "A" if first.name == "b.png" else "B"
+
+    monkeypatch.setattr(vision, "_ask_pair", prefers_b_by_content)
+    verdict = vision.compare(a, b)
+    assert verdict.better == "after" and verdict.agreed
+
+
+def test_the_design_gate_is_pairwise_not_an_absolute_score():
+    """Absolute scores from every local model measured were unusable:
+    compressed for one, and INVERTED for gemma4, which rated the better
+    build 2.0 and the worse one 2.2. Any fixed threshold over that is
+    either unreachable or meaningless."""
+    import inspect
+
+    from ledger.executor import ReviewDesignSkill
+    src = inspect.getsource(ReviewDesignSkill.run)
+    assert "compare(" in src, "the gate is not using pairwise comparison"
+    assert "verdict.agreed" in src, "the order-swap agreement is not required"
+
+
+def test_the_first_review_captures_a_baseline_and_claims_nothing():
+    import inspect
+
+    from ledger.executor import ReviewDesignSkill
+    src = inspect.getsource(ReviewDesignSkill.run)
+    assert "captured the starting appearance" in src, (
+        "the first review must record a baseline rather than pass or fail")
+    assert "self.baseline is None or not self.baseline.is_file()" in src
