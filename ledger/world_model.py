@@ -32,7 +32,7 @@ from dataclasses import dataclass
 
 from .actions import Catalog
 from .journal import Journal
-from .state import Props, state_key
+from .state import Props, effect_key, state_key
 
 STOCHASTIC_PRIOR = 0.5  # Eq. 3's maximum-entropy prior, reused for unobserved
                         # optimistic contracts
@@ -147,8 +147,9 @@ class L3Stub:
         self.calls = 0
         self.cache: dict[tuple[str, str], Prediction] = {}
 
-    def predict(self, s: Props, action_name: str) -> Prediction | None:
-        key = (state_key(s), action_name)
+    def predict(self, s: Props, action_name: str,
+                vocabulary: frozenset | None = None) -> Prediction | None:
+        key = (effect_key(s), action_name)
         if key in self.cache:
             return self.cache[key]
         self.calls += 1
@@ -170,8 +171,9 @@ class L3Generative:
         if cache_path:
             self.load(cache_path)
 
-    def predict(self, s: Props, action_name: str) -> Prediction | None:
-        key = (state_key(s), action_name)
+    def predict(self, s: Props, action_name: str,
+                vocabulary: frozenset | None = None) -> Prediction | None:
+        key = (effect_key(s), action_name)
         if key in self.cache:
             added, removed = self.cache[key]
             return Prediction((s | frozenset(added)) - frozenset(removed),
@@ -190,6 +192,12 @@ class L3Generative:
             return None
         added = tuple(sorted(str(p) for p in obj.get("add", ())))
         removed = tuple(sorted(str(p) for p in obj.get("del", ())))
+        if vocabulary is not None:
+            # A proposition no sensor can report ("design.reviewed") is a
+            # guess the planner can never confirm; dropping it makes the
+            # prediction an honest no-op instead of a phantom state.
+            added = tuple(p for p in added if p in vocabulary)
+            removed = tuple(p for p in removed if p in vocabulary)
         self.cache[key] = (added, removed)
         return Prediction((s | frozenset(added)) - frozenset(removed),
                           STOCHASTIC_PRIOR, "L3")
@@ -251,10 +259,17 @@ class LayeredWorldModel:
         # Unknown effects (or unknown action): L2 -> L3 -> none.
         if self.l2.can_predict(s, action_name):
             return self.l2.predict(s, action_name)
-        pred = self.l3.predict(s, action_name)
+        pred = self.l3.predict(s, action_name, self._vocabulary())
         if pred is not None:
             return pred
         return Prediction(s, 0.0, "none")
+
+    def _vocabulary(self) -> frozenset:
+        # Recomputed per call: the strategist can grow the catalog mid-episode.
+        vocab: set = set()
+        for a in self.catalog:
+            vocab |= a.prec | a.add | a.delete
+        return frozenset(vocab)
 
     def _contradicted(self, s: Props, action_name: str) -> Prediction | None:
         """The observed effect of a deterministic action whose contract was

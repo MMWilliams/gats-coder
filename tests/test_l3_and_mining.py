@@ -117,3 +117,30 @@ def test_mined_prediction_carries_l2_provenance(tmp_path):
     pred = wm.predict(frozenset({"start", "s1"}), "Mystery")
     assert pred.layer == "L2"
     assert "s2" in pred.next_props
+
+
+def test_l3_cache_ignores_bookkeeping():
+    """A later round adds patch.applied:iterationN to every state. That
+    changes nothing about what an action does, so it must not buy a fresh
+    model call: the chess loop spent ~45% of six hours re-asking."""
+    backend = FakeBackend(oracle)
+    wm = LayeredWorldModel(planner_catalog(), l3=L3Generative(backend))
+    base = frozenset({"s1"})
+    first = wm.predict(base | {"patch.applied:iteration1"}, "Mystery")
+    again = wm.predict(base | {"patch.applied:iteration2",
+                               "patch.queued:iteration2",
+                               "repo.branch:ledger/x"}, "Mystery")
+    assert backend.calls == 1
+    assert "s2" in first.next_props and "s2" in again.next_props
+    # the asking state's own bookkeeping survives in the prediction
+    assert "patch.applied:iteration2" in again.next_props
+
+
+def test_l3_drops_propositions_no_sensor_reports():
+    """The live model answered ReviewDesign with `design.reviewed`, a prop
+    nothing can observe. Unobservable predictions become an honest no-op."""
+    backend = FakeBackend(lambda _: json.dumps(
+        {"add": ["s2", "design.reviewed"], "del": ["made.up"]}))
+    wm = LayeredWorldModel(planner_catalog(), l3=L3Generative(backend))
+    pred = wm.predict(frozenset({"s1", "made.up"}), "Mystery")
+    assert pred.next_props == frozenset({"s1", "s2", "made.up"})

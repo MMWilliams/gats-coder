@@ -454,9 +454,11 @@ class AuthorPatchSkill:
 def review_design_action() -> Action:
     """The action that makes visual quality reachable by the planner.
 
-    Stochastic and effects-unknown on purpose: whether a build passes a
-    visual review is not a thing the contract can promise, so the planner
-    must learn it from observation. Once `design.ok` is in the goal, the
+    Stochastic with a declared effect, RunSuite's shape: whether a build
+    passes is not a thing the contract can promise, so the planner learns
+    the odds from observation. Declared as effects-unknown it was reachable
+    only through L3, and the value search asked the model once per expanded
+    state -- hundreds of calls a step, for props no sensor reports. Once `design.ok` is in the goal, the
     refinement loop falls straight out of the existing search --
     AuthorPatch, ApplyPatch, ReviewDesign, and if the review fails the
     critique is now sitting in the authoring evidence for the next attempt.
@@ -464,7 +466,7 @@ def review_design_action() -> Action:
     """
     return Action("ReviewDesign", prec=frozenset(),
                   add=frozenset({"design.ok"}), delete=frozenset(),
-                  risk="exec", deterministic=False, effects_known=False)
+                  risk="exec", deterministic=False)
 
 
 def build_authoring_catalog(slots: list[str], suite: str = "unit") -> Catalog:

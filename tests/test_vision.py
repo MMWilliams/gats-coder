@@ -104,8 +104,9 @@ def test_design_ok_never_substitutes_for_tests_passing():
     a = review_design_action()
     assert a.add == frozenset({"design.ok"})
     assert not any("tests.pass" in p for p in a.add)
-    # unknown effects: whether a build passes review cannot be promised
-    assert a.effects_known is False and a.deterministic is False
+    # the outcome can't be promised (stochastic) but the effect is declared,
+    # so the planner reaches the review without asking a model per state
+    assert a.effects_known is True and a.deterministic is False
 
 
 def test_the_sensor_reads_the_cache_and_never_guesses():
