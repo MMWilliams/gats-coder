@@ -114,6 +114,29 @@ def failure_excerpt(text: str, limit: int = 4000) -> str:
     return out[:head] + "\n[... output trimmed ...]\n" + out[-(limit - head):]
 
 
+# Strong patterns name the failure; weak ones ("Build failed in 82ms") only
+# announce it, so they are used only when nothing stronger is present.
+_HEADLINES = (
+    re.compile(r"^(FAILED\b|ERROR\b|GAME_FAIL|error during build|"
+               r".*\b\w*(Error|Exception):)", re.IGNORECASE),
+    re.compile(r".*\b(failed|error)\b", re.IGNORECASE),
+)
+
+
+def failure_headline(text: str) -> str:
+    """One line naming what failed, for the episode's run history."""
+    lines = [ln.strip() for ln in failure_excerpt(text).splitlines()
+             if ln.strip() and "DeprecationWarning" not in ln]
+    for pattern in _HEADLINES:
+        for i, ln in enumerate(lines):
+            if pattern.match(ln):
+                # "error during build:" says little; the next line says what
+                if ln.endswith(":") and i + 1 < len(lines):
+                    ln = f"{ln} {lines[i + 1]}"
+                return ln[:200]
+    return lines[-1][:200] if lines else "(no output)"
+
+
 class BlobStore:
     """Content-addressed store for execution evidence (design SS9.1).
     Content is secret-redacted before hashing, so the stored blob and its
@@ -158,6 +181,24 @@ class ExecContext:
     # Optional (text) -> None sink for live phase reporting. Skills call it
     # so a UI can say what is happening *now* instead of "working...".
     progress: object = None
+    # Every suite result of this episode, across rounds, one JSON line each.
+    # Kept outside the worktree so the candidate cannot edit its own record.
+    history_path: Path | None = None
+
+    def record_suite(self, ok: bool, headline: str) -> None:
+        if self.history_path is None:
+            return
+        import json
+        with open(self.history_path, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"ok": ok, "what": headline}) + "\n")
+
+    def suite_history(self, n: int = 12) -> list[dict]:
+        if self.history_path is None or not self.history_path.is_file():
+            return []
+        import json
+        rows = [json.loads(ln) for ln in self.history_path.read_text(
+            encoding="utf-8").splitlines() if ln.strip()]
+        return rows[-n:]
 
     def say(self, text: str) -> None:
         if self.progress is not None:
@@ -197,6 +238,7 @@ class RunSuiteSkill:
             props = {f"tests.pass:{self.suite}"}
             claims = [f"{self.suite} suite passes"]
             ctx.suite_evidence.pop(self.suite, None)
+            ctx.record_suite(True, "all checks passed")
         else:
             m = re.search(r"(\d+) failed", proc.stdout)
             bucket = fail_bucket(int(m.group(1))) if m else "1-5"
@@ -204,6 +246,8 @@ class RunSuiteSkill:
             claims = [f"{self.suite} suite failing ({bucket})"]
             tail = redact_secrets(failure_excerpt(proc.stdout + proc.stderr))
             ctx.suite_evidence[self.suite] = {"tail": tail, "sha": rec["out"]}
+            ctx.record_suite(False, redact_secrets(
+                failure_headline(proc.stdout + proc.stderr)))
         ctx.test_cache.put(content_fingerprint(ctx.worktree), props)
         return SkillResult(ok=proc.returncode == 0,
                            claimed_props=frozenset(props),
@@ -906,7 +950,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                       blobs=BlobStore(episode_dir / "blobs"),
                       test_cache=test_cache,
                       queue_dir=queue_dir, applied_dir=applied_dir,
-                      progress=progress)
+                      progress=progress,
+                      history_path=episode_dir / "suite_history.jsonl")
     skills: dict[str, Skill] = {
         "RunSuite": RunSuiteSkill(test_cmd),
         "Commit": CommitSkill("ledger: apply queued fix"),

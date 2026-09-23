@@ -145,6 +145,9 @@ def test_ledger_authors_its_own_fix(repo, tmp_path):
     assert "AuthorPatch:a" in result.plan
     assert "ApplyPatch:a" in result.plan
     assert result.plan[-1] == "Commit"
+    # A red suite is never re-run on the same content: seen live, the
+    # optimistic prior used to buy a second identical run before authoring.
+    assert result.plan[:2] == ["RunSuite", "AuthorPatch:a"], result.plan
     # The planner still made zero LLM calls to decide what to do.
     assert result.llm_planning_calls == 0
     assert executor.incidents == 0
@@ -315,6 +318,36 @@ def test_failure_excerpt_keeps_the_error_not_the_frames():
     long = "ERROR first\n" + "noise line\n" * 2000 + "last line\n"
     ex = failure_excerpt(long, limit=500)
     assert "ERROR first" in ex and "last line" in ex and len(ex) < 600
+
+
+def test_failure_headline_names_the_failure_not_the_announcement():
+    from ledger.executor import failure_headline
+    vite = ("x Build failed in 82ms\n\x1b[31merror during build:\n"
+            "src/scene.js (22:18): Expected ';'\n")
+    assert failure_headline(vite) == \
+        "error during build: src/scene.js (22:18): Expected ';'"
+    game = ("CHECK page load\nVERIFIER_ERROR\n"
+            "page.evaluate: TypeError: x is undefined\n    at f (a.js:1)\n")
+    assert failure_headline(game) == "page.evaluate: TypeError: x is undefined"
+    pytest_out = ("..F\nFAILED tests/test_calc.py::test_add - assert 1 == 2\n"
+                  "1 failed, 2 passed\n")
+    assert failure_headline(pytest_out).startswith("FAILED tests/test_calc.py")
+
+
+@needs_git
+def test_the_author_sees_the_run_history(repo, tmp_path):
+    """43 of 208 chess runs regressed to an earlier check; the author only
+    ever saw the latest failure, so it could not know."""
+    from ledger.executor import RunSuiteSkill
+    ctx = _ctx(repo, tmp_path)
+    ctx.history_path = tmp_path / "suite_history.jsonl"
+    RunSuiteSkill(TEST_CMD).run(ctx)          # the fixture repo is red
+    ctx.record_suite(True, "all checks passed")
+    prompts: list[str] = []
+    AuthorPatchSkill("a", FakeBackend(lambda p: prompts.append(p) or FIX_DIFF),
+                     "fix add()").run(ctx)
+    assert "TEST RUNS SO FAR" in prompts[0]
+    assert "1. FAIL:" in prompts[0] and "2. PASS: all checks passed" in prompts[0]
 
 
 def _pkg(root, name, entry_text, meta):

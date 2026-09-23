@@ -140,6 +140,13 @@ def useful_actions(props: Props, catalog: Catalog, graph: TransitionGraph,
     u = graph.ensure_node(props)
     useful = []
     for a in catalog.applicable(props):
+        # A stochastic action is a measurement, and a state already holding
+        # one of its outcomes has measured this content. RunSuite on a red
+        # tree kept its optimistic p=0.5, so the planner re-ran a failing
+        # suite before ever authoring -- seen live; on the chess verifier
+        # each rerun costs minutes and observes the same thing.
+        if not a.deterministic and (a.add | a.delete) & props:
+            continue
         edge = graph.get_edge(u, a.name)
         nxt = graph.props_of(edge.v_key) if edge is not None \
             else wm.predict(props, a.name).next_props

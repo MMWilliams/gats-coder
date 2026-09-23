@@ -532,6 +532,19 @@ class AuthorPatchSkill:
         if instructions:
             extra_parts.append("PROJECT INSTRUCTIONS (from the repository)\n"
                                + instructions)
+        # The latest failure alone hides regressions: on the chess loop 43
+        # of 208 consecutive runs failed at an EARLIER check than the run
+        # before -- a patch broke what the previous one had fixed.
+        read_history = getattr(ctx, "suite_history", None)
+        history = read_history() if read_history else []
+        if len(history) > 1:
+            extra_parts.append(
+                "TEST RUNS SO FAR IN THIS TASK (oldest first). Do not "
+                "reintroduce a failure an earlier run had already got past, "
+                "and do not repeat an approach that failed the same way "
+                "twice.\n" + "\n".join(
+                    f"  {i}. {'PASS' if h['ok'] else 'FAIL'}: {h['what']}"
+                    for i, h in enumerate(history, 1)))
         evidence = getattr(ctx, "suite_evidence", {}) or {}
         evidence_tail = "\n".join(e["tail"] for _, e in sorted(evidence.items()))
         if evidence_tail:
