@@ -26,6 +26,24 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
   published pinned URL starts 404ing after a release. Deliberate, but worth
   remembering before handing anyone a version-pinned command.
 
+## Branch `ledger-quality` (2026-09-23), pushed, NOT merged into main
+
+main has ~8.5k lines of another session's uncommitted work; merge by hand.
+Overlaps: main's uncommitted skills_llm.py already sets ReviewDesign
+effects_known (same fix), and its planner forces RunSuite after a patch
+(which masked the two planner bugs fixed here).
+
+- [ ] Merge into main without clobbering the other session's changes.
+- [ ] Re-run a chess round on the merged code; compare L3 calls, author
+      rejections by the build gate, wall time per round against r65-r69.
+- [ ] Build gate misses 12/68 chess build failures (esbuild-level errors
+      like assigning to a const); consider running the project's own
+      bundler (vite/esbuild) on a temp overlay when node_modules exists.
+- [ ] 43/208 chess runs regressed to an earlier check. History in the
+      prompt is the cheap half; the structural half is keeping the best
+      candidate (revert a patch that regresses), which needs a progress
+      signal from the verifier.
+
 ## Done (2026-08-23 — v0.13.0, an instrument for how it LOOKS)
 
 - [x] **`--design-review`.** Every sensor LEDGER had reported something a
