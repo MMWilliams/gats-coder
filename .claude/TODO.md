@@ -36,9 +36,8 @@ effects_known (same fix), and its planner forces RunSuite after a patch
 - [ ] Merge into main without clobbering the other session's changes.
 - [ ] Re-run a chess round on the merged code; compare L3 calls, author
       rejections by the build gate, wall time per round against r65-r69.
-- [ ] Build gate misses 12/68 chess build failures (esbuild-level errors
-      like assigning to a const); consider running the project's own
-      bundler (vite/esbuild) on a temp overlay when node_modules exists.
+- [x] Bundle gate (ledger/bundle_check.py): with it the gates catch 66/68
+      chess build failures, plus 15 defects Vite let through.
 - [ ] 43/208 chess runs regressed to an earlier check. History in the
       prompt is the cheap half; the structural half is keeping the best
       candidate (revert a patch that regresses), which needs a progress
