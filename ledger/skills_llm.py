@@ -614,6 +614,12 @@ class AuthorPatchSkill:
             diff = None
             broken = (syntax_errors(written)
                       + import_errors(ctx.worktree, written)) if written else []
+            if written and not broken:
+                # The project's own bundler sees what patterns cannot:
+                # on chess it also caught ten `const` reassignments that
+                # Vite let through and the page then crashed on.
+                from .bundle_check import bundle_errors
+                broken = bundle_errors(ctx.worktree, written)
             if broken:
                 failure = ("these files would not build; fix them and send "
                            "every file again in full:\n" + "\n".join(broken))
