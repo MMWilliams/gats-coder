@@ -36,6 +36,7 @@ from .state import Props, effect_key, state_key
 
 STOCHASTIC_PRIOR = 0.5  # Eq. 3's maximum-entropy prior, reused for unobserved
                         # optimistic contracts
+PRIOR_WEIGHT = 2.0      # pseudo-observations the prior is worth against L2
 
 L3_PROMPT = """You are the transition model of a planning agent. Given the \
 current state (a set of propositions) and an action, predict the action's \
@@ -96,6 +97,11 @@ class L2Learned:
         return sum(
             sum(c.values()) for (_, a), c in self._effects.items() if a == action_name
         )
+
+    def frequency(self, s: Props, action_name: str) -> tuple[int, int]:
+        """(count of the most frequent effect, total observations)."""
+        effects = self._effects[(state_key(s), action_name)]
+        return max(effects.values()), sum(effects.values())
 
     def can_predict(self, s: Props, action_name: str) -> bool:
         return self.observations_at(s, action_name) > 0
@@ -254,7 +260,16 @@ class LayeredWorldModel:
             # Stochastic contract: learned per-state stats first (Eq. 5),
             # optimistic L1 prior before any observation.
             if self.l2.can_predict(s, action_name):
-                return self.l2.predict(s, action_name)
+                pred = self.l2.predict(s, action_name)
+                # Eq. 6's min(n/n0, 1) is confidence in a *deterministic*
+                # effect. Used as a stochastic outcome's probability it
+                # made one observed PASS worth p=0.1, below the 0.5 prior,
+                # so the more the planner tested the less it wanted to:
+                # live, it stacked three patches before running the suite.
+                # Shrink the observed frequency toward the prior instead.
+                top, n = self.l2.frequency(s, action_name)
+                p = (top + STOCHASTIC_PRIOR * PRIOR_WEIGHT) / (n + PRIOR_WEIGHT)
+                return Prediction(pred.next_props, p, "L2")
             return self.l1.predict(s, action_name)
         # Unknown effects (or unknown action): L2 -> L3 -> none.
         if self.l2.can_predict(s, action_name):

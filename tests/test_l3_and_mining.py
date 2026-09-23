@@ -119,6 +119,23 @@ def test_mined_prediction_carries_l2_provenance(tmp_path):
     assert "s2" in pred.next_props
 
 
+def test_one_observed_success_never_lowers_a_stochastic_prior():
+    """Eq. 6's n/n0 made one observed PASS worth p=0.1 against a 0.5
+    prior; live, the planner then stacked three patches without testing."""
+    cat = Catalog([Action("RunSuite", add=frozenset({"tests.pass:unit"}),
+                          deterministic=False)])
+    wm = LayeredWorldModel(cat)
+    s = frozenset({"patch.applied:a"})
+    assert wm.predict(s, "RunSuite").p == 0.5
+    wm.l2.record(s, "RunSuite", s | {"tests.pass:unit"})
+    pred = wm.predict(s, "RunSuite")
+    assert pred.layer == "L2" and pred.p > 0.5
+    assert "tests.pass:unit" in pred.next_props
+    for _ in range(20):
+        wm.l2.record(s, "RunSuite", s | {"tests.pass:unit"})
+    assert wm.predict(s, "RunSuite").p > 0.9
+
+
 def test_l3_cache_ignores_bookkeeping():
     """A later round adds patch.applied:iterationN to every state. That
     changes nothing about what an action does, so it must not buy a fresh
