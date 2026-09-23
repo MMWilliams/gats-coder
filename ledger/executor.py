@@ -93,6 +93,27 @@ def redact_secrets(text: str) -> str:
     return text
 
 
+_ANSI = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+# A stack frame inside a dependency tells the author nothing it can edit.
+_DEPENDENCY_FRAME = re.compile(
+    r"^\s+at .*(node_modules|site-packages|node:internal)|"
+    r"^\s+File \".*(site-packages|lib[\\/]python)")
+
+
+def failure_excerpt(text: str, limit: int = 4000) -> str:
+    """What the author sees of a failing run: colour codes and dependency
+    stack frames removed, then head AND tail when it is still too long.
+    A build error is printed first and the stack after it, so a tail alone
+    can hand the author nothing but frames."""
+    lines = [ln for ln in _ANSI.sub("", text).splitlines()
+             if not _DEPENDENCY_FRAME.search(ln)]
+    out = "\n".join(lines)
+    if len(out) <= limit:
+        return out
+    head = limit * 2 // 5
+    return out[:head] + "\n[... output trimmed ...]\n" + out[-(limit - head):]
+
+
 class BlobStore:
     """Content-addressed store for execution evidence (design SS9.1).
     Content is secret-redacted before hashing, so the stored blob and its
@@ -181,7 +202,7 @@ class RunSuiteSkill:
             bucket = fail_bucket(int(m.group(1))) if m else "1-5"
             props = {f"tests.fail_count:{self.suite}:{bucket}"}
             claims = [f"{self.suite} suite failing ({bucket})"]
-            tail = redact_secrets((proc.stdout + proc.stderr)[-4000:])
+            tail = redact_secrets(failure_excerpt(proc.stdout + proc.stderr))
             ctx.suite_evidence[self.suite] = {"tail": tail, "sha": rec["out"]}
         ctx.test_cache.put(content_fingerprint(ctx.worktree), props)
         return SkillResult(ok=proc.returncode == 0,

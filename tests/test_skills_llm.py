@@ -15,7 +15,7 @@ from ledger.sensors import ExpensiveResultCache
 from ledger.skills_llm import (AuthorPatchSkill, build_authoring_catalog,
                                repair_hunk_counts,
                                diff_from_files, extract_diff,
-                               extract_files)
+                               extract_files, import_errors, syntax_errors)
 
 FIX_DIFF = "".join(difflib.unified_diff(
     BUGGY.splitlines(keepends=True), FIXED.splitlines(keepends=True),
@@ -262,3 +262,106 @@ def test_whole_file_response_is_queued_as_a_patch(repo, tmp_path):
     queued = (ctx.queue_dir / "a.patch").read_text(encoding="utf-8")
     assert "calc.py" in queued
     assert any("built the patch from" in str(c) for c in result.claims)
+
+
+# -- syntax gate -------------------------------------------------------------
+
+def test_syntax_errors_catches_the_chess_typo():
+    """The real slip from the chess loop, r69: it cost a whole round."""
+    import shutil
+    if not shutil.which("node"):
+        pytest.skip("node not installed")
+    bad = ("import * as THREE from 'three';\nexport class S {\n"
+           "  init() {\n    this/renderer = new THREE.WebGLRenderer();\n"
+           "  }\n}\n")
+    errs = syntax_errors([("src/scene.js", bad)])
+    assert len(errs) == 1 and "src/scene.js" in errs[0]
+    good = bad.replace("this/renderer", "this.renderer")
+    assert syntax_errors([("src/scene.js", good)]) == []
+
+
+def test_syntax_errors_python_and_json():
+    assert syntax_errors([("a.py", "def f(:\n")])[0].startswith("a.py:1")
+    assert syntax_errors([("a.json", "{\"a\": }")])
+    assert syntax_errors([("a.py", "x = 1\n"), ("b.json", "{}"),
+                          ("c.gd", "anything")]) == []
+
+
+@needs_git
+def test_a_file_that_does_not_parse_is_sent_back(repo, tmp_path):
+    ctx = _ctx(repo, tmp_path)
+    prompts: list[str] = []
+
+    def author(prompt: str) -> str:
+        prompts.append(prompt)
+        if len(prompts) == 1:
+            return FILE_RESPONSE.replace("return a + b", "return a +")
+        return FILE_RESPONSE
+
+    result = AuthorPatchSkill("a", FakeBackend(author), "fix add()").run(ctx)
+    assert result.ok, result.claims
+    assert "would not build" in prompts[1] and "calc.py" in prompts[1]
+    assert any(c["cmd"] == "syntax check" for c in result.commands)
+
+
+def test_failure_excerpt_keeps_the_error_not_the_frames():
+    from ledger.executor import failure_excerpt
+    out = ("\x1b[31merror during build:\n"
+           "src/scene.js (22:18): Expected ';'\x1b[39m\n"
+           + "".join(f"    at f{i} (file:///w/node_modules/rollup/x.js:{i})\n"
+                     for i in range(200)))
+    ex = failure_excerpt(out)
+    assert "Expected ';'" in ex and "\x1b" not in ex and "node_modules" not in ex
+    long = "ERROR first\n" + "noise line\n" * 2000 + "last line\n"
+    ex = failure_excerpt(long, limit=500)
+    assert "ERROR first" in ex and "last line" in ex and len(ex) < 600
+
+
+def _pkg(root, name, entry_text, meta):
+    pkg = root / "node_modules" / name
+    pkg.mkdir(parents=True)
+    (pkg / "package.json").write_text(json.dumps(meta), encoding="utf-8")
+    (pkg / "esm.js").write_text(entry_text, encoding="utf-8")
+
+
+def test_import_errors_default_from_a_package_without_one(tmp_path):
+    """Sixteen chess-loop rounds died on `import Chess from 'chess.js'`."""
+    _pkg(tmp_path, "chess.js", "class Chess {}\nexport { Chess, WHITE };\n",
+         {"main": "cjs.js", "module": "esm.js"})
+    bad = [("src/game.js", "import Chess from 'chess.js';\n")]
+    errs = import_errors(tmp_path, bad)
+    assert len(errs) == 1 and "no default export" in errs[0] and "Chess" in errs[0]
+    good = [("src/game.js", "import { Chess } from 'chess.js';\n")]
+    assert import_errors(tmp_path, good) == []
+
+
+def test_import_errors_names_a_sibling_never_exported(tmp_path):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "scene.js").write_text(
+        "export function initScene() {}\nexport const a = 1, b = 2;\n",
+        encoding="utf-8")
+    errs = import_errors(tmp_path, [(
+        "src/main.js",
+        "import { initScene, Scene3D } from './scene.js';\n"
+        "import { thing } from './missing.js';\n")])
+    assert any("Scene3D" in e and "initScene" in e for e in errs)
+    assert any("missing.js" in e and "does not exist" in e for e in errs)
+    # a file written in the same patch counts as its new version
+    errs = import_errors(tmp_path, [
+        ("src/main.js", "import { Scene3D as S } from './scene';\n"),
+        ("src/scene.js", "export class Scene3D {}\n")])
+    assert errs == []
+
+
+def test_import_errors_stays_quiet_when_it_cannot_know(tmp_path):
+    """A guess would be a false alarm: star re-exports, CommonJS packages,
+    subpath imports and uninstalled dependencies are never flagged."""
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "all.js").write_text("export * from './x.js';\n",
+                                             encoding="utf-8")
+    files = [("src/m.js", "import { anything } from './all.js';\n"
+                          "import three from 'three/addons/x.js';\n"
+                          "import cjs from 'left-pad';\n")]
+    assert import_errors(tmp_path, files) == []          # no node_modules
+    _pkg(tmp_path, "left-pad", "module.exports = 1;\n", {"main": "esm.js"})
+    assert import_errors(tmp_path, files) == []          # CommonJS

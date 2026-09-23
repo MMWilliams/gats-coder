@@ -22,7 +22,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .actions import Action, Catalog
-from .executor import SkillResult, TEST_FAIL_PROPS, _run_cmd
+from .executor import SkillResult, TEST_FAIL_PROPS, _run_cmd, failure_excerpt
 
 _DIFF_START = re.compile(r"^(diff --git |--- |\+\+\+ )", re.MULTILINE)
 _FENCE = re.compile(r"```(?:diff|patch)?\s*\n(.*?)```", re.DOTALL)
@@ -258,6 +258,201 @@ def extract_files(text: str) -> list[tuple[str, str]]:
     return out
 
 
+def syntax_errors(files: list[tuple[str, str]]) -> list[str]:
+    """Parse-check whole files before they cost a suite run.
+
+    A one-character slip (`this/renderer = ...`) used to cost a full round:
+    apply, npm install, build, fail, re-plan. Parsing is deterministic and
+    takes milliseconds, so the model hears about it inside the same
+    authoring call. Languages without a checker here pass unchecked.
+    """
+    import json
+    import shutil
+    import tempfile
+
+    errors: list[str] = []
+    node = shutil.which("node")
+    with tempfile.TemporaryDirectory() as tmp:
+        for i, (rel, body) in enumerate(files):
+            suffix = Path(rel).suffix.lower()
+            if suffix == ".py":
+                try:
+                    compile(body, rel, "exec")
+                except SyntaxError as e:
+                    errors.append(f"{rel}:{e.lineno}: {e.msg}")
+            elif suffix == ".json":
+                try:
+                    json.loads(body)
+                except ValueError as e:
+                    errors.append(f"{rel}: {e}")
+            elif suffix in (".js", ".mjs", ".cjs") and node:
+                # Browser and Vite code is ES modules; only .cjs is not.
+                probe = Path(tmp) / f"f{i}{'.cjs' if suffix == '.cjs' else '.mjs'}"
+                probe.write_text(body, encoding="utf-8")
+                proc = subprocess.run([node, "--check", str(probe)],
+                                      capture_output=True, text=True,
+                                      encoding="utf-8", errors="replace",
+                                      timeout=60)
+                if proc.returncode != 0:
+                    msg = failure_excerpt(proc.stderr).replace(
+                        str(probe), rel).strip()
+                    errors.append("\n".join(msg.splitlines()[:6]))
+    return errors
+
+
+_JS_SUFFIXES = (".js", ".mjs")
+_BLOCK_COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
+_LINE_COMMENT = re.compile(r"^\s*//.*$", re.MULTILINE)
+_IMPORT = re.compile(
+    r"^\s*(?:import|export)\s+(?P<clause>[\w$*{}\s,]+?)\s+from\s+"
+    r"['\"](?P<spec>[^'\"]+)['\"]", re.MULTILINE)
+_EXPORT_DECL = re.compile(
+    r"^\s*export\s+(?:async\s+)?(?:function\s*\*?|class|const|let|var)\s+"
+    r"(?P<name>[\w$]+)", re.MULTILINE)
+_EXPORT_LIST = re.compile(r"^\s*export\s*\{(?P<names>[^}]*)\}", re.MULTILINE)
+_EXPORT_STAR_AS = re.compile(r"^\s*export\s*\*\s*as\s+([\w$]+)", re.MULTILINE)
+
+
+def _js_code(text: str) -> str:
+    return _LINE_COMMENT.sub("", _BLOCK_COMMENT.sub("", text))
+
+
+def _js_exports(text: str) -> tuple[set, bool, bool]:
+    """(names, has_default, has_star) of an ES module, by pattern. A module
+    that re-exports with `export *` may export names we cannot see, so
+    named imports from it are never flagged; `export *` never carries a
+    default, so a default import still is."""
+    code = _js_code(text)
+    names = {m.group("name") for m in _EXPORT_DECL.finditer(code)}
+    for m in _EXPORT_LIST.finditer(code):
+        for part in m.group("names").split(","):
+            part = part.strip()
+            if part:
+                names.add(part.split(" as ")[-1].strip())
+    names |= set(_EXPORT_STAR_AS.findall(code))
+    has_default = ("default" in names
+                   or re.search(r"^\s*export\s+default\b", code, re.M) is not None)
+    has_star = re.search(r"^\s*export\s*\*\s*from", code, re.M) is not None
+    return names - {"default"}, has_default, has_star
+
+
+def _package_entry(root: Path, spec: str) -> Path | None:
+    """The ES-module entry of a bare import, or None when it cannot be
+    determined (then nothing is checked -- a guess would be a false alarm).
+    CommonJS-only packages return None: bundlers synthesise their default."""
+    import json
+
+    parts = spec.split("/")
+    name_len = 2 if spec.startswith("@") else 1
+    if len(parts) > name_len:
+        return None                                    # subpath imports
+    pkg = root / "node_modules" / "/".join(parts[:name_len])
+    try:
+        meta = json.loads((pkg / "package.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    entry = meta.get("exports", {})
+    if isinstance(entry, dict):
+        entry = entry.get(".", entry)
+    while isinstance(entry, dict):
+        entry = next((entry[k] for k in ("import", "module", "browser", "default")
+                      if k in entry), None)
+    if not isinstance(entry, str):
+        entry = meta.get("module")
+        if not entry and meta.get("type") == "module":
+            entry = meta.get("main")
+    if not isinstance(entry, str) or entry.endswith(".cjs"):
+        return None
+    target = (pkg / entry).resolve()
+    return target if target.is_file() else None
+
+
+def import_errors(root: Path, files: list[tuple[str, str]]) -> list[str]:
+    """Check every import in the written JS files against what the target
+    actually exports, over the tree as it will be after the patch.
+
+    Measured on 237 chess-loop patches: after syntax, the next biggest
+    build killer was imports -- `import Chess from 'chess.js'` (it has no
+    default export) sixteen times, and names a sibling file never
+    exported. Each one cost a full round; all are decidable from source.
+    """
+    root = Path(root)
+    written = {rel: body for rel, body in files}
+
+    def read(rel: str) -> str | None:
+        if rel in written:
+            return written[rel]
+        path = root / rel
+        return path.read_text(encoding="utf-8", errors="replace") \
+            if path.is_file() else None
+
+    def resolve_relative(importer: str, spec: str) -> str | None:
+        base = (Path(importer).parent / spec).as_posix()
+        parts: list[str] = []
+        for seg in base.split("/"):
+            if seg == "..":
+                if parts:
+                    parts.pop()
+            elif seg not in ("", "."):
+                parts.append(seg)
+        base = "/".join(parts)
+        for cand in (base, base + ".js", base + ".mjs", base + "/index.js"):
+            if read(cand) is not None:
+                return cand
+        return None
+
+    errors: list[str] = []
+    for rel, body in files:
+        if Path(rel).suffix.lower() not in _JS_SUFFIXES:
+            continue
+        for m in _IMPORT.finditer(_js_code(body)):
+            clause, spec = m.group("clause").strip(), m.group("spec")
+            if spec.startswith("."):
+                target_rel = resolve_relative(rel, spec)
+                if target_rel is None:
+                    errors.append(f'{rel}: imports "{spec}", which does not exist')
+                    continue
+                if Path(target_rel).suffix.lower() not in _JS_SUFFIXES:
+                    continue
+                target_text = read(target_rel)
+            elif spec.startswith(("/", "http:", "https:", "node:")):
+                continue
+            else:
+                if not (root / "node_modules").is_dir():
+                    continue
+                entry = _package_entry(root, spec)
+                if entry is None:
+                    continue
+                target_text = entry.read_text(encoding="utf-8", errors="replace")
+            names, has_default, has_star = _js_exports(target_text)
+            wanted_default = False
+            wanted: list[str] = []
+            head, _, braces = clause.partition("{")
+            for piece in head.split(","):
+                piece = piece.strip()
+                if piece and not piece.startswith("*"):
+                    wanted_default = True
+            for piece in braces.rstrip("}").split(","):
+                piece = piece.strip()
+                if piece:
+                    orig = piece.split(" as ")[0].strip()
+                    if orig == "default":
+                        wanted_default = True
+                    else:
+                        wanted.append(orig)
+            known = ", ".join(sorted(names)[:12]) or "nothing named"
+            if wanted_default and not has_default:
+                errors.append(f'{rel}: imports a default from "{spec}", which '
+                              f"has no default export (it exports: {known})")
+            missing = [w for w in wanted if w not in names]
+            if missing and not has_star:
+                errors.append(f'{rel}: imports {", ".join(missing)} from '
+                              f'"{spec}", which does not export '
+                              f"{'it' if len(missing) == 1 else 'them'} "
+                              f"(it exports: {known})")
+    return errors
+
+
 def diff_from_files(root: Path, files: list[tuple[str, str]]) -> str:
     """Build a unified diff from whole-file contents, deterministically.
 
@@ -404,6 +599,16 @@ class AuthorPatchSkill:
             # diff we build from them is correct by construction.
             written = extract_files(response)
             diff = None
+            broken = (syntax_errors(written)
+                      + import_errors(ctx.worktree, written)) if written else []
+            if broken:
+                failure = ("these files would not build; fix them and send "
+                           "every file again in full:\n" + "\n".join(broken))
+                claims.append(f"attempt {attempt + 1}: {len(broken)} "
+                              "syntax/import error(s)")
+                commands.append({"cmd": "syntax check", "exit": 1,
+                                 "out": ctx.blobs.put(failure)})
+                continue
             if written:
                 diff = diff_from_files(ctx.worktree, written) or None
                 if diff:
