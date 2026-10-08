@@ -14,8 +14,11 @@ rules) and journaled -- an MCP tool is a capability, never a trust grant.
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 import threading
+
+from . import sandbox
 from dataclasses import dataclass, field
 
 
@@ -32,17 +35,27 @@ class MCPServer:
     PROTOCOL = "2025-06-18"
 
     def __init__(self, name: str, command: list[str], risk: str = "network",
-                 timeout: int = 20):
+                 timeout: int = 20, call_timeout: int = 300):
         self.name = name
         self.risk = risk if risk in ("read", "write", "exec", "network",
                                      "irreversible") else "network"
+        # Starting a server and running a tool are different waits (codex:
+        # 30s / 300s). A slow tool is cancelled; only a dead server is fatal.
         self._timeout = timeout
+        self._call_timeout = call_timeout
         self._id = 0
         self._lock = threading.Lock()
-        self._proc = subprocess.Popen(
+        self._replies: dict = {}
+        self._arrived = threading.Condition()
+        self._eof = False
+        self._wire = threading.Lock()
+        # In its own job: closing the server kills whatever it spawned too.
+        self._job = sandbox.popen(
             [str(c) for c in command], stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
             text=True, encoding="utf-8", bufsize=1)
+        self._proc = self._job.proc
+        threading.Thread(target=self._read, daemon=True).start()
         self._rpc("initialize", {
             "protocolVersion": self.PROTOCOL,
             "capabilities": {},
@@ -55,46 +68,62 @@ class MCPServer:
 
     # -- wire ----------------------------------------------------------------
     def _send(self, msg: dict) -> None:
-        self._proc.stdin.write(json.dumps(msg) + "\n")
-        self._proc.stdin.flush()
+        with self._wire:
+            self._proc.stdin.write(json.dumps(msg) + "\n")
+            self._proc.stdin.flush()
 
     def _notify(self, method: str, params: dict) -> None:
         self._send({"jsonrpc": "2.0", "method": method, "params": params})
 
-    def _rpc(self, method: str, params: dict) -> dict:
+    def _read(self) -> None:
+        """Route every response to its id; stray output is tolerated."""
+        for line in self._proc.stdout:
+            try:
+                msg = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(msg, dict) and "id" in msg:
+                with self._arrived:
+                    self._replies[msg["id"]] = msg
+                    self._arrived.notify_all()
+        with self._arrived:
+            self._eof = True
+            self._arrived.notify_all()
+
+    def _rpc(self, method: str, params: dict, timeout: float | None = None) -> dict:
+        timeout = self._timeout if timeout is None else timeout
         with self._lock:
             self._id += 1
             rid = self._id
             self._send({"jsonrpc": "2.0", "id": rid, "method": method,
                         "params": params})
-            timer = threading.Timer(self._timeout, self._proc.kill)
-            timer.start()
-            try:
-                while True:
-                    line = self._proc.stdout.readline()
-                    if not line:
-                        raise RuntimeError(
-                            f"mcp server {self.name!r}: no response to "
-                            f"{method} (timeout or crash)")
-                    try:
-                        msg = json.loads(line)
-                    except json.JSONDecodeError:
-                        continue  # tolerate stray output
-                    if msg.get("id") != rid:
-                        continue  # notification or unrelated
-                    if "error" in msg:
-                        err = msg["error"]
-                        raise RuntimeError(
-                            f"mcp server {self.name!r}: {method} -> "
-                            f"{err.get('message', err)}")
-                    return msg.get("result") or {}
-            finally:
-                timer.cancel()
+        with self._arrived:
+            got = self._arrived.wait_for(
+                lambda: rid in self._replies or self._eof, timeout)
+            msg = self._replies.pop(rid, None)
+        if msg is None:
+            if not got:
+                # Cancel and carry on (goose); the server stays usable.
+                try:
+                    self._notify("notifications/cancelled",
+                                 {"requestId": rid, "reason": "timeout"})
+                except OSError:
+                    pass
+                raise RuntimeError(f"mcp server {self.name!r}: {method} timed "
+                                   f"out after {timeout}s (cancelled)")
+            raise RuntimeError(f"mcp server {self.name!r}: no response to "
+                               f"{method} (server exited)")
+        if "error" in msg:
+            err = msg["error"]
+            raise RuntimeError(f"mcp server {self.name!r}: {method} -> "
+                               f"{err.get('message', err) if isinstance(err, dict) else err}")
+        return msg.get("result") or {}
 
     # -- calls ---------------------------------------------------------------
     def call(self, tool: str, arguments: dict) -> str:
         result = self._rpc("tools/call",
-                           {"name": tool, "arguments": arguments or {}})
+                           {"name": tool, "arguments": arguments or {}},
+                           timeout=self._call_timeout)
         parts = [c.get("text", "") for c in result.get("content", [])
                  if c.get("type") == "text"]
         text = "\n".join(p for p in parts if p) or json.dumps(result)
@@ -107,6 +136,7 @@ class MCPServer:
             self._proc.terminate()
         except OSError:
             pass
+        self._job.close()
 
 
 def load_servers(cfg: dict, on_error=None) -> dict[str, MCPServer]:
@@ -122,7 +152,8 @@ def load_servers(cfg: dict, on_error=None) -> dict[str, MCPServer]:
             servers[name] = MCPServer(
                 str(name), list(spec["command"]),
                 risk=str(spec.get("risk", "network")),
-                timeout=int(spec.get("timeout", 20)))
+                timeout=int(spec.get("timeout", 20)),
+                call_timeout=int(spec.get("call_timeout", 300)))
         except Exception as exc:
             if on_error:
                 on_error(f"mcp server {name!r} failed to start: {exc}")
@@ -164,10 +195,10 @@ class MCPToolSkill:
     """
 
     def __init__(self, server, tool: str, arguments: dict,
-                 claims: frozenset, provenance=None):
+                 claims: frozenset, provenance=None, variables=None):
         self.server = server
         self.tool = tool
-        self.arguments = dict(arguments or {})
+        self.arguments = expand(dict(arguments or {}), variables or {})
         self.claimed = claims
         self.provenance = provenance
 
@@ -198,6 +229,23 @@ class MCPToolSkill:
         )
 
 
+def expand(value, variables: dict):
+    """`${name}` -> variables[name] in every string of a config value.
+
+    Only episode facts the runner fixed before planning (branch, episode,
+    worktree), never state or model output: the planner still chooses
+    actions, not arguments. An unknown name is left as written.
+    """
+    if isinstance(value, str):
+        return re.sub(r"\$\{(\w+)\}",
+                      lambda m: str(variables.get(m.group(1), m.group(0))), value)
+    if isinstance(value, dict):
+        return {k: expand(v, variables) for k, v in value.items()}
+    if isinstance(value, list):
+        return [expand(v, variables) for v in value]
+    return value
+
+
 def _worst(a: str, b: str) -> str:
     """The more dangerous of two risk classes."""
     order = list(RISK_LEVELS)
@@ -205,7 +253,7 @@ def _worst(a: str, b: str) -> str:
 
 
 def contracted_actions(servers: dict, cfg: dict, vocabulary,
-                       provenance=None, on_error=None):
+                       provenance=None, on_error=None, variables=None):
     """(actions, skills) for every tool the config contracts.
 
     Rejects rather than degrades. A tool whose effects are not in the sensor
@@ -276,6 +324,6 @@ def contracted_actions(servers: dict, cfg: dict, vocabulary,
             ))
             skills[label] = MCPToolSkill(
                 server, tool_name, contract.get("arguments") or {},
-                effects, provenance=provenance)
+                effects, provenance=provenance, variables=variables)
 
     return actions, skills

@@ -1,7 +1,7 @@
 """STRIPS-style action contracts (paper SS3.1): prec / add / del + risk class.
 
-An action a is applicable in s iff prec(a) <= s; applying it yields
-s' = (s | add(a)) - del(a).
+An action a is applicable in s iff prec(a) <= s and forbid(a) & s is empty;
+applying it yields s' = (s | add(a)) - del(a).
 """
 
 from __future__ import annotations
@@ -31,9 +31,14 @@ class Action:
     # effects (unfamiliar tool, new build system): L1 cannot predict them;
     # L2 stats and the L3 generative layer take over (paper Eq. 3/9).
     effects_known: bool = True
+    # Negative preconditions. Conjunctive `prec` cannot say "only once the
+    # suite has been read" (pass and fail are alternatives), but "not while
+    # tests.unknown" can, and that is the contract that keeps authoring from
+    # running blind on top of unverified patches.
+    forbid: Props = field(default_factory=frozenset)
 
     def applicable(self, s: Props) -> bool:
-        return self.prec <= s
+        return self.prec <= s and not (self.forbid & s)
 
     def apply(self, s: Props) -> Props:
         return (s | self.add) - self.delete
@@ -48,6 +53,9 @@ class Action:
             "cost": self.cost,
             "det": self.deterministic,
             "fx": self.effects_known,
+            # Only when present, so catalogues without negative
+            # preconditions keep the content hash their journals recorded.
+            **({"forbid": sorted(self.forbid)} if self.forbid else {}),
         }
 
     @staticmethod
@@ -64,6 +72,7 @@ class Action:
             cost=float(d.get("cost", 1.0)),
             deterministic=bool(d.get("det", True)),
             effects_known=bool(d.get("fx", True)),
+            forbid=frozenset(d.get("forbid", ())),
         )
 
 

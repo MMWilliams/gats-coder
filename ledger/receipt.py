@@ -191,6 +191,9 @@ def _build(loaded: list[tuple[Path, list]], scope: str) -> dict:
                     # Present only on the actions that called one, which is
                     # what makes the roster below meaningful.
                     "model": entry.get("model") or None,
+                    # The worktree tree this action started from, when one
+                    # was snapshotted (`ledger rewind` restores it).
+                    **({"tree_before": entry["tree"]} if entry.get("tree") else {}),
                 })
                 if after and risk in TAINT_RISKS:
                     privileged.append({"run": number, "i": index,

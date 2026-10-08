@@ -281,8 +281,11 @@ def _run_attempts(args, root, cfg_file, backend, gate, profile,
         for i in range(args.attempts)]
     outcomes = session.run_parallel(specs,
                                     max_workers=min(args.attempts, 4))
-    ranked = sorted(outcomes,
-                    key=lambda o: (not o.success, o.steps, o.name))
+    from .vote import rank
+    base = subprocess.run(["git", "rev-parse", "HEAD"], cwd=root,
+                          capture_output=True, text=True).stdout.strip()
+    ranked = rank(outcomes, base) if base else sorted(
+        outcomes, key=lambda o: (not o.success, o.steps, o.name))
     winner = ranked[0]
     if not args.json:
         print(ui.headline(winner.success,
@@ -1481,6 +1484,36 @@ def cmd_vis(args) -> int:
     return 0
 
 
+def cmd_rewind(args) -> int:
+    """Put an episode's worktree back to the tree recorded before a step."""
+    from .receipt import segment_paths
+    from .snapshots import Snapshots
+    episode = Path(args.episode)
+    snaps = episode / "snapshots.git"
+    if not snaps.is_dir():
+        return _fail(f"{episode} has no snapshots (recorded from v0.15 on)")
+    trees = []
+    for seg in segment_paths(episode):
+        for line in seg.read_text(encoding="utf-8").splitlines():
+            entry = json.loads(line)
+            if entry.get("t") == "EXEC" and entry.get("tree"):
+                trees.append((entry["action"], entry["tree"]))
+    if not trees:
+        return _fail("no snapshot was recorded in this episode's journal")
+    if args.step is None:
+        for i, (action, tree) in enumerate(trees, 1):
+            print(f"  {i:>3}  {tree[:12]}  before {action}")
+        return 0
+    if not 1 <= args.step <= len(trees):
+        return _fail(f"step must be 1..{len(trees)}")
+    action, tree = trees[args.step - 1]
+    backup = Snapshots(snaps, episode / "worktree").restore(tree)
+    print(f"{ui.ok(ui.OK)} worktree restored to the tree before {action} "
+          f"({tree[:12]})")
+    print(ui.dim(f"  the tree it replaced is {backup} (snapshotted first)"))
+    return 0
+
+
 def cmd_stats(args) -> int:
     g = TransitionGraph.load(args.graph)
     for k, v in g.stats().items():
@@ -2186,6 +2219,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-o", "--out", default=None,
                    help="output path (default: journal path with .html)")
     p.set_defaults(fn=cmd_vis)
+
+    p = sub.add_parser("rewind", help="list an episode's per-step snapshots, "
+                                      "or restore the worktree to one")
+    p.add_argument("episode", help="the episode directory")
+    p.add_argument("--step", type=int, default=None,
+                   help="restore the tree recorded before this step "
+                        "(omit to list them)")
+    p.set_defaults(fn=cmd_rewind)
 
     p = sub.add_parser("stats", help="show a persisted graph's statistics")
     p.add_argument("graph")

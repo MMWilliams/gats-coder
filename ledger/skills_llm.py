@@ -397,6 +397,7 @@ class AuthorPatchSkill:
                                + instructions)
         evidence = getattr(ctx, "suite_evidence", {}) or {}
         evidence_tail = "\n".join(e["tail"] for _, e in sorted(evidence.items()))
+        symbol_paths: list[str] = []
         if evidence_tail:
             extra_parts.append("MOST RECENT FAILING TEST OUTPUT\n"
                                + evidence_tail)
@@ -404,6 +405,24 @@ class AuthorPatchSkill:
             if source_context:
                 extra_parts.append("SOURCE AROUND TEST FAILURES\n"
                                    + source_context)
+            # The deterministic search every stuck author was missing: where
+            # the names in the failure are defined, used and changed, and
+            # which repo-local imports no longer resolve.
+            from .failures import broken_imports, symbol_evidence
+            symbols, symbol_paths = symbol_evidence(ctx.worktree, evidence_tail)
+            if symbols:
+                extra_parts.append(symbols)
+            if "Error" in evidence_tail:
+                broken = broken_imports(ctx.worktree)
+                if broken:
+                    extra_parts.append("REPO-LOCAL IMPORTS THAT DO NOT RESOLVE\n"
+                                       + "\n".join(str(b) for b in broken[:10]))
+        tracker = getattr(ctx, "failures", None)
+        stuck_block = tracker.prompt_block() if tracker is not None else ""
+        if stuck_block:
+            extra_parts.append(stuck_block)
+        if getattr(ctx, "apply_evidence", ""):
+            extra_parts.append(ctx.apply_evidence)
         # A visual critique is evidence of the same kind as a failing test:
         # a specific, checkable complaint about the build that exists.
         design = getattr(ctx, "design_evidence", "") or ""
@@ -422,7 +441,8 @@ class AuthorPatchSkill:
             if extra:
                 extra_parts.append(extra)
         files = self.context_files or select_context(
-            ctx.worktree, self.task_text + "\n" + evidence_tail)
+            ctx.worktree, self.task_text + "\n" + evidence_tail
+            + "\n" + "\n".join(symbol_paths))
         file_contents = ""
         if files:
             file_contents = read_files(ctx.worktree, files)
@@ -582,6 +602,21 @@ class AuthorPatchSkill:
                     if retry.ok:
                         diff, checked = repaired, retry
                         claims.append("repaired the patch's hunk counts")
+            if not checked.ok:
+                # Or the context is slightly off: find each hunk by content,
+                # rebuild the diff from the result, and let git judge that.
+                from .hunks import LocateError, apply_by_content
+                try:
+                    rebuilt_files, tiers = apply_by_content(ctx.worktree, diff)
+                except LocateError as exc:
+                    checked = PatchAttempt(False, f"{checked.reason}\n{exc}", diff)
+                else:
+                    rebuilt = diff_from_files(ctx.worktree, rebuilt_files)
+                    retry = self._validate(ctx, rebuilt) if rebuilt else None
+                    if retry is not None and retry.ok:
+                        diff, checked = rebuilt, retry
+                        claims.append("located the hunks by content ("
+                                      + ", ".join(tiers) + ")")
             commands.append({
                 "cmd": f"git apply --check ({self.slot}, attempt {attempt + 1})",
                 "exit": 0 if checked.ok else 1,
@@ -653,16 +688,20 @@ def build_authoring_catalog(slots: list[str], suite: str = "unit") -> Catalog:
             # Preconditions are conjunctive (paper SS3.1), so "author only
             # when a suite is failing" is not expressible -- the two failure
             # buckets are alternatives, and requiring both is unsatisfiable.
-            # Authoring is otherwise always *possible*, so the only honest
-            # precondition is the resource one: LLM budget remains (SS12.3).
-            # When the meter runs dry the proposition vanishes and authoring
-            # becomes symbolically inapplicable -- the budget surfaces as
-            # planner behavior, not an exception. Ordering is left to
-            # search, which prefers RunSuite first because it is the
-            # shorter path to the goal, and only reaches for AuthorPatch
-            # once that path is falsified by reality.
+            # The positive precondition is the resource one: LLM budget
+            # remains (SS12.3). When the meter runs dry the proposition
+            # vanishes and authoring becomes symbolically inapplicable -- the
+            # budget surfaces as planner behavior, not an exception.
+            #
+            # The negative ones close the two unattended failures of
+            # 2026-08-25. `tests.unknown` forbids authoring on top of a patch
+            # nobody has tested yet: datum authored twelve times in a row
+            # without a RunSuite and left a green suite red. `fail.stuck`
+            # withdraws authoring once one failure has survived STUCK_AT
+            # runs: relay patched the same ImportError nine times.
             f"AuthorPatch:{slot}",
             prec=frozenset({"budget.llm:ok"}),
+            forbid=frozenset({f"tests.unknown:{suite}", "fail.stuck"}),
             add=frozenset({f"patch.queued:{slot}"}),
             risk="write", deterministic=False))
         actions.append(Action(

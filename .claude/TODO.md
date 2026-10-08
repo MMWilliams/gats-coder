@@ -332,14 +332,45 @@ its own (`test_the_chat_session_shares_one_provenance_with_its_episodes`).
 detection and none leaves verification to the policy, so items 1-2 below
 are both the fix for the 2026-08-25 failures and unclaimed ground.
 
-- [ ] `fail.sig:<hash>` proposition from normalized RunSuite failures;
-      AuthorPatch requires repeat < 3, escalate `stuck` at 5. Fixture: relay r2.
-- [ ] `suite.stale` set by ApplyPatch, cleared only by RunSuite; required
-      absent for AuthorPatch and goal. Fixture: datum sketch-solver.
-- [ ] Dangling-import sensor (`ast`) + `git grep -nw` of the missing name.
-- [ ] ast/import gate around ApplyPatch with revert on new errors.
-- [ ] Content-located hunk matcher ladder (replaces `repair_hunk_counts`).
-- [ ] Job Object for skill subprocesses + MCP servers; then Low-integrity token.
+Built 2026-10-08 (unreleased, tests/test_harness.py, backup of the tree
+before it at `refs/backup/pre-harness-2026-10-08`):
+
+- [x] `Action.forbid` (negative preconditions). AuthorPatch forbids
+      `tests.unknown:<suite>` (no authoring on an untested patch: datum) and
+      `fail.stuck` (relay).
+- [x] `failures.py`: normalized failure signature + FailureTracker fed by
+      RunSuite (persisted to failures.json, reloaded on resume). Nudge block
+      in the author prompt at 2 repeats; `fail.stuck` at 5; ESCALATION
+      reason `stuck` with signature/summary.
+- [x] Author evidence: `git grep -w` + diff + `git log -S` for the names in
+      the failure; repo-local imports that no longer resolve.
+- [x] ApplyPatch gate: syntax + new broken imports -> `git apply -R`, patch
+      dropped, reason to the next author.
+- [x] `hunks.py` content-located matcher (exact/rstrip/strip/unicode/anchor),
+      after `repair_hunk_counts` fails; context always taken from the file.
+- [x] `sandbox.py` Job Object (KILL_ON_JOB_CLOSE, created suspended) for
+      `_run_cmd`, hooks and MCP servers; POSIX uses a process group.
+- [x] `snapshots.py` tree before every write action -> EXEC `tree`, receipt
+      `tree_before`; `ledger rewind <episode> [--step N]`.
+- [x] MCP servers closed at episode end; `${branch}/${episode}/${worktree}`
+      in contracted tool arguments.
+
+Still open from the study:
+- [ ] Sandbox phase 2: restricted token + Low integrity, worktree labelled
+      Low, `.git`/`.ledger` not; fail closed; "Access is denied" ->
+      `sandbox.denied`. Expect test suites that write to %TEMP% or caches to
+      break under Low integrity; needs a writable-roots list.
+- [x] Best-of-N (`--attempts`) ranks passing attempts by agreement over
+      AST-normalized changes (`vote.py`), then steps.
+- [ ] Graded RunSuite outcome into L2 (collection < more fails < fewer <
+      pass). Touches world-model semantics; needs its own design pass.
+- [x] MCP: reader thread routes replies by id; separate `timeout` (start)
+      and `call_timeout` (300s); a slow call is cancelled with
+      `notifications/cancelled` and the server stays up.
+- [ ] MCP lazy connect: conflicts with validating contracts against
+      tools/list at episode start; skipped.
+- [ ] Relay and datum fixtures re-run live against the new contracts.
+- [ ] The gate memo / taint findings below are unrelated and still open.
 
 ## Code review of the uncommitted tree (2026-10-08): unfixed
 
@@ -357,8 +388,8 @@ are both the fix for the 2026-08-25 failures and unclaimed ground.
 - [ ] Smaller: tauri orphan on startup timeout (`main.rs:85`), late answers
       recorded as approvals (`app.py:86`), lexicographic segment sort
       (`app.py:233`), OpenAI `image_url` shape (`llm.py:238`), Playwright
-      helper-binary pick (`vision.py:139`), MCP servers never closed
-      (`executor.py:1168`).
+      helper-binary pick (`vision.py:139`). (MCP servers never closed: fixed
+      by the harness pass.)
 
 ## Open (2026-08-25 — two live episodes, two different failures)
 

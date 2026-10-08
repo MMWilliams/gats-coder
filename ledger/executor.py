@@ -23,7 +23,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Protocol
 
+from . import sandbox
 from .actions import Action, Catalog
+from .failures import (FailureTracker, broken_imports, failure_sensor,
+                       importers_of, tracked_python)
 from .goal import GoalCompileError, compile_goal, goal_vocabulary
 from .graph import TransitionGraph
 from .journal import Journal
@@ -32,6 +35,7 @@ from .repo import Worktree, content_fingerprint, git
 from .sensors import (ExpensiveResultCache, SensorBank, brief_sensor,
                       design_sensor, dir_marker_sensor, git_sensor,
                       product_sensor, test_status_sensor, test_unknown_sensor)
+from .snapshots import Snapshots
 from .state import Props
 from .taint import TAINT_RISKS, Provenance
 from .world_model import L3Generative, LayeredWorldModel
@@ -224,6 +228,12 @@ class ExecContext:
     # Optional (text) -> None sink for live phase reporting. Skills call it
     # so a UI can say what is happening *now* instead of "working...".
     progress: object = None
+    # Consecutive identical suite failures (failures.py), and where they
+    # persist so a resumed episode keeps counting instead of starting over.
+    failures: FailureTracker = field(default_factory=FailureTracker)
+    failures_path: Path | None = None
+    # Why ApplyPatch last refused and reverted a patch, for the next author.
+    apply_evidence: str = ""
 
     def say(self, text: str) -> None:
         if self.progress is not None:
@@ -239,8 +249,7 @@ class Skill(Protocol):
 
 def _run_cmd(ctx: ExecContext, cmd: list[str],
              env: dict | None = None) -> tuple[subprocess.CompletedProcess, dict]:
-    proc = subprocess.run(cmd, cwd=ctx.worktree, capture_output=True,
-                          text=True, timeout=600, env=env)
+    proc = sandbox.run(cmd, cwd=ctx.worktree, text=True, timeout=600, env=env)
     out_sha = ctx.blobs.put(proc.stdout + "\n--- stderr ---\n" + proc.stderr)
     return proc, {"cmd": " ".join(cmd), "exit": proc.returncode, "out": out_sha}
 
@@ -279,6 +288,13 @@ class RunSuiteSkill:
             claims = [f"{self.suite} suite failing ({bucket})"]
             tail = redact_secrets((proc.stdout + proc.stderr)[-4000:])
             ctx.suite_evidence[self.suite] = {"tail": tail, "sha": rec["out"]}
+        sig = ctx.failures.observe(proc.returncode == 0,
+                                   proc.stdout + "\n" + proc.stderr)
+        if sig is not None:
+            claims.append(f"failure {sig.sig} ({sig.phase}) seen "
+                          f"{ctx.failures.repeat}x in a row: {sig.summary}")
+        if ctx.failures_path is not None:
+            ctx.failures.save(ctx.failures_path)
         ctx.test_cache.put(content_fingerprint(ctx.worktree), props)
         return SkillResult(ok=proc.returncode == 0,
                            claimed_props=frozenset(props),
@@ -548,10 +564,40 @@ class ApplyPatchSkill:
 
     def run(self, ctx: ExecContext) -> SkillResult:
         patch_file = ctx.queue_dir / f"{self.patch_id}.patch"
+        diff = patch_file.read_text(encoding="utf-8", errors="replace")
+        touched = sorted({ln[6:].split("\t")[0] for ln in diff.splitlines()
+                          if ln.startswith("+++ b/")})
+        python = any(t.endswith(".py") for t in touched)
+        before: set = set()
+        if python:
+            files = tracked_python(ctx.worktree)
+            before = set(broken_imports(
+                ctx.worktree, _import_scope(ctx.worktree, touched, files), files))
         proc, rec = _run_cmd(ctx, ["git", "apply", str(patch_file)])
         if proc.returncode != 0:
             return SkillResult(ok=False, claims=["patch failed to apply"],
                                commands=[rec])
+        problems = _syntax_errors(ctx.worktree, touched)
+        if python:
+            files = tracked_python(ctx.worktree)
+            after = set(broken_imports(
+                ctx.worktree, _import_scope(ctx.worktree, touched, files), files))
+            problems += sorted(str(b) for b in after - before)
+        if problems:
+            # SWE-agent's lint-gated edit: a patch that makes the tree
+            # unimportable is reverted before anything runs on it, and the
+            # reason goes to the next author instead of to the suite.
+            revert, rrec = _run_cmd(ctx, ["git", "apply", "-R", str(patch_file)])
+            patch_file.unlink(missing_ok=True)
+            ctx.apply_evidence = (
+                "YOUR LAST PATCH WAS REVERTED BEFORE TESTING because it broke "
+                "the tree:\n" + "\n".join(problems[:10]))
+            return SkillResult(
+                ok=False, claims=["patch reverted: " + "; ".join(problems[:3])]
+                + ([] if revert.returncode == 0 else ["revert failed"]),
+                commands=[rec, rrec])
+        ctx.apply_evidence = ""
+        ctx.failures.applied(diff)
         ctx.applied_dir.mkdir(parents=True, exist_ok=True)
         shutil.move(str(patch_file), str(ctx.applied_dir / patch_file.name))
         diff_sha = ctx.blobs.put(
@@ -561,6 +607,27 @@ class ApplyPatchSkill:
             claimed_props=frozenset({f"patch.applied:{self.patch_id}"}),
             claims=[f"applied patch {self.patch_id}"],
             commands=[rec], artifacts={"diff": diff_sha})
+
+
+def _import_scope(root: Path, touched: list[str], files: list[str]) -> list[str]:
+    """Touched Python files plus whatever might import them."""
+    py = [t for t in touched if t.endswith(".py")]
+    modules = [t[:-3].replace("/", ".").removesuffix(".__init__") for t in py]
+    return sorted(set(py) | set(importers_of(root, modules, files)))
+
+
+def _syntax_errors(root: Path, touched: list[str]) -> list[str]:
+    import ast
+    out = []
+    for rel in touched:
+        f = Path(root) / rel
+        if not rel.endswith(".py") or not f.is_file():
+            continue
+        try:
+            ast.parse(f.read_text(encoding="utf-8", errors="replace"), filename=rel)
+        except SyntaxError as exc:
+            out.append(f"{rel}:{exc.lineno}: syntax error: {exc.msg}")
+    return out
 
 
 class CommitSkill:
@@ -764,8 +831,10 @@ class RepoExecutor:
                  journal: Journal | None = None,
                  gate: Gate = attended_gate, profile: str = "attended",
                  hooks: list[dict] | None = None,
-                 provenance: Provenance | None = None):
+                 provenance: Provenance | None = None,
+                 snapshots: Snapshots | None = None):
         self.ctx = ctx
+        self.snapshots = snapshots
         self.catalog = catalog
         self.skills = skills
         self.sensors = sensors
@@ -798,8 +867,8 @@ class RepoExecutor:
         if not cmd:
             return -1
         try:
-            proc = subprocess.run(
-                cmd, cwd=self.ctx.worktree, capture_output=True, text=True,
+            proc = sandbox.run(
+                cmd, cwd=self.ctx.worktree, text=True,
                 timeout=int(hook.get("timeout", 30)),
                 env={**os.environ,
                      "LEDGER_EVENT": event,
@@ -868,6 +937,12 @@ class RepoExecutor:
 
         self.ctx.say(f"step {self.steps}: {action_name}")
         self.steps += 1
+        tree = None
+        if self.snapshots is not None and action.risk in ("write", "irreversible"):
+            try:
+                tree = self.snapshots.take()
+            except (RuntimeError, OSError, subprocess.SubprocessError) as exc:
+                self.ctx.say(f"warning: no snapshot before {action_name}: {exc}")
         result = self.skills[action_name].run(self.ctx)
         if self.journal is not None:
             # `model` only when there was one: adding an empty field to
@@ -880,6 +955,7 @@ class RepoExecutor:
                 commands=result.commands, artifacts=result.artifacts,
                 risk=action.risk,
                 **({"model": result.model} if result.model else {}),
+                **({"tree": tree} if tree else {}),
             )
         self._fire_hooks("post_action", action_name, action.risk)
 
@@ -1047,7 +1123,18 @@ def _protect_scratch(repo_root: Path) -> None:
                           encoding="utf-8")
 
 
-def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
+def run_repo_episode(*args, **kwargs) -> tuple[EpisodeResult, "RepoExecutor", Path]:
+    """See _run_repo_episode. MCP servers started for the episode are closed
+    when it ends, however it ends; they used to outlive it."""
+    opened: list = []
+    try:
+        return _run_repo_episode(*args, _opened=opened, **kwargs)
+    finally:
+        for server in opened:
+            server.close()
+
+
+def _run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                      goal: Props | None, test_cmd: list[str],
                      cfg: PlanConfig | None = None,
                      gate: Gate = attended_gate,
@@ -1077,6 +1164,7 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                      seed_graph_path: str | None = None,
                      mcp_config: dict | None = None,
                      required_patch_slot: str | None = None,
+                     _opened: list | None = None,
                      ) -> tuple[EpisodeResult, RepoExecutor, Path]:
     """End-to-end journaled episode on a real repo (M2/M3).
 
@@ -1166,6 +1254,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
             print(f"warning: {message}", file=sys.stderr)
 
         mcp_servers = load_servers(mcp_config, on_error=warn)
+        if _opened is not None:
+            _opened.extend(mcp_servers.values())
         if mcp_servers:
             # The same namespace the strategist validates proposals against:
             # every proposition the action contracts already mention, which is
@@ -1173,7 +1263,9 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
             vocabulary = set(catalog_vocabulary(catalog))
             mcp_actions, mcp_skills = contracted_actions(
                 mcp_servers, mcp_config, vocabulary, provenance=provenance,
-                on_error=warn)
+                on_error=warn,
+                variables={"branch": branch, "episode": episode_dir.name,
+                           "worktree": str(episode_dir / "worktree")})
             if mcp_actions:
                 catalog = Catalog(list(catalog) + mcp_actions)
                 say(f"{len(mcp_actions)} contracted MCP action(s) available")
@@ -1207,10 +1299,14 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         dir_marker_sensor("applied", "patch.applied:", applied_dir),
     ]
     meter = None
+    failures_path = episode_dir / "failures.json"
+    failures = (FailureTracker.load(failures_path) if resume
+                else FailureTracker())
     if slots:
         from .sensors import budget_sensor
         meter = BudgetMeter(max_author_attempts, resource="llm")
         sensor_list.append(budget_sensor(meter))
+        sensor_list.append(failure_sensor(failures))
     if push:
         from .sensors import remote_branch_sensor
         sensor_list.append(remote_branch_sensor(branch))
@@ -1238,7 +1334,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                       blobs=BlobStore(episode_dir / "blobs"),
                       test_cache=test_cache,
                       queue_dir=queue_dir, applied_dir=applied_dir,
-                      progress=progress)
+                      progress=progress, failures=failures,
+                      failures_path=failures_path)
     if resume:
         ctx.suite_evidence.update(resume_suite_evidence(episode_dir))
         ctx.product_concerns = resume_product_concerns(episode_dir)
@@ -1316,7 +1413,9 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     with Journal(str(journal_path)) as journal:
         executor = RepoExecutor(ctx, catalog, skills, sensors,
                                 journal=journal, gate=gate, profile=profile,
-                                hooks=hooks, provenance=provenance)
+                                hooks=hooks, provenance=provenance,
+                                snapshots=Snapshots(episode_dir / "snapshots.git",
+                                                    worktree.path))
         initial = sensors.probe(worktree.path)
         if brief is not None:
             say(f"{len(brief.requirements)} requirement(s) decided up front")
@@ -1451,7 +1550,12 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
             # SS7.4 escalation: the episode could not reach the goal on its
             # own. Journal *why* so the human resumes from evidence, not
             # from a shrug.
-            if meter is not None and meter.exhausted:
+            stuck = {}
+            if failures.stuck:
+                reason = "stuck"
+                stuck = {"failure": failures.last, "repeat": failures.repeat,
+                         "summary": failures.summary}
+            elif meter is not None and meter.exhausted:
                 reason = "budget_exhausted"
             elif executor.denials:
                 reason = "gate_denied"
@@ -1463,6 +1567,7 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                 "ESCALATION", reason=reason, denials=executor.denials,
                 author_attempts=(meter.spent if meter is not None else 0),
                 author_attempt_limit=(meter.limit if meter is not None else 0),
+                **stuck,
             )
         graph.save(str(episode_dir / "graph.sqlite"))
         if l2_path:
