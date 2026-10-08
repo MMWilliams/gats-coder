@@ -16,7 +16,7 @@ from ledger import tui
 from ledger.chat import Conversation, repl
 from ledger.journal import Journal
 from ledger.llm import (AnthropicAPIBackend, FakeBackend, OpenAIAPIBackend,
-                        resolve_backend)
+                        is_backend_unavailable, resolve_backend)
 
 FIX_DIFF = ("--- a/calc.py\n+++ b/calc.py\n@@ -1,2 +1,2 @@\n"
             " def add(a, b):\n-    return a - b\n+    return a + b\n")
@@ -45,6 +45,23 @@ class _Stub(BaseHTTPRequestHandler):
 
     def log_message(self, *a):  # keep test output clean
         pass
+
+    def do_GET(self):
+        if not self.path.endswith("/models"):
+            self.send_response(404)
+            self.end_headers()
+            return
+        status = getattr(_Stub, "models_status", 200)
+        if status >= 400:
+            self.send_response(status)
+            self.end_headers()
+            return
+        data = b'{"data": []}'
+        self.send_response(200)
+        self.send_header("content-type", "application/json")
+        self.send_header("content-length", str(len(data)))
+        self.end_headers()
+        self.wfile.write(data)
 
 
 @pytest.fixture
@@ -78,6 +95,49 @@ def test_openai_backend_with_and_without_key(stub_server):
     assert keyless.complete("hi") == "openai says hi"
     assert "authorization" not in _Stub.seen[-1][1]
     assert keyless.id == "ollama:qwen3-coder"
+
+
+def test_vision_backend_attaches_preview_to_chat_request(stub_server, tmp_path):
+    preview = tmp_path / "preview.png"
+    preview.write_bytes(b"\x89PNG\r\n\x1a\npreview")
+    backend = OpenAIAPIBackend(model="qwen3.8:27b", api_key="",
+                               base_url=stub_server, id_prefix="ollama")
+    assert backend.supports_vision
+    assert backend.complete_with_image("Inspect the render", preview) == "openai says hi"
+    content = _Stub.seen[-1][2]["messages"][0]["content"]
+    assert content[0] == {"type": "text", "text": "Inspect the render"}
+    assert content[1]["type"] == "image_url"
+    assert content[1]["image_url"].startswith("data:image/png;base64,")
+
+
+def test_health_check_reachable_vs_server_error(stub_server):
+    backend = OpenAIAPIBackend(model="qwen3.8:27b", api_key="",
+                               base_url=stub_server)
+    assert backend.health_check() is True
+    _Stub.models_status = 503
+    try:
+        assert backend.health_check() is False
+    finally:
+        _Stub.models_status = 200
+
+
+def test_health_check_false_when_unreachable():
+    backend = OpenAIAPIBackend(model="x", api_key="",
+                               base_url="http://127.0.0.1:1")
+    assert backend.health_check(timeout=1) is False
+
+
+def test_is_backend_unavailable_distinguishes_transport_from_content_errors():
+    assert is_backend_unavailable(
+        "http://x/chat -> HTTP 500: cudaMalloc failed: out of memory")
+    assert is_backend_unavailable(
+        "http://x/chat unreachable: [Errno 111] Connection refused")
+    assert is_backend_unavailable("backend unavailable (health check failed)")
+    assert not is_backend_unavailable(
+        "game/tools/generate_city.py: 293 changed lines exceeds the "
+        "58-line limit for a localized test failure")
+    assert not is_backend_unavailable(
+        "response contained neither FILE: blocks nor a unified diff")
 
 
 def test_resolve_backend_matrix(monkeypatch):

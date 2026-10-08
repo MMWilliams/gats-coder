@@ -27,6 +27,32 @@ def git(root: Path | str, *args: str, check: bool = True) -> subprocess.Complete
     return proc
 
 
+def fast_forward(repo_root: Path | str, branch: str) -> tuple[bool, str]:
+    """Bring an episode branch into the repository's checked-out branch,
+    only when that is a pure fast-forward.
+
+    An episode works in its own worktree and commits to `ledger/<name>`;
+    nothing it built is visible from the repository root until something
+    moves it there. Fast-forward is the only integration that adds no
+    commit of its own and cannot silently combine two histories: the
+    branch was cut from the repository's HEAD, so if HEAD has not moved
+    since, the merge is exactly the episode's verified commits and nothing
+    else. Anything less clean is reported, not attempted.
+    """
+    root = Path(repo_root)
+    current = git(root, "rev-parse", "--abbrev-ref", "HEAD",
+                  check=False).stdout.strip()
+    if not current or current == "HEAD":
+        return False, "the repository is not on a branch (detached HEAD)"
+    if current == branch:
+        return True, f"{branch} is already checked out here"
+    proc = git(root, "merge", "--ff-only", branch, check=False)
+    if proc.returncode != 0:
+        detail = (proc.stderr or proc.stdout).strip().splitlines()
+        return False, (detail[-1] if detail else "git merge --ff-only failed")
+    return True, f"fast-forwarded {current} to {branch}"
+
+
 def content_fingerprint(root: Path | str) -> str:
     """SHA-256 over sorted (path, file-content-hash) of tracked and
     untracked-unignored files. Same content => same fingerprint."""

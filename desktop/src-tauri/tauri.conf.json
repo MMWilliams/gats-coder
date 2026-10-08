@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "LEDGER",
+  "version": "0.14.0",
+  "identifier": "ai.kyberos.ledger",
+  "build": {
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["msi", "nsis"],
+    "icon": ["icons/icon.ico"],
+    "shortDescription": "Watch a run, approve its gates, read its receipt.",
+    "longDescription": "The desktop window for LEDGER, the audit-first coding agent. Episodes, gate approvals and signed receipts, served by the ledger CLI on loopback."
+  }
+}

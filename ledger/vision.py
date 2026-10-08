@@ -32,10 +32,12 @@ import json
 import os
 import shutil
 import socket
+import struct
 import subprocess
 import sys
 import tempfile
 import time
+import zlib
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
@@ -130,6 +132,13 @@ def _chrome() -> str | None:
             "/usr/bin/chromium"):
         if Path(candidate).exists():
             return candidate
+    # A machine with Playwright has a Chromium already, in its own cache.
+    for cache in (Path.home() / "AppData" / "Local" / "ms-playwright",
+                  Path.home() / ".cache" / "ms-playwright"):
+        for candidate in sorted(cache.glob("chromium-*/chrome-*/chrome*"),
+                                reverse=True):
+            if candidate.is_file() and candidate.suffix in ("", ".exe"):
+                return str(candidate)
     return None
 
 
@@ -137,6 +146,167 @@ def _free_port() -> int:
     with socket.socket() as s:
         s.bind(("127.0.0.1", 0))
         return int(s.getsockname()[1])
+
+
+def page_root(root: Path | str) -> Path | None:
+    """The directory whose index.html is the thing to photograph.
+
+    A bundler project's root index.html imports bare module names that no
+    plain server can resolve, so served as-is it photographs as a blank
+    page with a console error -- indistinguishable from a build that draws
+    nothing. The built output is what a person would open; prefer it.
+    """
+    root = Path(root)
+    for sub in ("dist", "build"):
+        if (root / sub / "index.html").is_file():
+            return root / sub
+    if (root / "index.html").is_file():
+        return root
+    return None
+
+
+def ensure_built(root: Path | str, timeout: int = 300) -> bool:
+    """Refresh a bundler's output when the source is newer than it.
+
+    True when there is nothing to build or the build succeeded. The suite
+    usually builds already; this covers the order the planner may choose,
+    where a photograph is taken of an output older than the patch.
+    """
+    root = Path(root)
+    package = root / "package.json"
+    if not package.is_file() or shutil.which("npm") is None:
+        return True
+    try:
+        scripts = json.loads(package.read_text(encoding="utf-8")).get("scripts", {})
+    except (ValueError, OSError):
+        return True
+    if "build" not in scripts:
+        return True
+    output = root / "dist" / "index.html"
+    newest_source = 0.0
+    for sub in ("src", "index.html", "package.json"):
+        path = root / sub
+        candidates = path.rglob("*") if path.is_dir() else [path]
+        for item in candidates:
+            try:
+                if item.is_file():
+                    newest_source = max(newest_source, item.stat().st_mtime)
+            except OSError:
+                pass
+    if output.is_file() and output.stat().st_mtime >= newest_source:
+        return True
+    try:
+        # npm on Windows is a .cmd shim: only a shell can start it.
+        done = subprocess.run("npm run build", cwd=str(root), shell=True,
+                              capture_output=True, timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return done.returncode == 0
+
+
+def _unfilter(kind: int, raw: bytes, prior: bytes, bpp: int) -> bytearray:
+    line = bytearray(raw)
+    if kind == 0:
+        return line
+    if kind == 1:
+        for i in range(bpp, len(line)):
+            line[i] = (line[i] + line[i - bpp]) & 0xFF
+    elif kind == 2:
+        for i in range(len(line)):
+            line[i] = (line[i] + prior[i]) & 0xFF
+    elif kind == 3:
+        for i in range(len(line)):
+            left = line[i - bpp] if i >= bpp else 0
+            line[i] = (line[i] + ((left + prior[i]) >> 1)) & 0xFF
+    elif kind == 4:
+        for i in range(len(line)):
+            a = line[i - bpp] if i >= bpp else 0
+            b = prior[i]
+            c = prior[i - bpp] if i >= bpp else 0
+            p = a + b - c
+            pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+            predictor = a if pa <= pb and pa <= pc else (b if pb <= pc else c)
+            line[i] = (line[i] + predictor) & 0xFF
+    return line
+
+
+def png_stats(path: Path | str, samples: int = 20000) -> dict | None:
+    """Colour count and contrast of a PNG, decoded with the stdlib.
+
+    Enough to tell a painted screen from a flat one, which is the one
+    question the usability probe asks of a screenshot. Handles the 8-bit,
+    non-interlaced grey/RGB/RGBA files headless Chrome writes; anything
+    else is reported as None (not assessed), never as blank.
+    """
+    try:
+        data = Path(path).read_bytes()
+    except OSError:
+        return None
+    if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return None
+    offset, width = 8, 0
+    height = depth = colour = interlace = 0
+    idat = bytearray()
+    while offset + 8 <= len(data):
+        length, kind = struct.unpack_from(">I4s", data, offset)
+        chunk = data[offset + 8:offset + 8 + length]
+        if kind == b"IHDR":
+            width, height, depth, colour, _, _, interlace = struct.unpack(
+                ">IIBBBBB", chunk)
+        elif kind == b"IDAT":
+            idat += chunk
+        elif kind == b"IEND":
+            break
+        offset += 12 + length
+    channels = {0: 1, 2: 3, 4: 2, 6: 4}.get(colour)
+    if not (width and height and channels) or depth != 8 or interlace:
+        return None
+    try:
+        raw = zlib.decompress(bytes(idat))
+    except zlib.error:
+        return None
+    stride = width * channels
+    if len(raw) < height * (stride + 1):
+        return None
+    prior = bytearray(stride)
+    step = max(1, (width * height) // samples)
+    luma_sum = luma_sq = 0.0
+    count = 0
+    colours: set = set()
+    position = 0
+    for row in range(height):
+        start = row * (stride + 1)
+        line = _unfilter(raw[start], raw[start + 1:start + 1 + stride],
+                         prior, channels)
+        for x in range(width):
+            if position % step == 0:
+                base = x * channels
+                if channels >= 3:
+                    r, g, b = line[base], line[base + 1], line[base + 2]
+                else:
+                    r = g = b = line[base]
+                luma = 0.299 * r + 0.587 * g + 0.114 * b
+                luma_sum += luma
+                luma_sq += luma * luma
+                count += 1
+                colours.add((r >> 4, g >> 4, b >> 4))
+            position += 1
+        prior = line
+    if not count:
+        return None
+    mean = luma_sum / count
+    variance = max(0.0, luma_sq / count - mean * mean)
+    return {"width": width, "height": height, "distinct": len(colours),
+            "mean": mean, "stddev": variance ** 0.5}
+
+
+def looks_blank(stats: dict | None) -> bool:
+    """A screen with a couple of colours and no contrast is not a first
+    paint; it is the background. None means not assessed, and not
+    assessed is not blank."""
+    if not stats:
+        return False
+    return stats["distinct"] < 12 or stats["stddev"] < 6.0
 
 
 def screenshot(root: Path | str, out: Path, *, wait_ms: int = 9000,

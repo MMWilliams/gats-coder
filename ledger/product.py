@@ -34,8 +34,10 @@ is one they keep.
 from __future__ import annotations
 
 import json
+import os
 import re
 from dataclasses import dataclass
+from pathlib import Path
 
 from .llm import extract_json
 
@@ -135,6 +137,55 @@ def detect_kind(task_text: str, default: str = "") -> str:
     return default
 
 
+#: Kinds whose usability a program can partly decide without asking a model:
+#: does any input reach the code, and does the screen show anything.
+PROBED_KINDS = ("game", "web")
+
+_INPUT_EVENTS = (r"(pointerdown|pointerup|pointermove|mousedown|mouseup|"
+                 r"mousemove|click|dblclick|touchstart|touchend|touchmove|"
+                 r"keydown|keyup|keypress|wheel|gamepadconnected)")
+_LISTENER = re.compile(
+    r"""addEventListener\s*\(\s*['"]""" + _INPUT_EVENTS + r"""['"]"""
+    r"""|\bon""" + _INPUT_EVENTS + r"""\s*=""", re.I)
+_SOURCE_SUFFIXES = {".js", ".mjs", ".cjs", ".ts", ".jsx", ".tsx", ".html",
+                    ".vue", ".svelte"}
+_SKIP_DIRS = {"node_modules", "dist", "build", ".git", ".ledger", "vendor",
+              "coverage", ".artifacts"}
+
+
+def input_wiring(root, limit: int = 20) -> list[str]:
+    """Where the source listens for a person: `file:line` per handler.
+
+    The single most common way a game shipped unplayable in this project's
+    history was a build with a test API and not one pointer or key handler
+    -- the rules worked, the suite was green, and nothing a person did
+    could reach the program. This is the fact a sensor can state about
+    that: it decides only whether such a handler exists, not whether it is
+    wired to anything sensible. Static, cheap, and deliberately a floor.
+    """
+    root = Path(root)
+    hits: list[str] = []
+    for current, dirs, files in os.walk(root):
+        dirs[:] = sorted(d for d in dirs if d not in _SKIP_DIRS)
+        for name in sorted(files):
+            path = Path(current) / name
+            if path.suffix.lower() not in _SOURCE_SUFFIXES:
+                continue
+            try:
+                if path.stat().st_size > 2_000_000:
+                    continue
+                text = path.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            for number, line in enumerate(text.splitlines(), 1):
+                if _LISTENER.search(line):
+                    rel = path.relative_to(root).as_posix()
+                    hits.append(f"{rel}:{number}")
+                    if len(hits) >= limit:
+                        return hits
+    return hits
+
+
 def requirements(kind: str, only: list[str] | None = None) -> list[tuple[str, str]]:
     entry = CHECKLISTS.get(kind)
     if not entry:
@@ -173,6 +224,33 @@ class Concern:
 
     def line(self) -> str:
         return f"{self.dimension}: {self.concern}"
+
+
+def concerns_block(kind: str, concerns) -> str:
+    """The review's findings as authoring evidence.
+
+    Accepts Concern objects or the dicts the journal stores them as, so a
+    resumed episode can rebuild the same block from its PRODUCT_REVIEW
+    entry instead of paying for the review again.
+    """
+    lines = []
+    for item in concerns or []:
+        get = (item.get if isinstance(item, dict)
+               else lambda key, default="": getattr(item, key, default))
+        dimension = str(get("dimension") or "").strip()
+        concern = str(get("concern") or "").strip()
+        check = str(get("check") or "").strip()
+        if not concern:
+            continue
+        lines.append(f"- {dimension}: {concern}"
+                     + (f" (how to check: {check})" if check else ""))
+    if not lines:
+        return ""
+    label = CHECKLISTS.get(kind, ("this product", []))[0]
+    return ("WHAT THE CONTRACT DOES NOT GUARANTEE FOR " + label.upper()
+            + "\nInferred from the request; a build that leaves these open "
+            "is not finished even with a green suite. Close them:\n"
+            + "\n".join(lines))
 
 
 REVIEW_PROMPT = """You are reviewing a build request before any work starts.

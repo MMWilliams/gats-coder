@@ -15,11 +15,21 @@ from ledger.sensors import ExpensiveResultCache
 from ledger.skills_llm import (AuthorPatchSkill, build_authoring_catalog,
                                repair_hunk_counts,
                                diff_from_files, extract_diff,
-                               extract_files)
+                               extract_files, failure_source_context)
 
 FIX_DIFF = "".join(difflib.unified_diff(
     BUGGY.splitlines(keepends=True), FIXED.splitlines(keepends=True),
     fromfile="a/calc.py", tofile="b/calc.py"))
+
+
+def test_failure_context_includes_traceback_line_beyond_file_head(tmp_path):
+    source = tmp_path / "scene.py"
+    source.write_text("\n".join(f"line {i}" for i in range(1, 501)),
+                      encoding="utf-8")
+    output = f'File "{source}", line 423, in build_scene\nTypeError: wrong type'
+    context = failure_source_context(tmp_path, output)
+    assert "423: line 423" in context
+    assert "413: line 413" in context
 
 
 def responder(prompt: str) -> str:
@@ -103,6 +113,94 @@ def test_author_patch_retries_after_rejection(repo, tmp_path):
     assert (ctx.queue_dir / "a.patch").exists()
 
 
+class _FlakyBackend:
+    """Raises a backend-down error once, then answers `health` for the
+    fail-fast probe before the next attempt."""
+
+    id = "flaky"
+
+    def __init__(self, health):
+        self.calls = 0
+        self.health_calls = 0
+        self._health = health
+
+    def complete(self, prompt: str) -> str:
+        self.calls += 1
+        if self.calls == 1:
+            raise RuntimeError(
+                "http://x/chat -> HTTP 500: cudaMalloc failed: out of memory")
+        return FIX_DIFF
+
+    def health_check(self) -> bool:
+        self.health_calls += 1
+        return self._health
+
+
+@needs_git
+def test_author_patch_skips_retry_when_backend_stays_down(repo, tmp_path,
+                                                          monkeypatch):
+    monkeypatch.setattr("ledger.skills_llm.time.sleep", lambda *_: None)
+    ctx = _ctx(repo, tmp_path)
+    backend = _FlakyBackend(health=False)
+    result = AuthorPatchSkill("a", backend, "fix add()").run(ctx)
+
+    assert not result.ok
+    assert backend.calls == 1          # never re-sent the prompt
+    assert backend.health_calls == 1
+    assert any("backend error" in c for c in result.claims)
+    assert any("health check failed" in c for c in result.claims)
+
+
+@needs_git
+def test_author_patch_retries_once_backend_health_recovers(repo, tmp_path,
+                                                            monkeypatch):
+    monkeypatch.setattr("ledger.skills_llm.time.sleep", lambda *_: None)
+    ctx = _ctx(repo, tmp_path)
+    backend = _FlakyBackend(health=True)
+    result = AuthorPatchSkill("a", backend, "fix add()").run(ctx)
+
+    assert result.ok
+    assert backend.calls == 2
+    assert backend.health_calls == 1
+    assert (ctx.queue_dir / "a.patch").exists()
+
+
+@needs_git
+def test_author_patch_rejects_diff_text_inside_python_file(repo, tmp_path):
+    ctx = _ctx(repo, tmp_path)
+    calls = {"n": 0}
+
+    def respond(prompt: str) -> str:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            return "FILE: calc.py\n```python\n@@ -1 +1 @@\n-bad\n+good\n```"
+        return FIX_DIFF
+
+    result = AuthorPatchSkill("a", FakeBackend(respond), "fix").run(ctx)
+    assert result.ok
+    assert calls["n"] == 2
+    assert any("Python syntax error" in claim for claim in result.claims)
+
+
+@needs_git
+def test_author_patch_rejects_large_rewrite_after_suite_failure(repo, tmp_path):
+    ctx = _ctx(repo, tmp_path)
+    ctx.suite_evidence["unit"] = {"tail": "one failing assertion"}
+    calls = {"n": 0}
+
+    def respond(prompt: str) -> str:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            body = "\n".join(f"value_{i} = {i}" for i in range(40))
+            return f"FILE: calc.py\n```python\n{body}\n```"
+        return FIX_DIFF
+
+    result = AuthorPatchSkill("a", FakeBackend(respond), "fix").run(ctx)
+    assert result.ok
+    assert calls["n"] == 2
+    assert any("localized test failure" in claim for claim in result.claims)
+
+
 def test_no_leftover_candidate_files(tmp_path, repo):
     ctx = _ctx(repo, tmp_path)
     AuthorPatchSkill("a", FakeBackend(FIX_DIFF), "fix").run(ctx)
@@ -122,6 +220,8 @@ def test_authoring_catalog_shape():
     assert author.add == frozenset({"patch.queued:a"})
     # Applying consumes the queued patch.
     assert "patch.queued:a" in cat.get("ApplyPatch:a").delete
+    # Every code change invalidates the prior suite result and permits a rerun.
+    assert "tests.unknown:unit" in cat.get("ApplyPatch:a").add
 
 
 def test_authoring_catalog_requires_slots():
@@ -144,6 +244,7 @@ def test_ledger_authors_its_own_fix(repo, tmp_path):
     assert result.success, result.plan
     assert "AuthorPatch:a" in result.plan
     assert "ApplyPatch:a" in result.plan
+    assert result.plan[result.plan.index("ApplyPatch:a") + 1] == "RunSuite"
     assert result.plan[-1] == "Commit"
     # The planner still made zero LLM calls to decide what to do.
     assert result.llm_planning_calls == 0

@@ -26,6 +26,382 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
   published pinned URL starts 404ing after a release. Deliberate, but worth
   remembering before handing anyone a version-pinned command.
 
+## Direction (stated 2026-09-03)
+
+LEDGER is **the trustworthy, flexible AI agent for devs, companies and
+enterprise**: bring your own model, and get auditability, tracking and
+reliability as the product rather than as a feature. See the product-thesis
+memory — the model is a component, the trust layer is the thing nobody else
+is building.
+
+Four workstreams, in the order they unblock each other:
+
+1. **Desktop app** (started, below). Nothing else reaches a non-terminal user.
+2. **MCP as contracted planner actions — DONE 2026-09-04**, see below.
+   Computer use inherits its rules.
+3. **Computer use.** Today there is `vision.py` (screenshot + VLM for design
+   review) and nothing that acts. Same rule as MCP when it lands: a click is
+   an action with a risk class, gated and journaled, or the receipt stops
+   meaning anything.
+4. **Model flexibility — DONE 2026-09-04.** The `llm.py` protocol already
+   covered claude CLI, anthropic, openai, ollama and any OpenAI-compatible
+   base_url; what was missing was provenance, and that is now recorded.
+
+   Every backend already exposed `id` as `provider:model`, so this was
+   threading rather than new plumbing: `SkillResult.model` -> the EXEC entry
+   -> `actions[].model` in the receipt, plus a receipt-wide `models` roster
+   naming each model and what it was used for (goal compilation, AuthorPatch,
+   ...). `runs[].goal_backend` carries the compiler's.
+
+   `model` is written to EXEC only when there was one, so the journals of the
+   many actions that call no model are unchanged. Actions that called nothing
+   report `null` rather than inheriting the episode's model, which is the
+   distinction an auditor actually needs.
+
+   The roster is first-seen order rather than sorted, because on a resumed
+   episode the model can change between attempts and which one wrote what is
+   the question being asked. Tested with exactly that case.
+
+   Open: only the authoring skill reports its model. `product.review`,
+   the strategist and `vision.py` all call models and stay anonymous.
+
+## MCP tools as contracted actions (2026-09-04, local only)
+
+Tools reached `chat` only, so the planner could not use one and an MCP call
+could never be part of a verified episode. `contracted_actions()` in
+`ledger/mcp.py` turns a configured tool into an ordinary catalogue Action, and
+`run_repo_episode(..., mcp_config=...)` merges those into the catalogue and
+the skill table.
+
+```jsonc
+"mcp": {"servers": {"docs": {
+  "command": ["python", "tools/docs_server.py"], "risk": "network",
+  "tools": {"publish": {"risk": "irreversible",
+                        "effects": ["docs.published"],
+                        "prec": ["repo.clean"],
+                        "arguments": {"path": "site/"}}}}}}
+```
+
+Five rules, each because the alternative is the free tool loop this design
+refuses:
+
+- **Only contracted tools are reachable.** A server can advertise anything;
+  the planner reaches only what config names. The stub in the tests offers
+  `peek` and it stays unreachable.
+- **The operator owns the arguments.** They are fixed in config. A model
+  choosing arguments is a model deciding what happens, and then nothing
+  downstream is verifiable.
+- **Effects must be in the sensor vocabulary**, validated against
+  `catalog_vocabulary` the same way the strategist validates proposals.
+  Anything else is refused out loud rather than dropped: an unverifiable
+  action in an audited episode is worse than a missing one.
+- **A tool may raise its risk, never lower it.** The server's risk is the
+  operator's floor, or a tool could declare itself safe and route around the
+  gate.
+- **Effects are claims, not facts.** The skill reports the contracted
+  propositions and the sensors decide. Proved with a stub that reports
+  success and changes nothing: it produces an INCIDENT naming
+  `tests.pass:unit` as claimed-not-observed, and the episode does not
+  succeed on the tool's say-so. That test deliberately queues no patch, so
+  the contracted tool is the ONLY route to the goal and the planner is
+  guaranteed to reach it.
+
+`deterministic=False` on every one: a remote call over somebody else's pipe
+is not a contract, so L1 is optimistic and L2 learns per state.
+
+**A tool result taints the session**, recorded when the reply arrives rather
+than an action later, and `taint.external_sources` recognises an `EXEC` whose
+action starts with `mcp.` so a receipt explains its own escalations from the
+chain alone.
+
+Restructuring note: resolving the episode's `Provenance` moved to before the
+catalogue is built, because the MCP skills take it at construction. Building
+skills against a fresh one and then adopting the gate's is the two-objects
+bug that has now bitten this file three times, where the gate escalates
+correctly while the receipt reports a clean sheet.
+
+- [x] 10 tests in `tests/test_mcp_actions.py`, driven against a real stdio
+      server. With model provenance, full suite 356 green.
+
+### Open
+- [x] **Wired into the CLI.** `ledger run` and the chat runner forward
+      `.ledger/config.json` as `mcp_config`, so contracted actions are
+      reachable from the command line, not only from the API. An absent
+      `mcp` block yields none.
+- [ ] Servers started for an episode are never closed; they die with the
+      process. Fine for a CLI run, a leak for a long-lived `ledger app`.
+- [ ] Tool arguments are static. Templating them from state (a branch name,
+      a slot) is the obvious next want and the obvious next way to
+      reintroduce model-chosen arguments, so it needs a contract of its own.
+
+## Desktop app + voice (2026-09-03, local only)
+
+- [x] **`ledger app`** — `ledger/app.py`, stdlib `http.server`, no new
+      dependencies. Episode list, run timeline built from the journal,
+      receipt on demand, gate approval.
+- [x] **`DesktopApprover` closes a real hole.** `tty_approver` denies when
+      there is no terminal, which is correct reasoning, but it means an
+      episode launched from anywhere except a shell has every gated action
+      refused and escalates `gate_denied`. The approver publishes the
+      question and blocks until the window answers; no answer inside
+      `GATE_TIMEOUT_S` (600) still denies, because a gate that defaults to
+      yes when unattended is not a gate. Drop-in for
+      `PolicyGate(approver=...)`, and a `deny` rule never reaches the window,
+      since policy outranks consent.
+- [x] **voiceforge absorbed as a TTS engine.** `resolve_tts` is now
+      voiceforge -> piper -> sapi -> silent. It is the only engine whose
+      identity we own and can sell, and it watermarks by default (EU AI Act
+      Art. 50).
+
+      The boundary is loopback HTTP and not an import, deliberately:
+      voiceforge needs torch and CUDA, LEDGER has no dependencies at all.
+      New file `voiceforge/runtime/speak_server.py` holds a warm engine and
+      serves `POST /speak`; nothing else in voiceforge changed, so it stays
+      independently runnable and testable. Start it with
+      `conda run -n voiceforge python -m runtime.speak_server`.
+
+      Defaults to VITS in the `voiceforge` env on purpose: RTF 0.018 is ample
+      for reading out a verdict, and it means the daemon never needs
+      chatterbox, which pins torch==2.6.0 and silently downgrades that env to
+      CPU. Expressive engines stay in `cbx`.
+- [x] 26 new tests (8 voice bridge, 18 app); full suite 344 green.
+
+### Open
+- [x] **The Tauri shell is built and runs** (2026-09-04). `desktop/src-tauri`,
+      Tauri 2.11, compiles clean in 3m37s to a 5.6 MB
+      `ledger-desktop.exe`. Verified by launching it: window titled LEDGER
+      appears, it spawns `ledger app --no-open`, the control surface answers
+      in 2s, episodes render, and closing the window stops the server.
+
+      No `tauri-cli` needed — the crate is scaffolded by hand and
+      `cargo build --release` is enough for the binary. The CLI is only
+      required for `cargo tauri build` if we want MSI/NSIS installers, which
+      is the remaining packaging step.
+
+      Three rules the shell holds, each because the alternative is worse:
+      it polls `/api/health` before painting (a window against a server that
+      is not up yet reads as broken, not slow); it reuses an already-running
+      server instead of fighting for the port; and it only kills a server it
+      started itself.
+- [ ] **Installers not built.** `cargo tauri build` needs `tauri-cli`
+      (`cargo install tauri-cli`). The bundle config and a placeholder icon
+      are in place; the icon is a stand-in until the rename lands.
+- [ ] **`running` is inferred from a missing END entry**, so an episode that
+      died months ago still shows as running in the window. The stub
+      `build-a-calculator-app-in-javascript` journal demonstrates it. Fold in
+      file mtime, or journal an explicit abort.
+- [x] **Gates now route to the window, including across processes**
+      (2026-09-04). `--app-url` on `run` and `chat`, or `LEDGER_APP_URL`.
+      `RemoteApprover` posts the question to a running app and polls for the
+      answer, so `ledger app` in one window and `ledger run` in another is a
+      real workflow rather than an aspiration.
+
+      Every failure path denies: no app, a window closed mid-question, a
+      question the server has forgotten. None of those is a human saying yes.
+      `--yes` still wins over the app, because it is an explicit decision to
+      pre-approve and routing it to a window would ask something already
+      answered. Naming `--app-url` for an app that is not running is a hard
+      error rather than a silent fall back to the terminal, which would only
+      surprise you at the first gate.
+
+      Proved before and after on a real episode: attended profile with no
+      terminal gives `success=False, denials=2`; the same episode with a
+      window open gives `success=True, denials=0` and the full plan
+      `RunSuite -> ApplyPatch -> RunSuite -> Commit`.
+
+      Lifecycle detail worth keeping: `resolve()` is the single place a
+      decision becomes final and it pops from `_pending` there. Answering in
+      the waiter instead left answered questions sitting in the window with
+      live buttons, and made a double-click a second answer to the same gate.
+- [ ] **No live stream.** The window polls every 4s. An SSE tail of the
+      journal is the obvious upgrade and the journal is already append-only.
+- [ ] **Voice is one-way in the app.** It speaks through `voice.py`; the
+      window has no microphone. Speaking TO it from the desktop is the point
+      of the absorb and is not done.
+
+## Done (2026-08-25: signed receipts + taint escalation, unreleased)
+
+The journal was already the whole truth and could not leave the machine
+that produced it. `ledger receipt` extracts a run's claims (policy in
+force, every gated decision, every action, every incident, what was in
+scope that nobody vouched for), signs them Ed25519, and binds them to the
+journal head hash. `ledger verify-receipt` checks the signature alone, or
+with `--journal` re-derives the body and compares. `extract()` is a pure
+function of the journal file precisely so a verifier can do that.
+
+- [x] `ledger/signing.py`: RFC 8032 Ed25519 in the stdlib (no deps to
+      spend; HMAC was never an option because a verifier holding the secret
+      could forge what it is checking). Checked against the RFC's own test
+      vectors, cross-checked once against `cryptography`. Key auto-created
+      at `~/.ledger/keys/default.json`, 0600 at creation.
+- [x] `ledger/taint.py` + `PolicyGate(taint_probe=...)`: once untrusted
+      content is in scope, the autonomy profile stops applying and every
+      non-read action is escalated. The approval memo is keyed by taint
+      state, so a `yes` given before a page was read is not inherited after
+      it. An explicit `allow` rule still wins: policy is the operator
+      saying so in advance, which is the one thing a fetched page cannot do.
+- [x] `ledger/receipt.py`: receipts carry `provenance.gaps` (the gate
+      decided with untrusted content in scope and recorded none: fails
+      verification) and `unexplained_sources` (the gate was stricter than
+      the journal accounts for: reported, not fatal).
+- [x] **The chat surface is taint-aware too.** One `Provenance` per
+      session, shared by the MCP tool gate, the `Conversation`, and every
+      episode the session launches, so a tool result read at 10:01 still
+      constrains the episode started at 10:04. A refusal (`DENIED`) is our
+      own fixed string and does not taint; a `TOOL ERROR` is the server's
+      words and does. `run_repo_episode` writes `inherited_taint` into the
+      journal HEADER, so an episode's receipt explains its own escalations
+      without the reader needing the conversation.
+- [x] **The unit is the episode, not the file** (`ledger.receipt/2`).
+      Resume writes `episode.r2.jsonl` and a re-run appends another HEADER
+      to the file it is in; a receipt now covers every run of every
+      segment, reports each attempt separately (`runs[]`, with its own
+      profile, plan, escalation and taint), and aggregates into `totals`.
+      `--run` narrows to one file's latest run. Point it at the directory
+      or any segment, same receipt.
+- [x] **Receipts are durable.** Verification rebuilds the body from the
+      segment list and entry counts the receipt itself records, not from
+      whatever is on disk now, so resuming an episode does not invalidate a
+      receipt issued before it: the continuation is a note. `Journal.
+      verify_entries` makes that safe: a prefix of a hash chain is a chain.
+- [x] **Taint does not leak across a resume.** A resumed episode is a new
+      process with a new context; what carries is the HEADER's
+      `inherited_taint` and nothing else. The receipt-wide
+      `external_sources` union still records what the task ever touched.
+- [x] `ledger key`: show or export the public key, since `--key-id`
+      pinning is theatre without a way to publish the key it pins.
+- [x] 28 receipt tests + 2 denial-regression tests; full suite 318 green.
+      README updated.
+
+- [x] **A gate denial no longer outlives the session that gave it.**
+      Surfaced by the receipt's per-run breakdown, in one line of output:
+      attempt 1 under `attended` denied everything and escalated
+      `gate_denied` after 2 steps; attempt 2 resumed with an approving gate
+      and escalated `no_path` at **0 steps**. §8.1 treated a refusal as an
+      observation, so the divergence arm learned a self-loop, which went
+      into `episode_dir/graph.sqlite` AND the repo's shared `l2.sqlite` and
+      came back on the warm start. The human changed their mind and the
+      planner could not hear it.
+
+      Fix: a refusal is a fact about this session's permissions, not about
+      what the action does, and the two must not be confused.
+      `run_episode(..., blocked=set())` is filled in by the ENVIRONMENT;
+      `RepoExecutor` adds an action to it on gate denial or a blocking
+      pre-action hook. A blocked action is pruned from `useful_actions`
+      directly, nothing is learned, nothing is persisted. The OBSERVE entry
+      records `denied` (and `diverged: false`, because nothing executed, so
+      no prediction was falsified), which is also how `replay` rebuilds the
+      same blocked set and stays bit-exact. Verified by reverting the wiring
+      and watching both new tests fail. After: attempt 2 succeeds with the
+      full plan.
+
+**Both real bugs in this work were found by running it end to end, not by
+the unit tests**: same pattern as v0.8.x. (1) The receipt derived taint
+only from ingress entries, so a gate that escalated correctly still issued
+a receipt claiming nothing external was in scope. (2) `run_repo_episode`
+built its own `Provenance` while a caller-supplied gate kept a different
+one, so the executor journaled a view of the episode the gate never used.
+Both are the same failure: two objects where there must be one, invisible
+from either side, which is why the wiring now has an identity assertion of
+its own (`test_the_chat_session_shares_one_provenance_with_its_episodes`).
+
+### Open
+- [ ] **Taint is per-session and never clears.** Correct and blunt: one
+      fetched page escalates everything until the session ends. If that
+      turns out to be unusable in practice the answer is per-source scoping
+      (which action families a given source may influence), not a timeout,
+      but do not build that until a real session complains.
+- [ ] **`ledger run --strategise` is the other live ingress** and it is
+      wired, but the strategist has still never fired in a live episode
+      (see the v0.11.0 note below), so the research → escalation path has
+      only ever run in tests.
+- [ ] **Key distribution is still hand-to-hand.** `ledger key` publishes
+      the public half; pinning a `key_id` you were handed out of band is
+      fine for a design partner and does not scale past one. No revocation,
+      no rotation, no directory. Do not build a PKI: the next real step is
+      probably letting a receipt carry a chain to a key someone already
+      trusts (a signed commit, a domain).
+- [ ] Receipts name blob shas but do not carry the blobs, so a verifier
+      who wants the actual command output still needs the episode dir.
+      Probably right; worth an explicit `--with-evidence` bundle later.
+- [ ] Not released. Version stays 0.14.0 until someone decides to ship it.
+
+## Harness study (2026-10-08): build order in HARNESS_STUDY.md
+
+12 open-source agents read from source. None hashes outcomes for loop
+detection and none leaves verification to the policy, so items 1-2 below
+are both the fix for the 2026-08-25 failures and unclaimed ground.
+
+- [ ] `fail.sig:<hash>` proposition from normalized RunSuite failures;
+      AuthorPatch requires repeat < 3, escalate `stuck` at 5. Fixture: relay r2.
+- [ ] `suite.stale` set by ApplyPatch, cleared only by RunSuite; required
+      absent for AuthorPatch and goal. Fixture: datum sketch-solver.
+- [ ] Dangling-import sensor (`ast`) + `git grep -nw` of the missing name.
+- [ ] ast/import gate around ApplyPatch with revert on new errors.
+- [ ] Content-located hunk matcher ladder (replaces `repair_hunk_counts`).
+- [ ] Job Object for skill subprocesses + MCP servers; then Low-integrity token.
+
+## Code review of the uncommitted tree (2026-10-08): unfixed
+
+- [ ] `app.py:336` gate server: `ACAO: *`, no token/Origin check; any page
+      or test process can approve gates. `app.py:448` unescaped innerHTML,
+      Tauri `csp: null`.
+- [ ] `executor.py:755` gate memo keyed by family: one MCP tool approval
+      covers every tool on that server; taint memo ignores which sources.
+- [ ] `skills_llm.py:430` web pages enter the author prompt untainted; the
+      tracked diff imports untracked modules (web, brief, modes, self_heal,
+      domain_workers, lab_contracts): commit them together.
+- [ ] `chat.py:211` taint skipped when MCP text starts with "DENIED".
+- [ ] `skills_llm.py:532` 20% rewrite cap fires on any failing suite,
+      including normal feature work; still charges the budget.
+- [ ] Smaller: tauri orphan on startup timeout (`main.rs:85`), late answers
+      recorded as approvals (`app.py:86`), lexicographic segment sort
+      (`app.py:233`), OpenAI `image_url` shape (`llm.py:238`), Playwright
+      helper-binary pick (`vision.py:139`), MCP servers never closed
+      (`executor.py:1168`).
+
+## Open (2026-08-25 — two live episodes, two different failures)
+
+Both launched against real repos, both left to run unattended, both failed.
+They fail for unrelated reasons and the second one is the important one.
+
+- [ ] **A repeated identical failure must change strategy, not just spend
+      budget.** `relay` phases 7+8 (`readstate-rtm`, r2) escalated
+      `budget_exhausted` after 32 steps. The planner was NOT at fault — it
+      interleaved `AuthorPatch -> ApplyPatch -> RunSuite` nine times and
+      verified after every single patch. The suite reported the same
+      `ImportError: cannot import name 'get_hub' from 'server.deps'` every
+      time, and the loop answered each one by authoring another patch on
+      slot `a`. The actual defect was two lines: an earlier patch renamed
+      the provider in `server/deps.py` to `get_events` and left
+      `server/routes/workspaces.py:11` importing the old name, so all of
+      phases 7-8 died at collection. Verification worked perfectly and
+      changed nothing. Nothing in the loop notices "identical failure
+      signature N times in a row" and escalates to a different move
+      (re-read the failing import, widen context, full-file rewrite,
+      ask). This is the gap worth closing next.
+- [ ] **The planner can stop verifying entirely.** `datum` phases 4+5
+      (`sketch-solver`) escalated `max_steps` after 20 steps; steps 9-20
+      are twelve consecutive `AuthorPatch -> ApplyPatch` pairs with no
+      `RunSuite` between them — authoring blind for 60% of the episode,
+      only 4 RunSuite calls total. It left the worktree uncollectable:
+      `cad/__init__.py:65` imports `SketchAnalysis` from `cad.sketch`,
+      which never defines it, so phases 1-3 that were passing now fail
+      too. One RunSuite would have caught it on the next step. Suspect
+      ApplyPatch's predicted effects are trusted enough that UCB1 stops
+      valuing an observation; compare against the relay run, where the
+      same catalogue DID interleave RunSuite.
+- [ ] **The four trust primitives are necessary and not sufficient.**
+      Worktree sandbox, hash-chained receipts, budget cap and worktree
+      isolation as undo all worked exactly as designed in both runs —
+      neither the relay repo nor the datum repo was touched, all damage
+      stayed inside `.ledger/episodes/*/worktree`. And neither run was one
+      you would have been willing to leave alone for an hour: one produced
+      32 steps of nothing, the other left a green suite red. Safety held;
+      usefulness did not.
+- [ ] Both episodes are resumable and reproduce the bugs on demand — keep
+      them as the fixtures for whatever detector gets built.
+
 ## Done (2026-08-23 — v0.13.0, an instrument for how it LOOKS)
 
 - [x] **`--design-review`.** Every sensor LEDGER had reported something a

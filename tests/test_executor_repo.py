@@ -13,9 +13,21 @@ import subprocess
 from conftest import FIXED, GOAL, TEST_CMD, needs_git, queue_fix
 
 from ledger.journal import Journal
-from ledger.executor import run_repo_episode
+from ledger.executor import BlobStore, resume_suite_evidence, run_repo_episode
 from ledger.llm import FakeBackend
 from ledger.replay import replay
+
+
+def test_resume_keeps_latest_unaddressed_suite_failure(tmp_path):
+    episode = tmp_path / "episode"
+    sha = BlobStore(episode / "blobs").put("Blender traceback: line 423")
+    (episode / "episode.jsonl").write_text(json.dumps({
+        "t": "EXEC", "action": "RunSuite",
+        "commands": [{"exit": 1, "out": sha}]}) + "\n", encoding="utf-8")
+    assert "line 423" in resume_suite_evidence(episode)["unit"]["tail"]
+    (episode / "episode.r2.jsonl").write_text(json.dumps({
+        "t": "EXEC", "action": "ApplyPatch:a"}) + "\n", encoding="utf-8")
+    assert resume_suite_evidence(episode) == {}
 
 
 @needs_git

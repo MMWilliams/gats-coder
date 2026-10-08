@@ -9,6 +9,7 @@ through the layered world model (L3, cached per Eq. 8) and the goal compiler
 from __future__ import annotations
 
 import copy
+import base64
 import json
 import os
 import re
@@ -16,6 +17,7 @@ import shutil
 import subprocess
 import urllib.error
 import urllib.request
+from pathlib import Path
 from typing import Callable, Protocol
 
 
@@ -44,6 +46,29 @@ class LLMBackend(Protocol):
     id: str
 
     def complete(self, prompt: str) -> str: ...
+
+
+# Substrings seen in real outages: HTTP 5xx (the provider itself is broken),
+# urllib's own "unreachable" wording for a refused/unresolved connection, a
+# client-side timeout, and the llama.cpp/CUDA allocation-failure phrases
+# Ollama passes through verbatim in a 500 body when the host is out of
+# memory. Distinguishing these from "the model wrote a bad patch" matters:
+# only these justify backing off instead of retrying immediately.
+_BACKEND_DOWN_MARKERS = (
+    "HTTP 500", "HTTP 502", "HTTP 503", "HTTP 504",
+    "unreachable:", "unavailable", "timed out",
+    "Connection refused", "Connection reset",
+    "out of memory", "bad_alloc", "cudaMalloc failed",
+    "has terminated", "MemoryError",
+)
+
+
+def is_backend_unavailable(message: str) -> bool:
+    """True when a backend failure means "the server is broken", not "the
+    model's answer was bad". A dead local model server keeps failing the
+    same way every call; callers use this to back off instead of hammering
+    it (see skills_llm.AuthorPatch and modes.run_until)."""
+    return any(marker in message for marker in _BACKEND_DOWN_MARKERS)
 
 
 class FakeBackend:
@@ -190,21 +215,62 @@ class OpenAIAPIBackend:
         self._timeout = timeout
         self.id = f"{id_prefix}:{model}"
         self.calls = 0
+        self.supports_vision = any(name in model.lower() for name in
+                                   ("qwen3.8", "qwen3-vl", "gemma4"))
 
     def complete(self, prompt: str) -> str:
+        return self._complete(prompt)
+
+    def complete_with_image(self, prompt: str, image_path: Path) -> str:
+        image_path = Path(image_path)
+        image_bytes = image_path.read_bytes()
+        if not image_bytes.startswith(b"\x89PNG\r\n\x1a\n") or len(image_bytes) > 5_000_000:
+            raise ValueError("preview must be a PNG smaller than 5 MB")
+        image_url = "data:image/png;base64," + base64.b64encode(image_bytes).decode("ascii")
+        return self._complete(prompt, image_url=image_url)
+
+    def _complete(self, prompt: str, image_url: str | None = None) -> str:
         self.calls += 1
         headers = {}
         if self._key:
             headers["authorization"] = f"Bearer {self._key}"
+        content = ([{"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": image_url}]
+                   if image_url else prompt)
+        payload = {"model": self._model,
+                   "messages": [{"role": "user", "content": content}]}
+        # Bonsai's OpenAI-compatible endpoint otherwise leaves thinking
+        # unbounded for requests without a per-call budget. Structured Ledger
+        # outputs can exhaust the response limit before the answer begins.
+        if "bonsai" in self._model.lower():
+            payload["thinking_budget_tokens"] = 512
         resp = _post_json(
-            f"{self._base}/chat/completions", headers,
-            {"model": self._model,
-             "messages": [{"role": "user", "content": prompt}]},
+            f"{self._base}/chat/completions", headers, payload,
             self._timeout)
         choices = resp.get("choices") or []
         if not choices:
             raise RuntimeError(f"no choices in response from {self._base}")
         return str((choices[0].get("message") or {}).get("content") or "")
+
+    def health_check(self, timeout: float = 5.0) -> bool:
+        """Cheap reachability probe (no completion tokens spent).
+
+        The OpenAI-compatible `/models` route is served by Ollama, vLLM,
+        and every provider this class targets, so this needs no per-provider
+        branching. Used to fail an attempt fast instead of waiting out a
+        full completion timeout against a server that is already down.
+        """
+        headers = {}
+        if self._key:
+            headers["authorization"] = f"Bearer {self._key}"
+        req = urllib.request.Request(f"{self._base}/models", headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                return resp.status < 500
+        except urllib.error.HTTPError as exc:
+            return exc.code < 500
+        except (urllib.error.URLError, OSError, TimeoutError):
+            return False
 
 
 # Writing a whole application is not the same call as compiling a one-line

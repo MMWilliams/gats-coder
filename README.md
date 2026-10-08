@@ -52,10 +52,22 @@ stop for approval at *execution* (search may still plan through them):
 | `supervised` | network, irreversible |
 | `autonomous` | irreversible |
 
+Once the session has read something from outside its trust boundary (a
+page the strategist fetched, an MCP tool result), the profile stops
+applying and every non-read action is escalated for the rest of the
+session, including inside episodes the conversation launches later. The
+approval memo is keyed by that state, so a `yes` given before the fetch is
+not inherited after it. An explicit `allow` policy rule still wins: that is
+the operator deciding in advance, which is the one thing a fetched page
+cannot do.
+
 `--profile` (or `profile` in `.ledger/config.json`) selects one; `--yes`
 pre-approves everything for unattended runs. A denial is not a crash: it is
-journaled, observed as a non-effect, and the planner routes around it. If no
-route remains, the episode ends with a journaled `ESCALATION` (reason:
+journaled, the action is out of the running for the rest of the session,
+and the planner routes around it. Nothing is learned from a refusal, so a
+"no" does not survive into the persistent graph or the repo's world model,
+and resuming with an approving gate picks the work back up. If no route
+remains, the episode ends with a journaled `ESCALATION` (reason:
 `gate_denied`, `budget_exhausted`, `max_steps`, or `no_path`). Patch
 authoring is metered per episode (`--max-author-attempts`, default 6) — a
 persistently failing model exhausts its budget and escalates instead of
@@ -125,9 +137,21 @@ ledger voice --setup         # one-time local install instructions
 ledger voice --devices       # list microphones
 ```
 
-Press Enter to talk, Enter again to stop; or just type — voice is additive,
-never a trap. Everything runs locally: `ffmpeg` records, `whisper.cpp`
-transcribes, `piper` speaks. No audio leaves the machine.
+Press Enter to talk, Enter again to stop; or just type, voice is additive
+and never a trap. Everything runs locally: `ffmpeg` records, `whisper.cpp`
+transcribes, and speech comes from **voiceforge** if its daemon is running,
+otherwise `piper`, otherwise the OS voice. No audio leaves the machine.
+
+voiceforge is preferred because it is the one engine whose voice identity is
+ours outright, and because it watermarks its output by default. It is reached
+over loopback rather than imported, so it keeps its own environment and LEDGER
+keeps having no dependencies:
+
+```
+conda run -n voiceforge python -m runtime.speak_server
+```
+
+A daemon that is not running costs you piper, never silence.
 
 Two deliberate limits. **Confirmations are keyboard-only** — a mis-heard
 "yes" must never be able to approve a push or a pull request, so gate
@@ -139,10 +163,44 @@ terminal keeps the full detail while the spoken channel gets the verdict
 Configure in `.ledger/config.json`:
 
 ```jsonc
-"voice": {"tts": "piper", "device": "Headset Microphone", "speak": true}
+"voice": {"tts": "auto", "device": "Headset Microphone", "speak": true}
+// tts: auto | voiceforge | piper | sapi | off
 ```
 
 `ledger doctor` reports recorder, speech-to-text, speech, and microphone.
+
+## The desktop app
+
+```
+ledger app                       # control surface + a browser window
+ledger app --no-open             # just the surface (the shell opens its own)
+ledger run "..." --app-url http://127.0.0.1:8129
+```
+
+`ledger app` serves a local control surface on loopback: the episode list, a
+run's timeline drawn from its journal, the signed receipt on demand, and the
+gate approvals. It is `http.server` and nothing else, so it ships inside the
+same wheel with no new dependencies. The desktop shell in `desktop/` is a
+Tauri window pointed at it, which starts the surface as a child process and
+stops it on close.
+
+**It closes a real hole rather than being a nicer CLI.** The terminal approver
+denies when there is no terminal, on the correct reasoning that without one
+there is nobody to ask. The consequence is that an episode launched from
+anywhere except a shell has every gated action refused and escalates
+`gate_denied`. With a window open, the question goes there instead:
+
+```
+ledger app                                        # in one window
+ledger run "fix the failing test" --app-url ...   # in another
+```
+
+The same attended episode that fails with two denials and no terminal
+succeeds with the full plan when a window is open. `LEDGER_APP_URL` sets the
+address once. Every failure path still denies -- no app, a window closed
+mid-question, a question the server has forgotten -- because none of those is
+a human saying yes. `--yes` continues to win over the app, since it is an
+explicit decision to pre-approve.
 
 ## Model backends
 
@@ -198,8 +256,41 @@ ledger vis <journal>          # one beautiful self-contained HTML report
 ledger incidents <journal>    # claims the sensors refused to confirm
 ledger replay <journal>       # bit-exact planner replay
 ledger verify-chain <journal> # tamper-evidence
+ledger receipt <episode>      # signed, portable account of what it was allowed to do
+ledger verify-receipt <file>  # check one, with or without the journal
+ledger key                    # the public key to publish so --key-id can pin you
 ledger stats <graph.sqlite>   # nodes, edges, dead ends, layer breakdown
 ```
+
+The journal is the whole truth and it never leaves the machine that made
+it, which is no use to somebody asking what your agent did on their behalf.
+`ledger receipt` extracts an episode's claims (policy in force, every
+gated decision, every action, every false claim the sensors caught, and
+what was in scope that nobody vouched for), signs them Ed25519 (stdlib, no
+dependencies) and binds them to each segment's head hash. It is small
+enough to email. `ledger verify-receipt` alone answers *the holder of this
+key stands behind these claims*; with `--journal` it re-derives the whole
+body from the chain and compares, which answers *these claims are that
+episode*. `--key-id` pins the issuer, so a valid signature by a stranger
+still fails.
+
+The unit is the **episode**, not the file. Resume writes `episode.jsonl`,
+`episode.r2.jsonl`, …, and a re-run appends another `HEADER` to the file it
+is already in; a receipt covers every run of every segment and reports each
+attempt separately, because one that attested only the first attempt would
+be true and would omit the attempt that did the work. Point it at the
+episode directory or any segment; the receipt is the same. `--run`
+narrows it to one file's latest run.
+
+Receipts are durable: verification re-derives the body from the segments
+and entry counts the receipt itself records, so an episode that is resumed
+afterwards does not invalidate a receipt issued before it. The
+continuation is reported as a note instead.
+
+A receipt also reports its own weaknesses rather than presenting a clean
+sheet: `gaps` (a gate decided with untrusted content in scope and recorded
+none: fails verification) and `unexplained_sources` (the gate was stricter
+than the journal accounts for: a note).
 
 Terminal output is styled on interactive terminals (verdict headlines,
 colored plan chains, aligned decision tables, escalation-aware `next:`

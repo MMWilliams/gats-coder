@@ -52,20 +52,26 @@ def replay(journal_path: str) -> ReplayResult:
     recorded_obs = [e for e in entries if e["t"] == "OBSERVE"]
     recorded_end = next((e for e in entries if e["t"] == "END"), None)
 
-    # Environment = the recorded observations, replayed in order.
+    # Environment = the recorded observations, replayed in order. A refusal
+    # changes what the planner may choose next, so the replayed environment
+    # has to reproduce it from the record or the search diverges.
     cursor = {"i": 0}
+    blocked: set[str] = set()
 
     def env_step(s, action_name):
         i = cursor["i"]
         if i >= len(recorded_obs):
             raise IndexError("replay ran past recorded observations")
         cursor["i"] = i + 1
+        if recorded_obs[i].get("denied"):
+            blocked.add(action_name)
         return frozenset(recorded_obs[i]["obs_props"])
 
     graph = TransitionGraph()
     wm = LayeredWorldModel(catalog)
     try:
-        result = run_episode(task, graph, wm, cfg, env_step, journal=None)
+        result = run_episode(task, graph, wm, cfg, env_step, journal=None,
+                             blocked=blocked)
     except IndexError as exc:
         return ReplayResult(ok=False, mismatches=[str(exc)])
 

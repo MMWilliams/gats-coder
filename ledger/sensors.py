@@ -117,6 +117,18 @@ def test_status_sensor(cache: ExpensiveResultCache,
                   cost_tier="expensive", probe=probe)
 
 
+def test_unknown_sensor(cache: ExpensiveResultCache,
+                        fingerprint_fn: Callable[[Path], str],
+                        suite: str = "unit") -> Sensor:
+    """Suite execution is useful once per content state, then after edits."""
+    def probe(root: Path) -> set:
+        return {f"tests.unknown:{suite}"} if cache.get(
+            fingerprint_fn(root)) is None else set()
+
+    return Sensor(name=f"test_unknown[{suite}]", version="1",
+                  cost_tier="instant", probe=probe)
+
+
 def design_sensor(cache: ExpensiveResultCache,
                   fingerprint_fn: Callable[[Path], str]) -> Sensor:
     """Emits `design.ok` when the last visual review of THIS content passed.
@@ -140,6 +152,44 @@ def design_sensor(cache: ExpensiveResultCache,
         return set(cached) if cached is not None else set()
 
     return Sensor(name="design_review", version="1",
+                  cost_tier="expensive", probe=probe)
+
+
+def product_sensor(cache: ExpensiveResultCache,
+                   fingerprint_fn: Callable[[Path], str]) -> Sensor:
+    """Emits `product.usable` when the last usability probe of THIS content
+    found nothing missing. Same cache shape as the test and design sensors,
+    but a different kind of evidence from `design.ok`: the probe is a
+    program deciding checkable facts (an input handler exists, the first
+    paint is not a flat colour), not a model's opinion, so it may sit
+    beside `tests.pass` in a goal.
+    """
+
+    def probe(root: Path) -> set:
+        cached = cache.get(fingerprint_fn(root))
+        return set(cached) if cached is not None else set()
+
+    return Sensor(name="product_probe", version="1",
+                  cost_tier="expensive", probe=probe)
+
+
+def brief_sensor(cache: ExpensiveResultCache,
+                 fingerprint_fn: Callable[[Path], str]) -> Sensor:
+    """Emits `brief.met` when THIS content satisfied every requirement the
+    episode froze before it started (design SS17).
+
+    A judge, like `design.ok`: reading source and deciding a requirement is
+    satisfied is opinion, so it never stands in for `tests.pass`. What
+    makes it worth having in a contract anyway is that the requirements it
+    judges against were fixed, hashed and journaled before the first patch
+    -- the bar cannot move, only the build.
+    """
+
+    def probe(root: Path) -> set:
+        cached = cache.get(fingerprint_fn(root))
+        return set(cached) if cached is not None else set()
+
+    return Sensor(name="brief_review", version="1",
                   cost_tier="expensive", probe=probe)
 
 

@@ -104,8 +104,74 @@ def test_design_ok_never_substitutes_for_tests_passing():
     a = review_design_action()
     assert a.add == frozenset({"design.ok"})
     assert not any("tests.pass" in p for p in a.add)
-    # unknown effects: whether a build passes review cannot be promised
-    assert a.effects_known is False and a.deterministic is False
+    # Stochastic: whether a build passes review cannot be promised. But the
+    # effects are DECLARED -- marked unknown, the planner never reaches for
+    # the review at all (see the reachability test below).
+    assert a.deterministic is False and a.effects_known is True
+
+
+def test_a_goal_that_needs_design_ok_actually_reaches_the_review(tmp_path,
+                                                                 monkeypatch):
+    """Regression: with the review's effects marked unknown, an episode
+    whose goal required `design.ok` never planned the review. It authored
+    patches until the budget ran out and escalated `no_path`, one
+    applicable action away from the proposition it needed."""
+    import json
+    import subprocess
+    import sys
+
+    from conftest import BUGGY, GOAL, TEST_CMD
+    from ledger import vision
+    from ledger.executor import run_repo_episode
+    from ledger.journal import Journal
+    from ledger.llm import FakeBackend
+
+    monkeypatch.setattr(vision, "screenshot",
+                        lambda root, out, **k: bool(
+                            Path(out).write_bytes(b"x" * 2000) or True))
+    monkeypatch.setattr(vision, "critique_image", lambda p, **k: vision.Critique(
+        scores={"lighting": 8}, problems=["flat"], summary="s", ok=True,
+        assessed=True))
+    monkeypatch.setattr(vision, "compare", lambda before, after, **k:
+                        vision.Comparison(better="after", agreed=True,
+                                          why="brighter"))
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+
+    def git(*args):
+        subprocess.run(["git", *args], cwd=repo, capture_output=True)
+
+    git("init", "-q")
+    (repo / "calc.py").write_text(BUGGY, encoding="utf-8")
+    (repo / "test_calc.py").write_text(
+        "from calc import add\n\ndef test_add():\n    assert add(2, 3) == 5\n",
+        encoding="utf-8")
+    (repo / "index.html").write_text("<canvas></canvas>", encoding="utf-8")
+    git("add", "-A")
+    git("-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "x")
+
+    episode = tmp_path / "ep"
+    episode.mkdir(parents=True)
+    (episode / "design-baseline.png").write_bytes(b"x" * 2000)
+
+    def responder(prompt):
+        if "REPOSITORY FILES" in prompt:
+            return ("FILE: calc.py\n```python\ndef add(a, b):\n"
+                    "    return a + b\n```")
+        return json.dumps({"goal": sorted(GOAL), "rationale": "green"})
+
+    result, _, journal = run_repo_episode(
+        repo, episode, None, TEST_CMD, task_text="build a game",
+        backend=FakeBackend(responder), slots=["it1"],
+        required_patch_slot="it1", product_kind="none", product_review=False,
+        design_review=True, max_author_attempts=4)
+
+    entries = Journal.read(str(journal))
+    assert "design.ok" in entries[0]["goal"]
+    assert any(e.get("t") == "EXEC" and e.get("action") == "ReviewDesign"
+               for e in entries), "the planner never reached the review"
+    assert result.success
 
 
 def test_the_sensor_reads_the_cache_and_never_guesses():

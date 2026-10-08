@@ -14,12 +14,37 @@ import os
 GENESIS = "0" * 64
 
 
-def _canonical(obj) -> str:
+def canonical(obj) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
 def _entry_hash(entry_without_h: dict) -> str:
-    return hashlib.sha256(_canonical(entry_without_h).encode("utf-8")).hexdigest()
+    return hashlib.sha256(canonical(entry_without_h).encode("utf-8")).hexdigest()
+
+
+def runs(entries: list) -> list[list]:
+    """A journal's runs, in order, one per HEADER.
+
+    A file accumulates every run of an episode: resume appends a new
+    segment file, but a re-run appends to this same one, and each starts
+    with its own HEADER. Anything before the first HEADER is orphaned and
+    dropped.
+    """
+    starts = [i for i, e in enumerate(entries) if e.get("t") == "HEADER"]
+    if not starts:
+        return [entries] if entries else []
+    bounds = starts + [len(entries)]
+    return [entries[a:b] for a, b in zip(starts, bounds[1:])]
+
+
+def current_run(entries: list) -> list:
+    """Just this run's entries.
+
+    Scanning the whole file makes a SUCCESSFUL run report a stale
+    escalation from an earlier attempt, which is worse than saying nothing.
+    """
+    found = runs(entries)
+    return found[-1] if found else entries
 
 
 class Journal:
@@ -39,7 +64,7 @@ class Journal:
             raise ValueError("'h' is a reserved journal field")
         h = _entry_hash(entry)
         entry["h"] = h
-        self._fh.write(_canonical(entry) + "\n")
+        self._fh.write(canonical(entry) + "\n")
         self._fh.flush()
         self._i += 1
         self._prev = h
@@ -65,17 +90,28 @@ class Journal:
         return entries
 
     @staticmethod
-    def verify_chain(path: str) -> tuple[bool, str | None]:
-        """Recompute every hash and link. Returns (ok, error-description)."""
+    def verify_entries(entries: list[dict]) -> tuple[bool, str | None]:
+        """Recompute every hash and link over already-read entries.
+
+        A prefix of a chain is itself a chain, so this also answers "were
+        the first N entries of this journal exactly these" -- which is how
+        a receipt stays verifiable after the episode it attests continues.
+        Never mutates what it is given.
+        """
         prev = GENESIS
-        for idx, entry in enumerate(Journal.read(path)):
-            claimed = entry.pop("h", None)
-            if entry.get("i") != idx:
-                return False, f"entry {idx}: index mismatch (got {entry.get('i')})"
-            if entry.get("prev") != prev:
+        for idx, entry in enumerate(entries):
+            body = {k: v for k, v in entry.items() if k != "h"}
+            if body.get("i") != idx:
+                return False, f"entry {idx}: index mismatch (got {body.get('i')})"
+            if body.get("prev") != prev:
                 return False, f"entry {idx}: broken link (prev hash mismatch)"
-            actual = _entry_hash(entry)
-            if actual != claimed:
+            actual = _entry_hash(body)
+            if actual != entry.get("h"):
                 return False, f"entry {idx}: content hash mismatch"
             prev = actual
         return True, None
+
+    @staticmethod
+    def verify_chain(path: str) -> tuple[bool, str | None]:
+        """Recompute every hash and link. Returns (ok, error-description)."""
+        return Journal.verify_entries(Journal.read(path))

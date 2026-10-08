@@ -215,6 +215,77 @@ class PiperTTS:
             tmp.unlink(missing_ok=True)
 
 
+class VoiceForgeTTS:
+    """Speak in a voice we own outright, served by a warm local daemon.
+
+    voiceforge mints identities in its own VITS speaker space and verifies
+    them against every real speaker in the corpus, so this is the one engine
+    here whose output carries no licence question and no third party's voice
+    actor. It also watermarks by default, which is the EU AI Act Article 50
+    marking obligation rather than a nicety.
+
+    Deliberately over HTTP and not by import. voiceforge needs torch and a
+    CUDA context and LEDGER has no dependencies at all; keeping the boundary
+    at loopback means neither project constrains the other's environment, and
+    voiceforge stays independently runnable and independently testable. Start
+    it with:
+
+        conda run -n voiceforge python -m runtime.speak_server
+
+    If it is not running we raise, and resolve_tts falls through to piper and
+    then to the OS voice. A missing daemon must never mean a silent agent.
+    """
+
+    id = "voiceforge"
+
+    def __init__(self, url: str | None = None, voice: str | None = None):
+        self.url = (url or os.environ.get("LEDGER_VOICEFORGE_URL")
+                    or "http://127.0.0.1:8124").rstrip("/")
+        self.voice = voice or os.environ.get("LEDGER_VOICEFORGE_VOICE")
+        self.player = find_player()
+        if not self.player:
+            raise RuntimeError("no audio player found (install ffmpeg)")
+        info = self._get("/health", timeout=2)
+        if not info.get("ok"):
+            raise RuntimeError(f"voiceforge daemon at {self.url} is not ready")
+        self.detail = f"voiceforge {info.get('voice') or 'base'}"
+
+    def _get(self, path: str, timeout: float = 2.0) -> dict:
+        import json as _json
+        import urllib.request
+        try:
+            with urllib.request.urlopen(self.url + path, timeout=timeout) as r:
+                return _json.loads(r.read().decode("utf-8"))
+        except Exception as exc:                      # noqa: BLE001
+            raise RuntimeError(
+                f"voiceforge daemon not reachable at {self.url}: {exc}") from exc
+
+    def speak(self, text: str) -> None:
+        if not text.strip():
+            return
+        import json as _json
+        import urllib.request
+        payload = {"text": text}
+        if self.voice:
+            payload["voice"] = self.voice
+        tmp = Path(tempfile.gettempdir()) / f"ledger-vf-{os.getpid()}.wav"
+        try:
+            request = urllib.request.Request(
+                self.url + "/speak",
+                data=_json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"})
+            with urllib.request.urlopen(request, timeout=120) as response:
+                audio = response.read()
+            if len(audio) > 44:
+                tmp.write_bytes(audio)
+                subprocess.run([*self.player, str(tmp)],
+                               capture_output=True, timeout=300)
+        except (OSError, subprocess.SubprocessError, ValueError):
+            pass          # a mute assistant beats a crashed one
+        finally:
+            tmp.unlink(missing_ok=True)
+
+
 class SapiTTS:
     """Zero-install Windows fallback: the built-in speech synthesiser."""
 
@@ -247,15 +318,23 @@ class NullTTS:
 
 
 def resolve_tts(kind: str = "auto"):
-    """piper -> sapi -> silent, unless a specific one is demanded."""
+    """voiceforge -> piper -> sapi -> silent, unless one is demanded.
+
+    voiceforge leads the auto chain because it is the only engine whose
+    identity we own and can ship commercially, and because it watermarks.
+    It is also the only one that can be absent, so the chain matters: a
+    daemon that is not running must degrade to piper, never to silence.
+    """
     kind = (kind or "auto").lower()
     if kind in ("off", "none"):
         return NullTTS()
+    if kind in ("voiceforge", "vf"):
+        return VoiceForgeTTS()
     if kind == "piper":
         return PiperTTS()
     if kind == "sapi":
         return SapiTTS()
-    for factory in (PiperTTS, SapiTTS):
+    for factory in (VoiceForgeTTS, PiperTTS, SapiTTS):
         try:
             return factory()
         except Exception:
@@ -413,12 +492,18 @@ def diagnostics() -> list[tuple[str, str, bool]]:
                  else "not installed (see: ledger voice --setup)",
                  bool(exe and model)))
     pexe, pmodel = find_piper()
-    if pexe and pmodel:
-        detail, ok = f"piper {Path(pmodel).stem}", True
-    elif sys.platform == "win32":
-        detail, ok = "piper voice missing; falling back to Windows SAPI", True
-    else:
-        detail, ok = "no text-to-speech found", False
+    # voiceforge first, because that is the auto order. Reported by asking the
+    # daemon rather than by looking for a binary: it is a service, and a
+    # service that is installed but not running is not a voice.
+    try:
+        detail, ok = VoiceForgeTTS().detail, True
+    except Exception:
+        if pexe and pmodel:
+            detail, ok = f"piper {Path(pmodel).stem}", True
+        elif sys.platform == "win32":
+            detail, ok = "piper voice missing; falling back to Windows SAPI", True
+        else:
+            detail, ok = "no text-to-speech found", False
     rows.append(("voice: text-to-speech", detail, ok))
     if sys.platform == "win32":
         devices = list_input_devices()

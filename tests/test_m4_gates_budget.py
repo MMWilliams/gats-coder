@@ -10,6 +10,7 @@ from ledger.executor import (BudgetMeter, GATED_RISKS, PolicyGate,
                              attended_gate, run_repo_episode, tty_approver)
 from ledger.journal import Journal
 from ledger.llm import FakeBackend
+from ledger.replay import replay
 from ledger.sensors import budget_sensor
 
 
@@ -77,6 +78,58 @@ def test_denied_episode_escalates_instead_of_crashing(repo, tmp_path):
     assert len(esc) == 1 and esc[0]["reason"] == "gate_denied"
     ok, err = Journal.verify_chain(str(journal_path))
     assert ok, err
+
+
+@needs_git
+def test_a_denial_does_not_outlive_the_session_that_gave_it(repo, tmp_path):
+    """Deny everything, then resume with an approving gate and let it work.
+
+    SS8.1 routes around a "no" by observing a self-loop, which used to be
+    learned: written into episode_dir/graph.sqlite and the repo's shared
+    l2.sqlite, reloaded on the warm start, and pruned before the resumed
+    episode took a single step. The human changed their mind and the
+    planner could not hear it -- attempt 2 escalated no_path at 0 steps.
+    """
+    episode_dir = tmp_path / "denied-then-allowed"
+    queue_fix(episode_dir)
+    l2 = tmp_path / "l2.sqlite"
+
+    first, executor, _ = run_repo_episode(
+        repo, episode_dir, GOAL, TEST_CMD, gate=PolicyGate("attended"),
+        profile="attended", l2_path=str(l2))
+    assert not first.success
+    assert executor.blocked, "a denied action must be blocked for the session"
+
+    second, _, journal_path = run_repo_episode(
+        repo, episode_dir, GOAL, TEST_CMD, profile="attended",
+        gate=PolicyGate("attended", approver=attended_gate),
+        l2_path=str(l2), resume=True)
+    assert second.success, second.plan
+    assert "ApplyPatch:fix-001" in second.plan
+
+    # Nothing in the resumed journal claims the refusals were divergences.
+    entries = Journal.read(str(journal_path))
+    assert not any(e["t"] == "OBSERVE" and e.get("denied") for e in entries)
+
+
+@needs_git
+def test_a_refusal_is_recorded_but_never_learned(repo, tmp_path):
+    """The refusal is in the journal as a refusal, and the world model is
+    untouched by it: no OBSERVE claims divergence, nothing was recorded."""
+    episode_dir = tmp_path / "refused"
+    queue_fix(episode_dir)
+    result, _, journal_path = run_repo_episode(
+        repo, episode_dir, GOAL, TEST_CMD, gate=PolicyGate("attended"),
+        profile="attended")
+
+    assert not result.success
+    entries = Journal.read(str(journal_path))
+    refused = [e for e in entries if e["t"] == "OBSERVE" and e.get("denied")]
+    assert refused, "a denied step must be journaled as denied"
+    assert all(not e["diverged"] for e in refused)
+    # Replay reproduces the search, which it can only do if it rebuilds the
+    # same set of unavailable actions from the record.
+    assert replay(str(journal_path)).ok
 
 
 @needs_git

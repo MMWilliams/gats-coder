@@ -1,0 +1,17 @@
+[package]
+name = "ledger-desktop"
+version = "0.14.0"
+edition = "2021"
+description = "LEDGER desktop shell"
+license = "MIT"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

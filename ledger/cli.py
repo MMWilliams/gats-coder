@@ -20,16 +20,18 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
-from . import AGENT_VERSION, ui, voice
+from . import AGENT_VERSION, receipt, signing, ui, voice
 from .chat import Conversation, repl
 from .executor import GATED_RISKS, PolicyGate, attended_gate, tty_approver
 from .graph import TransitionGraph
-from .journal import Journal
+from .journal import Journal, current_run as _current_run
 from .planner import PlanConfig, run_episode
 from .replay import replay as run_replay
 from .session import AgentSpec, Session
+from .taint import Provenance
 from .tasks import OPTIMAL_LENGTH, SyntheticEnv, suite
 from .world_model import LayeredWorldModel
 
@@ -172,13 +174,18 @@ def _merged_rules(args, cfg: dict) -> list | None:
     return rules or None
 
 
-def _gate_and_profile(args, cfg: dict):
+def _gate_and_profile(args, cfg: dict, taint_probe=None):
     """Resolve the autonomy profile and build its risk gate (design SS7.4).
 
     --yes approves everything the profile would have asked about; without a
     terminal the interactive gate denies, so unattended runs must say --yes
     (or use a permissive profile) explicitly. Policy rules apply regardless
     -- a deny rule outranks --yes.
+
+    `taint_probe` is the session's provenance, so every gate a session
+    builds -- the MCP tool gate and each episode's -- reads one view of
+    what untrusted content is in scope. Skipping permissions skips this
+    too, which is the point of the flag.
     """
     profile = getattr(args, "profile", None) or cfg.get("profile", "attended")
     if profile not in GATED_RISKS:
@@ -190,9 +197,25 @@ def _gate_and_profile(args, cfg: dict):
               file=sys.stderr)
         return attended_gate, profile
     approver = attended_gate if getattr(args, "yes", False) else tty_approver
+
+    # An open app window answers gates when there is no terminal to ask, which
+    # is the only reason a non-terminal user can run anything at all. --yes
+    # still wins: it is an explicit decision to pre-approve, and routing it to
+    # a window would ask a question the user already answered.
+    app_url = getattr(args, "app_url", None) or os.environ.get("LEDGER_APP_URL")
+    if app_url and not getattr(args, "yes", False):
+        from .app import RemoteApprover
+        if RemoteApprover.reachable(app_url):
+            approver = RemoteApprover(app_url)
+            print(ui.dim(f"  gates will be answered in the app at {app_url}"))
+        elif getattr(args, "app_url", None):
+            # Asked for by name and not there. Falling through to the terminal
+            # silently would be a surprise at the first gate.
+            raise SystemExit(f"no ledger app is answering at {app_url}")
     try:
         gate = PolicyGate(profile, approver=approver,
-                          rules=_merged_rules(args, cfg))
+                          rules=_merged_rules(args, cfg),
+                          taint_probe=taint_probe)
     except ValueError as exc:
         raise SystemExit(str(exc))
     return gate, profile
@@ -443,7 +466,11 @@ def cmd_run(args) -> int:
             context_files=args.context.split(",") if args.context else None,
             push=args.push, pr=args.pr, resume=args.resume,
             hooks=_hooks_of(cfg_file),
+            # Contracted MCP tools become planner actions; an absent
+            # `mcp` block simply yields none.
+            mcp_config=cfg_file,
             progress=None if quiet else progress,
+            required_patch_slot=getattr(args, "require_patch_slot", None),
         )
     except BackendUnavailable as exc:
         return _fail(str(exc))
@@ -499,7 +526,7 @@ def cmd_run(args) -> int:
         # launch immediately after building a game.
         built_in = episode_dir / "worktree"
         started = _launch_if_asked(
-            args, cfg, built_in if built_in.is_dir() else repo_root)
+            args, cfg_file, built_in if built_in.is_dir() else repo_root)
         print(ui.next_steps(
             f"ledger status {journal_path}",
             f"ledger why {journal_path} 0    {ui.dim('# the decision table')}",
@@ -537,18 +564,6 @@ def cmd_run(args) -> int:
                          f"    {ui.dim('# why the last step was chosen')}")
         print(ui.next_steps(*hints))
     return 0 if result.success else 1
-
-
-def _current_run(entries: list) -> list:
-    """Just this run's entries.
-
-    A journal accumulates every run of an episode (resume appends a new
-    segment, a re-run appends to the same file). Scanning the whole file
-    makes a SUCCESSFUL run report a stale escalation from an earlier
-    attempt, which is worse than saying nothing.
-    """
-    starts = [i for i, e in enumerate(entries) if e.get("t") == "HEADER"]
-    return entries[starts[-1]:] if starts else entries
 
 
 def _voice_session(args, cfg: dict, editor):
@@ -661,7 +676,7 @@ DEFAULT_CONFIG = {
 }
 
 
-def _chat_runner(root: Path, args, cfg_file: dict, backend):
+def _chat_runner(root: Path, args, cfg_file: dict, backend, provenance=None):
     """The unified session's execution arm: task text in, verified episode
     out. All the tracking a run needs -- naming, resume, config -- is
     automatic; the planner and gates work exactly as in `ledger run`."""
@@ -676,7 +691,7 @@ def _chat_runner(root: Path, args, cfg_file: dict, backend):
             cfg_path.write_text(json.dumps(cfg_now, indent=2) + "\n",
                                 encoding="utf-8")
             print(ui.dim("initialized .ledger/config.json with defaults"))
-        gate, profile = _gate_and_profile(args, cfg_now)
+        gate, profile = _gate_and_profile(args, cfg_now, provenance)
         budget = getattr(args, "max_author_attempts", None) \
             or int(cfg_now.get("max_author_attempts",
                                DEFAULT_AUTHOR_ATTEMPTS))
@@ -692,6 +707,7 @@ def _chat_runner(root: Path, args, cfg_file: dict, backend):
             l3_cache_path=str(root / ".ledger" / "l3.sqlite"),
             slots=[str(s) for s in cfg_now.get("slots", ["a", "b"])],
             hooks=_hooks_of(cfg_now),
+            mcp_config=cfg_now,
             resume=resume, progress=progress,
         )
         entries = _current_run(Journal.read(str(journal_path)))
@@ -699,11 +715,14 @@ def _chat_runner(root: Path, args, cfg_file: dict, backend):
                     if e["t"] == "ESCALATION"), None)
         reason = esc.get("reason") if esc else None
         plan_txt = " -> ".join(result.plan) or "(empty)"
+        branch = f"ledger/{name}"
+        worktree = episode_dir / "worktree"
         plain = (f"Episode {name!r} "
                  f"{'succeeded' if result.success else 'did not reach the goal'}"
                  f"{' (resumed)' if resume else ''}: {plan_txt} "
                  f"[{result.steps} steps, {executor.incidents} incidents"
-                 + (f", escalated: {reason}" if reason else "") + "]")
+                 + (f", escalated: {reason}" if reason else "") + "]. "
+                 f"Its work is on branch {branch} in {worktree}.")
         styled = "\n".join(filter(None, [
             ui.headline(result.success,
                         f"episode {name} {ui.DASH} goal reached",
@@ -718,10 +737,18 @@ def _chat_runner(root: Path, args, cfg_file: dict, backend):
             ui.kv("journal", ui.dim(str(journal_path))),
             ui.dim(f"  audit: ledger vis {journal_path}"),
         ]))
+        from .repo import fast_forward
         return {"success": result.success, "plan": result.plan,
                 "steps": result.steps, "incidents": executor.incidents,
                 "escalation": reason, "journal": str(journal_path),
                 "episode": name, "resumed": resume,
+                "branch": branch, "worktree": str(worktree),
+                # The session offers to bring a verified result into the
+                # repository the conversation is looking at; until then the
+                # model would truthfully report a repo with nothing in it.
+                "merge": ((lambda: fast_forward(root, branch))
+                          if result.success else None),
+                "merge_auto": bool(getattr(args, "yes", False)),
                 "summary_plain": plain, "summary_styled": styled}
     return runner
 
@@ -738,11 +765,22 @@ def cmd_chat(args) -> int:
     journal = None
     if args.journal:
         journal = Journal(args.journal)
-    conv = Conversation(backend=backend, journal=journal)
+    # One view of what untrusted content is in scope, shared by the tool
+    # gate, the conversation, and every episode the session launches. A
+    # tool result read at 10:01 has to still constrain the episode started
+    # at 10:04, which is the whole reason it is per-session and not
+    # per-call.
+    provenance = Provenance()
+    conv = Conversation(backend=backend, journal=journal,
+                        provenance=provenance)
+    chat_cfg = cfg_file.get("chat")
+    if isinstance(chat_cfg, dict) and chat_cfg.get("context_chars"):
+        conv.budget_chars = int(chat_cfg["context_chars"])
     is_repo = (root / ".git").exists()
     if is_repo:
         conv.add_repo_context(root, args.context.split(",") if args.context else None)
-    runner = _chat_runner(root, args, cfg_file, backend) if is_repo else None
+    runner = _chat_runner(root, args, cfg_file, backend, provenance) \
+        if is_repo else None
 
     # MCP: connect configured servers and expose their tools, gated.
     servers = {}
@@ -752,7 +790,7 @@ def cmd_chat(args) -> int:
                                on_error=lambda m: print(ui.warn(m),
                                                         file=sys.stderr))
     if servers:
-        tool_gate, _ = _gate_and_profile(args, cfg_file)
+        tool_gate, _ = _gate_and_profile(args, cfg_file, provenance)
 
         def tool_call(qualified: str, arguments: dict) -> str:
             sname, _, tname = qualified.partition(":")
@@ -1038,13 +1076,27 @@ def cmd_doctor(args) -> int:
     if git:
         ver = subprocess.run([git, "--version"], capture_output=True, text=True)
         checks.append(("git version", ver.stdout.strip(), True))
-    claude = shutil.which("claude")
-    checks.append(("claude CLI", claude or "NOT FOUND (needed for run/chat)",
-                   claude is not None))
+    backend_cfg = _config(Path(args.repo).resolve()).get("backend") or {}
+    backend_cfg = backend_cfg if isinstance(backend_cfg, dict) else {}
+    kind = backend_cfg.get("id") or backend_cfg.get("kind") or "claude"
+    if kind == "claude":
+        claude = shutil.which("claude")
+        checks.append(("claude CLI", claude or "NOT FOUND (selected backend)",
+                       claude is not None))
+    elif kind == "ollama":
+        ollama = shutil.which("ollama")
+        model = backend_cfg.get("model")
+        checks.append(("Ollama", ollama or "NOT FOUND (selected backend)",
+                       ollama is not None))
+        if ollama and model:
+            listing = subprocess.run([ollama, "list"], capture_output=True,
+                                     text=True, timeout=30)
+            present = any(line.split() and line.split()[0] == model
+                          for line in listing.stdout.splitlines()[1:])
+            checks.append(("local model", model if present else
+                           f"{model} NOT INSTALLED", present))
     gh = shutil.which("gh")
     checks.append(("gh CLI", gh or "not found (only needed for --pr)", True))
-    kind = (_config(Path(args.repo).resolve()).get("backend") or {})
-    kind = kind.get("kind") if isinstance(kind, dict) else None
     if kind == "anthropic":
         checks.append(("ANTHROPIC_API_KEY",
                        "set" if os.environ.get("ANTHROPIC_API_KEY")
@@ -1199,6 +1251,174 @@ def cmd_verify_chain(args) -> int:
     return 1
 
 
+def _receipt_path(journal: str, scope: str) -> Path:
+    """Episode receipts sit beside the segments they cover; a single-run
+    receipt is named after its own file, so the two never collide."""
+    path = Path(journal)
+    if path.is_dir():
+        return path / "receipt.json"
+    if scope == "episode":
+        return path.parent / "receipt.json"
+    return path.with_suffix(".receipt.json")
+
+
+def cmd_receipt(args) -> int:
+    scope = "run" if args.run else "episode"
+    try:
+        key = signing.load_key(args.key)
+        doc = receipt.issue(args.journal, key, scope=scope)
+    except (OSError, ValueError) as exc:
+        return _fail(str(exc))
+
+    if args.stdout:
+        print(json.dumps(doc, indent=2, sort_keys=True))
+        return 0
+
+    out = Path(args.out) if args.out else _receipt_path(args.journal, scope)
+    receipt.write(doc, out)
+
+    totals, prov = doc["totals"], doc["provenance"]
+    segments = doc["journal"]["segments"]
+    print(ui.headline(doc["outcome"]["success"], "episode SUCCESS",
+                      "goal not reached"))
+    print()
+    print(ui.kv("task", str(doc["episode"]["task"])))
+    if totals["runs"] > 1 or len(segments) > 1:
+        # The whole point of attesting an episode rather than a file: the
+        # attempt that failed and the attempt that worked are both in here.
+        print(ui.kv("attempts", f"{totals['runs']} runs across "
+                                f"{len(segments)} segment(s)"))
+        for number, run in enumerate(doc["runs"]):
+            verdict = ui.ok("reached the goal") if run["success"] \
+                else ui.bad(run["escalation"] or "did not finish")
+            # A run's plan holds what the planner attempted, refusals
+            # included, so the denial count is what makes it readable.
+            denied = sum(1 for d in doc["decisions"]
+                         if d["run"] == number and not d["approved"])
+            print(ui.dim(f"    run {number}  {run['file']}  "
+                         f"{run['profile']}  ") + verdict
+                  + ui.dim(f"  {run['steps']} steps"
+                           + (f", {denied} denied" if denied else "")))
+    print(ui.kv("policy", ", ".join(sorted(doc["policy"]["gated_risks"]))
+                + f" {ui.SEP} {len(doc['decisions'])} gated decisions, "
+                  f"{totals['denials']} denied"))
+    sources = prov["external_sources"]
+    if not sources:
+        print(ui.kv("untrusted", ui.ok(f"{ui.OK} nothing external entered "
+                                       "this episode")))
+    else:
+        print(ui.kv("untrusted", ui.warn(f"{len(sources)} source(s)")
+                    + ui.dim("  " + ", ".join(sources[:3]))))
+        exposed = prov["privileged_after_external"]
+        print(ui.kv("exposure", ui.bad(
+            f"{len(exposed)} privileged action(s) ran after") if exposed
+            else ui.ok(f"{ui.OK} no privileged action ran after")))
+    if prov["unexplained_sources"]:
+        print(ui.kv("unexplained", ui.warn(
+            f"{len(prov['unexplained_sources'])} source(s) the gate acted "
+            "on that no journaled ingress explains")))
+    for gap in prov["gaps"]:
+        print(ui.kv("gap", ui.bad(gap)))
+    print(ui.kv("chain", ui.ok(f"{ui.OK} intact")
+                if doc["journal"]["chain_ok"]
+                else ui.bad(f"{ui.FAIL} BROKEN")))
+    print(ui.kv("issuer", doc["sig"]["key_id"]
+                + ui.dim(f"  ({signing.key_path(args.key)})")))
+    print()
+    print(f"{ui.ok(ui.OK)} receipt written to {out} {ui.DASH} anyone can "
+          f"check it with: ledger verify-receipt {out.name} --key-id "
+          f"{doc['sig']['key_id']}")
+    return 0
+
+
+def cmd_verify_receipt(args) -> int:
+    try:
+        doc = receipt.read(args.receipt)
+    except (OSError, json.JSONDecodeError) as exc:
+        return _fail(f"cannot read {args.receipt}: {exc}")
+
+    verdict = receipt.verify(doc, args.journal)
+    ok, problems = verdict.ok, list(verdict.problems)
+    sig = doc.get("sig") or {}
+    if args.key_id and sig.get("key_id") != args.key_id:
+        # A signature that verifies proves somebody stood behind the claims,
+        # not that it was the somebody you meant.
+        ok = False
+        problems.append(f"issued by key {sig.get('key_id')}, expected "
+                        f"{args.key_id}")
+
+    totals = doc.get("totals") or {}
+    print(ui.headline(ok, "receipt VERIFIED", "receipt NOT verified"))
+    print()
+    print(ui.kv("issuer", str(sig.get("key_id"))))
+    print(ui.kv("checked", "signature + journal" if args.journal
+                else ui.warn("signature only ")
+                + ui.dim("(pass --journal to check the claims against the "
+                         "chain)")))
+    print(ui.kv("task", str((doc.get("episode") or {}).get("task"))))
+    print(ui.kv("attests", f"{totals.get('runs', 0)} run(s) {ui.SEP} "
+                           f"{totals.get('steps', 0)} steps {ui.SEP} "
+                           f"{len(doc.get('decisions') or [])} gated "
+                           f"decisions {ui.SEP} "
+                           f"{totals.get('incidents', 0)} incidents"))
+    for problem in problems:
+        print(f"  {ui.bad(ui.DOT)} {problem}")
+    for note in verdict.notes:
+        print(f"  {ui.warn(ui.DOT)} {note}")
+    return 0 if ok else 1
+
+
+def cmd_app(args) -> int:
+    """The desktop control surface. The Tauri shell points a window here."""
+    from . import app as app_mod
+
+    root = Path(args.repo).resolve()
+    try:
+        server, approver, url = app_mod.serve(root, host=args.host,
+                                              port=args.port)
+    except OSError as exc:
+        return _fail(f"cannot bind {args.host}:{args.port} ({exc})")
+
+    print(ui.kv("serving", url))
+    print(ui.kv("repo", str(root)))
+    print(ui.kv("gates", "answered in the window; without it they deny after "
+                         f"{app_mod.GATE_TIMEOUT_S}s"))
+    if not args.no_open:
+        import webbrowser
+        webbrowser.open(url)
+    print()
+    print(ui.dim("  Ctrl+C to stop"))
+    try:
+        while True:
+            time.sleep(3600)
+    except KeyboardInterrupt:
+        print()
+        return 0
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+def cmd_key(args) -> int:
+    key = signing.load_key(args.name)
+    published = {"alg": key["alg"], "key_id": key["key_id"],
+                 "public": key["public"]}
+    if args.export:
+        Path(args.export).write_text(
+            json.dumps(published, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8")
+        print(f"{ui.ok(ui.OK)} public key written to {args.export}")
+        return 0
+    print(ui.kv("key id", key["key_id"]))
+    print(ui.kv("public", key["public"]))
+    print(ui.kv("file", ui.dim(str(signing.key_path(args.name)))))
+    print()
+    print(ui.dim("  the signing seed never leaves that file. publish the two "
+                 "lines above and a counterparty can pin --key-id, which is "
+                 "what makes a valid signature by a stranger fail."))
+    return 0
+
+
 def cmd_replay(args) -> int:
     result = run_replay(args.journal)
     if result.ok:
@@ -1268,6 +1488,317 @@ def cmd_stats(args) -> int:
     return 0
 
 
+def cmd_plan_mode(args) -> int:
+    """A design document only; no episode or candidate patch is started."""
+    from .modes import create_plan
+    root = Path(args.repo).resolve()
+    backend = _backend(args, _config(root))
+    if backend is None:
+        return _fail("plan mode requires a model backend")
+    dest = Path(args.out).resolve() if args.out else (
+        root / ".ledger" / "plans" / f"plan-{int(time.time())}.md")
+    try:
+        create_plan(args.task, backend, dest)
+    except (ValueError, FileExistsError, OSError, RuntimeError) as exc:
+        return _fail(str(exc))
+    print(dest)
+    return 0
+
+
+def cmd_browse(args) -> int:
+    """Read a public web page as bounded text for documentation work."""
+    from .web import read_page
+    try:
+        print(read_page(args.url, args.max_chars))
+    except (OSError, ValueError, UnicodeError) as exc:
+        return _fail(str(exc))
+    return 0
+
+
+def cmd_brief(args) -> int:
+    """Interrogate a request and print what it decides the build must be.
+
+    The same step every episode now runs before its first patch, exposed on
+    its own so the answers can be read -- and argued with -- before any
+    budget is spent on them.
+    """
+    from .brief import write_brief
+    root = Path(args.repo).resolve()
+    cfg = _config(root)
+    backend = _backend(args, cfg)
+    if backend is None:
+        return _fail("brief requires a model backend")
+    kind = _resolved_kind(getattr(args, "product_kind", None) or "auto",
+                          args.task)
+    destination = Path(args.out).resolve() if args.out else (
+        root / ".ledger" / "briefs" / f"brief-{int(time.time())}.json")
+    brief = write_brief(args.task, kind, backend, destination)
+    if brief is None:
+        return _fail("the model did not produce any checkable requirements")
+    print(ui.bold(f"questions it asked itself ({kind or 'unclassified'})"))
+    for number, question in enumerate(brief.questions, 1):
+        print(f"  {number}. {ui.console_safe(question)}")
+    print()
+    print(ui.bold(f"what it decided the build must be  ({brief.digest()})"))
+    for requirement in brief.requirements:
+        print(f"  {ui.bold(requirement.id)}  {ui.console_safe(requirement.text)}")
+        if requirement.check:
+            print(ui.dim("    how to tell: "
+                         + ui.console_safe(requirement.check)))
+    print()
+    print(ui.dim(str(destination)))
+    return 0
+
+
+def cmd_research_mode(args) -> int:
+    """Generate a domain-specific provisional result and journal its evidence."""
+    from .domain_workers import propose
+    from .lab_contracts import EvidenceStore, ProblemSpec
+    root = Path(args.repo).resolve()
+    backend = _backend(args, _config(root))
+    if backend is None:
+        return _fail("research mode requires a model backend")
+    problem = ProblemSpec(
+        problem_id=args.id or f"research-{int(time.time())}",
+        domain=args.domain, input_artifacts=tuple(args.input or ()),
+        assumptions=tuple(args.assumption or ()),
+        constraints=tuple(args.constraint or ()),
+        required_output=args.task, task_budget=args.budget,
+        evaluation_contract=args.contract)
+    store = EvidenceStore(root / ".ledger" / "research" / "evidence.jsonl")
+    try:
+        store.append("problem", problem)
+        candidate = propose(problem, backend, store)
+    except (OSError, ValueError, RuntimeError) as exc:
+        return _fail(str(exc))
+    print(json.dumps(dataclasses.asdict(candidate), indent=2,
+                     ensure_ascii=True))
+    print("Evidence: " + str(store.path))
+    return 0
+
+
+def _resolved_kind(kind: str, task: str) -> str:
+    from .product import detect_kind
+    if kind == "auto":
+        return detect_kind(task or "")
+    return "" if kind == "none" else kind
+
+
+def cmd_iterative_mode(args) -> int:
+    """Repeat verified episodes in one worktree, preserving every attempt."""
+    from .executor import reviewed_already
+    from .modes import Attempt, command_acceptor, run_until
+    from .product import PROBED_KINDS
+    root = Path(args.repo).resolve()
+    name = args.name or f"{args.cmd}-{int(time.time())}"
+    journal = root / ".ledger" / "episodes" / name / "episode.jsonl"
+    worktree = journal.parent / "worktree"
+    prior_segments = list(journal.parent.glob("episode*.jsonl"))
+    iteration_offset = len(prior_segments)
+    verifier = (command_acceptor(args.accept, root)
+                if args.cmd == "goal" else None)
+
+    def episode(instruction: str, number: int) -> Attempt:
+        slot = f"iteration{iteration_offset + number}"
+        previous_journal = None
+        if number == 1 and prior_segments:
+            previous_journal = max(prior_segments,
+                                   key=lambda p: p.stat().st_mtime_ns)
+            instruction += ("\n\nResume from the previous episode: "
+                            + str(previous_journal))
+        elif number > 1:
+            completed_segments = list(journal.parent.glob("episode*.jsonl"))
+            if completed_segments:
+                previous_journal = max(
+                    completed_segments, key=lambda p: p.stat().st_mtime_ns)
+        if previous_journal is not None:
+            evidence = _recent_failure_context(previous_journal)
+            if evidence:
+                instruction += ("\n\nMost recent failure evidence (fix the "
+                                "specific cause before broad rewrites):\n"
+                                + evidence)
+        # The product is inferred, never assumed: a loop that told every
+        # build it was "a library" handed a chess game the library
+        # checklist and shipped it with a test API and no way to click a
+        # piece. Kind comes from the task unless stated; the usability
+        # review runs once per episode (its findings are journaled, and
+        # later segments read them back); game/web builds are probed and
+        # photographed on every change.
+        kind = getattr(args, "product_kind", None) or "auto"
+        run_args = ["run", instruction, "--repo", str(root), "--name", name,
+                    "--kind", kind, "--no-launch",
+                    "--slots", slot, "--require-patch-slot", slot]
+        if number > 1 or prior_segments:
+            run_args.append("--resume")
+        if reviewed_already(journal.parent):
+            run_args.append("--no-product-review")
+        if getattr(args, "design_review", True) and _resolved_kind(
+                kind, args.task) in PROBED_KINDS:
+            run_args.append("--design-review")
+        if args.backend:
+            run_args += ["--backend", args.backend]
+        if args.model:
+            run_args += ["--model", args.model]
+        if args.base_url:
+            run_args += ["--base-url", args.base_url]
+        if args.test:
+            run_args += ["--test", args.test]
+        if args.context:
+            run_args += ["--context", args.context]
+        if args.yes:
+            run_args.append("--yes")
+        if args.no_research:
+            run_args.append("--no-research")
+        if args.author_timeout:
+            run_args += ["--author-timeout", str(args.author_timeout)]
+        parsed = build_parser().parse_args(run_args)
+        code = parsed.fn(parsed)
+        segments = list(journal.parent.glob("episode*.jsonl"))
+        latest = max(segments, key=lambda p: p.stat().st_mtime_ns) if segments else journal
+        return Attempt(code == 0, worktree, latest,
+                       "episode succeeded" if code == 0 else "episode failed")
+
+    try:
+        attempts = run_until(args.task, episode, mode=args.cmd,
+                             accept=verifier, max_iterations=args.max_iterations,
+                             pause_seconds=args.pause,
+                             backend_down=_iteration_backend_down)
+    except KeyboardInterrupt:
+        print("\nstopped; episode artifacts preserved at " + str(journal.parent))
+        return 130
+    except Exception:
+        from .self_heal import (current_traceback, resource_exhaustion,
+                                try_repair)
+
+        details = current_traceback()
+        if not args.self_heal:
+            print(details, file=sys.stderr)
+            return 1
+        if resource_exhaustion(details):
+            retry = int(os.environ.get("LEDGER_RESOURCE_RETRY", "0"))
+            if retry < 3:
+                delay = 20 * (retry + 1)
+                print(f"Host memory exhausted; retrying Ledger in {delay}s "
+                      f"({retry + 1}/3).", file=sys.stderr)
+                time.sleep(delay)
+                environment = os.environ.copy()
+                environment["LEDGER_RESOURCE_RETRY"] = str(retry + 1)
+                try:
+                    # No cwd override: sys.argv[1:] may carry a --repo given
+                    # relative to the directory Ledger was invoked from, and
+                    # this resumes that same invocation. Pinning cwd to the
+                    # Ledger package's own source root silently redirected a
+                    # relative --repo into gats-coder itself and spent an
+                    # entire retry budget "fixing" the wrong project.
+                    return subprocess.run([sys.executable, "-m", "ledger",
+                                           *sys.argv[1:]],
+                                          env=environment).returncode
+                except OSError as exc:
+                    print(str(exc), file=sys.stderr)
+                    return 1
+            print(details, file=sys.stderr)
+            return 1
+        config_backend = _config(root).get("backend") or {}
+        if not isinstance(config_backend, dict):
+            config_backend = {}
+        backend_options = []
+        backend_id = args.backend or config_backend.get("id")
+        model = args.model or config_backend.get("model")
+        base_url = args.base_url or config_backend.get("base_url")
+        if backend_id:
+            backend_options.extend(["--backend", str(backend_id)])
+        if model:
+            backend_options.extend(["--model", str(model)])
+        if base_url:
+            backend_options.extend(["--base-url", str(base_url)])
+        depth = int(os.environ.get("LEDGER_SELF_HEAL_DEPTH", "0"))
+        print("Ledger framework failure; attempting isolated repair.",
+              file=sys.stderr)
+        if try_repair(details, source=Path(__file__).resolve().parents[1],
+                      episode_dir=journal.parent, depth=depth,
+                      backend_options=backend_options):
+            environment = os.environ.copy()
+            environment["LEDGER_SELF_HEAL_DEPTH"] = str(depth + 1)
+            print("Ledger repair passed tests; resuming episode.",
+                  file=sys.stderr)
+            # Same reasoning as the resource-retry respawn above: resume from
+            # the invocation directory, not the Ledger source root, so a
+            # relative --repo still points at the user's project.
+            return subprocess.run([sys.executable, "-m", "ledger",
+                                   *sys.argv[1:]],
+                                  env=environment).returncode
+        print(details, file=sys.stderr)
+        return 1
+    if args.cmd == "goal":
+        achieved = bool(attempts and attempts[-1].success and
+                        verifier is not None and _last_accepted(journal))
+        return 0 if achieved else 1
+    return 0 if any(attempt.success for attempt in attempts) else 1
+
+
+def _iteration_backend_down(attempt: "Attempt") -> bool:
+    """True when every AuthorPatch call in this iteration failed to reach
+    the model backend at all, as opposed to reaching it and getting a bad
+    patch back. Feeds run_until's cross-iteration backoff (see modes.py) so
+    a crashed local model server is not retried every iteration."""
+    from .llm import is_backend_unavailable
+    try:
+        events = [json.loads(line) for line in
+                  attempt.journal.read_text(encoding="utf-8").splitlines()]
+    except OSError:
+        return False
+    author_execs = [e for e in events if e.get("t") == "EXEC"
+                    and str(e.get("action", "")).startswith("AuthorPatch")]
+    if not author_execs:
+        return False
+    for event in author_execs:
+        claims = [str(c) for c in event.get("claims", [])]
+        if not claims or not all(is_backend_unavailable(c) for c in claims):
+            return False
+    return True
+
+
+def _recent_failure_context(journal: Path) -> str:
+    """Surface bounded, exact failure output to the next loop attempt."""
+    try:
+        lines = journal.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+    failures = []
+    for line in lines[-100:]:
+        try:
+            event = json.loads(line)
+        except ValueError:
+            continue
+        if event.get("t") != "EXEC" or event.get("ok") is not False:
+            continue
+        parts = [str(event.get("action", "failed action")),
+                 *[str(claim) for claim in event.get("claims", [])]]
+        for command in event.get("commands", []):
+            digest = command.get("out")
+            if not isinstance(digest, str):
+                continue
+            blob = journal.parent / "blobs" / (digest + ".txt")
+            try:
+                output = blob.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            parts.append(output[-2500:])
+        failures.append("\n".join(parts))
+    return "\n\n".join(failures[-2:])[-5000:]
+
+
+def _last_accepted(journal: Path) -> bool:
+    sidecar = journal.with_name("acceptance.jsonl")
+    if not sidecar.exists():
+        return False
+    try:
+        return json.loads(sidecar.read_text(encoding="utf-8").splitlines()[-1]
+                          )["exit_code"] == 0
+    except (IndexError, KeyError, ValueError, OSError):
+        return False
+
+
 # -- parser ------------------------------------------------------------------
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1293,6 +1824,82 @@ def build_parser() -> argparse.ArgumentParser:
                        help="override the API base URL (OpenAI-compatible "
                             "providers: Groq, DeepSeek, Kimi, vLLM, ...)")
 
+    p = sub.add_parser("plan", help="write a comprehensive design document")
+    p.add_argument("task")
+    p.add_argument("--repo", default=".")
+    p.add_argument("--out", default=None, help="new Markdown output path")
+    add_backend(p)
+    p.set_defaults(fn=cmd_plan_mode)
+
+    p = sub.add_parser("browse", help="read a public website or documentation page")
+    p.add_argument("url")
+    p.add_argument("--max-chars", type=int, default=3500)
+    p.set_defaults(fn=cmd_browse)
+
+    p = sub.add_parser("research", help="propose a provisional domain result")
+    p.add_argument("task")
+    p.add_argument("--domain", required=True,
+                   choices=["coding", "mathematics", "science", "reasoning"])
+    p.add_argument("--repo", default=".")
+    p.add_argument("--id", default=None, help="stable problem identifier")
+    p.add_argument("--budget", type=int, default=100)
+    p.add_argument("--contract", default="development-v1",
+                   help="external evaluation contract identifier")
+    p.add_argument("--input", action="append", help="input artifact reference")
+    p.add_argument("--assumption", action="append")
+    p.add_argument("--constraint", action="append")
+    add_backend(p)
+    p.set_defaults(fn=cmd_research_mode)
+
+    p = sub.add_parser("brief", help=(
+        "ask what a task actually requires, before building anything"))
+    p.add_argument("task")
+    p.add_argument("--repo", default=".")
+    p.add_argument("--out", default=None, help="where to write the brief")
+    p.add_argument("--kind", dest="product_kind", default=None,
+                   choices=["game", "web", "cli", "service", "library",
+                            "auto", "none"])
+    add_backend(p)
+    p.set_defaults(fn=cmd_brief)
+
+    for mode in ("loop", "goal"):
+        p = sub.add_parser(mode, help=(
+            "refine repeatedly until Ctrl-C" if mode == "loop" else
+            "repeat until an independent acceptance command succeeds"))
+        p.add_argument("task")
+        p.add_argument("--repo", default=".")
+        p.add_argument("--name", default=None, help="persistent episode name")
+        p.add_argument("--test", default=None)
+        p.add_argument("--context", default=None,
+                       help="comma-separated project files shown to the model")
+        p.add_argument("--yes", action="store_true")
+        p.add_argument("--no-research", action="store_true")
+        p.add_argument("--self-heal", action="store_true",
+                       help="repair a Ledger framework crash in an isolated "
+                            "snapshot, verify it, and resume")
+        p.add_argument("--author-timeout", type=int, default=None)
+        p.add_argument("--max-iterations", type=int, default=None,
+                       help="optional bound for this invocation")
+        p.add_argument("--pause", type=float, default=0,
+                       help="seconds between attempts (default: 0)")
+        p.add_argument("--kind", dest="product_kind", default=None,
+                       choices=["game", "web", "cli", "service", "library",
+                                "auto", "none"],
+                       help="what is being built (default: auto-detect from "
+                            "the task). Its usability requirements are "
+                            "inferred, reviewed once, probed on every "
+                            "change, and put in front of the model")
+        p.add_argument("--no-design-review", dest="design_review",
+                       action="store_false", default=True,
+                       help="do not photograph game/web builds for the "
+                            "vision critique")
+        if mode == "goal":
+            p.add_argument("--accept", required=True,
+                           help="trusted verifier command; candidate path is "
+                                "appended as its final argument")
+        add_backend(p)
+        p.set_defaults(fn=cmd_iterative_mode)
+
     p = sub.add_parser("init", help="create .ledger/config.json in a repo")
     p.add_argument("--repo", default=".")
     p.add_argument("--test", default=None, help="test command, e.g. 'pytest -q'")
@@ -1300,6 +1907,10 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(fn=cmd_init)
 
     p = sub.add_parser("run", help="run an agent episode against a repo")
+    p.add_argument("--app-url", dest="app_url", default=None,
+                   help="answer gates in a running `ledger app` "
+                        "window instead of at the terminal "
+                        "(env LEDGER_APP_URL)")
     p.add_argument("task", help="what you want done, in plain English")
     # Only fires when the goal is reached: launching a build already known
     # to be broken buries the escalation under a browser window.
@@ -1316,6 +1927,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--test", default=None, help="test command")
     p.add_argument("--slots", default=None,
                    help="comma-separated patch slots (default: a,b)")
+    p.add_argument("--require-patch-slot", default=None,
+                   help=argparse.SUPPRESS)
     p.add_argument("--context", default=None,
                    help="comma-separated files to show the model "
                         "(default: selected automatically)")
@@ -1409,6 +2022,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     p = sub.add_parser("chat",
                        help="the unified session: converse AND change code")
+    p.add_argument("--app-url", dest="app_url", default=None,
+                   help="answer gates in a running `ledger app` "
+                        "window instead of at the terminal "
+                        "(env LEDGER_APP_URL)")
     p.add_argument("--repo", default=".")
     p.add_argument("--ask", default=None, help="one-shot question, no REPL")
     p.add_argument("--context", default=None,
@@ -1508,6 +2125,51 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("verify-chain", help="verify a journal's hash chain")
     p.add_argument("journal")
     p.set_defaults(fn=cmd_verify_chain)
+
+    p = sub.add_parser("receipt",
+                       help="issue a signed, portable receipt for an episode")
+    p.add_argument("journal", help="an episode directory, or any of its "
+                                   "journal segments")
+    p.add_argument("-o", "--out", help="where to write it "
+                                       "(default: receipt.json beside the "
+                                       "journal)")
+    p.add_argument("--key", default="default",
+                   help="signing key name under ~/.ledger/keys")
+    p.add_argument("--run", action="store_true",
+                   help="attest only the latest run of this one file, not "
+                        "the whole episode")
+    p.add_argument("--stdout", action="store_true",
+                   help="write the receipt JSON to stdout instead of a file")
+    p.set_defaults(fn=cmd_receipt)
+
+    p = sub.add_parser("app",
+                       help="the desktop control surface: watch a run, "
+                            "approve its gates, read its receipt")
+    p.add_argument("--repo", default=".")
+    p.add_argument("--host", default="127.0.0.1")
+    p.add_argument("--port", type=int, default=8129)
+    p.add_argument("--no-open", action="store_true",
+                   help="do not open a browser (the Tauri shell opens its "
+                        "own window)")
+    p.set_defaults(fn=cmd_app)
+
+    p = sub.add_parser("key",
+                       help="show or export the public key receipts are "
+                            "signed with")
+    p.add_argument("--name", default="default")
+    p.add_argument("--export", help="write {alg, key_id, public} to a file")
+    p.set_defaults(fn=cmd_key)
+
+    p = sub.add_parser("verify-receipt",
+                       help="check a receipt's signature, and its journal "
+                            "if you have it")
+    p.add_argument("receipt")
+    p.add_argument("--journal", help="the journal it claims to attest; "
+                                     "without it only the signature is "
+                                     "checked")
+    p.add_argument("--key-id", help="the issuer key you expect, so a valid "
+                                    "signature by a stranger still fails")
+    p.set_defaults(fn=cmd_verify_receipt)
 
     p = sub.add_parser("replay", help="bit-exact planner replay of a journal")
     p.add_argument("journal")

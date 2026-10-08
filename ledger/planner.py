@@ -214,11 +214,20 @@ def run_episode(task: Task, graph: TransitionGraph, wm: LayeredWorldModel,
                 cfg: PlanConfig, env_step: EnvStep,
                 journal: Journal | None = None,
                 header_extra: dict | None = None,
-                strategist: Callable | None = None) -> EpisodeResult:
+                strategist: Callable | None = None,
+                blocked: set | None = None) -> EpisodeResult:
     """Paper Alg. 2 with the verify-after-execute divergence arm (SS6.4).
 
     llm_planning_calls counts L3 invocations made during search -- the
     quantity the paper drives to zero; skill-level calls are separate (M2+).
+
+    `blocked` is a set the ENVIRONMENT fills in to say "this action was not
+    permitted, and nothing ran". It is not a world model update: a human's
+    "no" is a fact about this session's permissions, not about what the
+    action does, and the two must not be confused. Learning a self-loop
+    from a refusal would teach the persistent graph and L2 that the action
+    is useless, which survives into every later episode in the repo and
+    leaves the planner unable to hear the human change their mind.
     """
     if journal is not None:
         journal.append(
@@ -240,11 +249,24 @@ def run_episode(task: Task, graph: TransitionGraph, wm: LayeredWorldModel,
     l3_calls_before = wm.l3.calls
     success = False
 
+    def available(props: Props) -> list:
+        found = useful_actions(props, task.catalog, graph, wm)
+        found = [a for a in found if a.name not in blocked] if blocked else found
+        # A changed candidate has invalidated the prior suite result. In a
+        # coding episode that requires an applied patch, obtain fresh test
+        # evidence before spending another authoring call on the same slot.
+        if (any(p.startswith("patch.applied:") and p in props for p in task.goal)
+                and any(p.startswith("tests.unknown:") for p in props)):
+            suites = [a for a in found if a.name == "RunSuite"]
+            if suites:
+                return suites
+        return found
+
     while len(plan) < cfg.max_steps:
         if task.goal <= s:
             success = True
             break
-        a_app = useful_actions(s, task.catalog, graph, wm)
+        a_app = available(s)
         if not a_app and strategist is not None:
             # Alg. 2 line 6 is where the agent used to give up: nothing it
             # can do reaches the goal. That is the wall between "I was told
@@ -258,7 +280,7 @@ def run_episode(task: Task, graph: TransitionGraph, wm: LayeredWorldModel,
                 wm.catalog = grown
                 wm.l1.catalog = grown
                 value_cache.clear()
-                a_app = useful_actions(s, task.catalog, graph, wm)
+                a_app = available(s)
         if not a_app:
             break  # Alg. 2 line 6: failure (journaled in END)
 
@@ -280,7 +302,12 @@ def run_episode(task: Task, graph: TransitionGraph, wm: LayeredWorldModel,
             journal.append("PLAN", **record)
 
         s_obs = env_step(s, chosen)
-        diverged = state_key(s_obs) != edge.v_key
+        # A refusal is not a divergence: divergence means the world model's
+        # prediction was falsified by executing the action, and here the
+        # action did not execute. Recorded so `status` counts divergences
+        # honestly and so replay can rebuild the same blocked set.
+        refused = bool(blocked) and chosen in blocked
+        diverged = not refused and state_key(s_obs) != edge.v_key
         if journal is not None:
             journal.append(
                 "OBSERVE",
@@ -288,7 +315,15 @@ def run_episode(task: Task, graph: TransitionGraph, wm: LayeredWorldModel,
                 obs_state=state_key(s_obs),
                 obs_props=sorted(s_obs),
                 diverged=diverged,
+                denied=refused,
             )
+        if refused:
+            # Nothing ran, so there is no transition to learn. The action is
+            # out of the running for the rest of the episode (`available`),
+            # which is what SS8.1's "the planner routes around the human's
+            # no" has to mean if the no is not to outlive the session.
+            plan.append(chosen)
+            continue
         action = task.catalog.get(chosen)
         learn_always = action is not None and (
             not action.deterministic or not action.effects_known)

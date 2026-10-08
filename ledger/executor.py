@@ -13,6 +13,7 @@ Journal ordering per step: PLAN (planner) -> GATE -> EXEC [-> INCIDENT]
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -28,9 +29,11 @@ from .graph import TransitionGraph
 from .journal import Journal
 from .planner import PlanConfig, EpisodeResult, Task, run_episode
 from .repo import Worktree, content_fingerprint, git
-from .sensors import (ExpensiveResultCache, SensorBank, design_sensor,
-                      dir_marker_sensor, git_sensor, test_status_sensor)
+from .sensors import (ExpensiveResultCache, SensorBank, brief_sensor,
+                      design_sensor, dir_marker_sensor, git_sensor,
+                      product_sensor, test_status_sensor, test_unknown_sensor)
 from .state import Props
+from .taint import TAINT_RISKS, Provenance
 from .world_model import L3Generative, LayeredWorldModel
 
 
@@ -111,6 +114,74 @@ class BlobStore:
         return sha
 
 
+def resume_product_concerns(episode_dir: Path) -> str:
+    """Rebuild the usability review's findings from the journal.
+
+    The review is asked once per episode; a resumed segment reads what it
+    said rather than paying for it again, and the journal entry is the
+    record of exactly what was inferred.
+    """
+    from .product import concerns_block
+    segments = sorted(episode_dir.glob("episode*.jsonl"),
+                      key=lambda path: path.stat().st_mtime_ns, reverse=True)
+    for segment in segments:
+        try:
+            entries = [json.loads(line) for line in segment.read_text(
+                encoding="utf-8").splitlines() if line.strip()]
+        except (OSError, ValueError):
+            continue
+        for entry in reversed(entries):
+            if entry.get("t") == "PRODUCT_REVIEW":
+                return concerns_block(str(entry.get("kind") or ""),
+                                      entry.get("concerns") or [])
+    return ""
+
+
+def reviewed_already(episode_dir: Path) -> bool:
+    """Has any segment of this episode journaled a usability review?"""
+    for segment in episode_dir.glob("episode*.jsonl"):
+        try:
+            text = segment.read_text(encoding="utf-8")
+        except OSError:
+            continue
+        if '"t": "PRODUCT_REVIEW"' in text or '"t":"PRODUCT_REVIEW"' in text:
+            return True
+    return False
+
+
+def resume_suite_evidence(episode_dir: Path) -> dict:
+    """Restore the latest unaddressed suite failure for a resumed author."""
+    segments = sorted(episode_dir.glob("episode*.jsonl"),
+                      key=lambda path: path.stat().st_mtime_ns, reverse=True)
+    for segment in segments:
+        try:
+            entries = [json.loads(line) for line in segment.read_text(
+                encoding="utf-8").splitlines() if line.strip()]
+        except (OSError, ValueError):
+            continue
+        for entry in reversed(entries):
+            if entry.get("t") != "EXEC":
+                continue
+            action = entry.get("action", "")
+            if action.startswith("ApplyPatch:"):
+                return {}
+            if action != "RunSuite":
+                continue
+            commands = entry.get("commands") or []
+            if not commands or commands[0].get("exit") == 0:
+                return {}
+            sha = commands[0].get("out", "")
+            if not re.fullmatch(r"[0-9a-f]{64}", sha):
+                return {}
+            blob = episode_dir / "blobs" / f"{sha}.txt"
+            try:
+                tail = blob.read_text(encoding="utf-8", errors="replace")[-4000:]
+            except OSError:
+                return {}
+            return {"unit": {"tail": tail, "sha": sha}}
+    return {}
+
+
 @dataclass
 class SkillResult:
     ok: bool
@@ -118,6 +189,12 @@ class SkillResult:
     claims: list = field(default_factory=list)  # freeform, recorded not believed
     commands: list = field(default_factory=list)  # [{cmd, exit, out}]
     artifacts: dict = field(default_factory=dict)  # label -> blob sha
+    # Which model produced this, as "provider:model". Empty for the skills
+    # that call no model at all, which is most of them. Recorded because
+    # "bring your own model" and "here is what happened" are the same
+    # product, and an audit that cannot say which model wrote a line of
+    # shipped code answers half the question.
+    model: str = ""
 
 
 @dataclass
@@ -134,6 +211,16 @@ class ExecContext:
     # the same way and for the same reason: a specific complaint about the
     # lighting is evidence to author against, not decoration.
     design_evidence: str = ""
+    # What the usability review inferred the contract leaves open (fixed
+    # for the episode) and what the deterministic probe last found missing
+    # (refreshed per change). Evidence, not decoration: both name a specific
+    # thing to build, checked by something other than the author.
+    product_concerns: str = ""
+    product_evidence: str = ""
+    # The frozen brief -- what this build was decided to be before any code
+    # existed -- and whatever the review last judged still missing from it.
+    brief_requirements: str = ""
+    brief_evidence: str = ""
     # Optional (text) -> None sink for live phase reporting. Skills call it
     # so a UI can say what is happening *now* instead of "working...".
     progress: object = None
@@ -150,9 +237,10 @@ class Skill(Protocol):
     def run(self, ctx: ExecContext) -> SkillResult: ...
 
 
-def _run_cmd(ctx: ExecContext, cmd: list[str]) -> tuple[subprocess.CompletedProcess, dict]:
+def _run_cmd(ctx: ExecContext, cmd: list[str],
+             env: dict | None = None) -> tuple[subprocess.CompletedProcess, dict]:
     proc = subprocess.run(cmd, cwd=ctx.worktree, capture_output=True,
-                          text=True, timeout=600)
+                          text=True, timeout=600, env=env)
     out_sha = ctx.blobs.put(proc.stdout + "\n--- stderr ---\n" + proc.stderr)
     return proc, {"cmd": " ".join(cmd), "exit": proc.returncode, "out": out_sha}
 
@@ -171,7 +259,15 @@ class RunSuiteSkill:
 
     def run(self, ctx: ExecContext) -> SkillResult:
         ctx.say(f"running the {self.suite} suite")
-        proc, rec = _run_cmd(ctx, self.cmd)
+        # Timestamp-based .pyc validation can reuse old bytecode if a patch
+        # changes a Python file to the same size within one clock second.
+        # The content-keyed cache lives outside the candidate worktree and
+        # gives every changed tree fresh imports without deleting user files.
+        fingerprint = content_fingerprint(ctx.worktree)
+        env = os.environ.copy()
+        env["PYTHONPYCACHEPREFIX"] = str(
+            ctx.queue_dir / "pycache" / fingerprint)
+        proc, rec = _run_cmd(ctx, self.cmd, env=env)
         if proc.returncode == 0:
             props = {f"tests.pass:{self.suite}"}
             claims = [f"{self.suite} suite passes"]
@@ -224,8 +320,11 @@ class ReviewDesignSkill:
         ctx.say("photographing the build and reviewing how it looks")
         fp = content_fingerprint(ctx.worktree)
 
+        from .vision import ensure_built, page_root
+        ensure_built(ctx.worktree)
         shot = Path(tempfile.mkdtemp(prefix="ledger-vision-")) / "now.png"
-        if not screenshot(ctx.worktree, shot, page=self.page):
+        root = page_root(ctx.worktree) or ctx.worktree
+        if not screenshot(root, shot, page=self.page):
             # Not assessed is not a failure: a machine with no vision model
             # or no page must not be unable to build anything.
             self.cache.put(fp, set())
@@ -266,6 +365,141 @@ class ReviewDesignSkill:
             commands=[{"cmd": "vision.compare", "exit": 0 if better else 1,
                        "out": blob}],
             artifacts={"critique": blob})
+
+
+class ProbeProductSkill:
+    """Can a person operate what was built? The part a program can decide.
+
+    Two facts, no model in the loop: does any user input reach the code (a
+    listener for a pointer, key or touch event somewhere in the source),
+    and does the first paint show anything (a screenshot that is not one
+    flat colour). Both were the exact failures of real builds that passed
+    every test: a chess game with a test API and no way to click a piece,
+    a scene whose canvas painted nothing. What the probe finds missing is
+    deposited as evidence for the next authoring attempt, the way a
+    failing suite's output is; `product.usable` is claimed only when
+    nothing is missing. A machine that cannot photograph reports the paint
+    as not assessed rather than failed.
+    """
+
+    def __init__(self, cache, kind: str, page: str = "index.html"):
+        self.cache = cache
+        self.kind = kind
+        self.page = page
+
+    def run(self, ctx: ExecContext) -> SkillResult:
+        import tempfile
+
+        from .product import input_wiring
+        from .vision import (ensure_built, looks_blank, page_root, png_stats,
+                             screenshot)
+        ctx.say("probing whether a person can use the build")
+        fp = content_fingerprint(ctx.worktree)
+        findings: list[str] = []
+        facts: list[str] = []
+
+        wired = input_wiring(ctx.worktree)
+        if wired:
+            facts.append("user input reaches the code: " + ", ".join(wired[:6]))
+        else:
+            findings.append(
+                "no handler for any pointer, key or touch event exists "
+                "anywhere in the source, so nothing a person does can reach "
+                "the program. Wire the inputs the player is told about "
+                "(clicking/dragging on the canvas, keyboard) so they change "
+                "the state and the screen.")
+
+        ensure_built(ctx.worktree)
+        root = page_root(ctx.worktree)
+        shot = Path(tempfile.mkdtemp(prefix="ledger-probe-")) / "first.png"
+        if root is not None and screenshot(root, shot, page=self.page,
+                                           size="640,400"):
+            stats = png_stats(shot)
+            if stats is None:
+                facts.append("first paint: not assessed (unreadable image)")
+            elif looks_blank(stats):
+                findings.append(
+                    f"the first paint is blank ({stats['distinct']} colours, "
+                    f"contrast {stats['stddev']:.1f}): the screen shows "
+                    "nothing when the page opens. Render the scene on load, "
+                    "and check the console for an error that stops it.")
+            else:
+                facts.append(f"first paint shows content ({stats['distinct']} "
+                             f"colours, contrast {stats['stddev']:.1f})")
+        else:
+            facts.append("first paint: not assessed (no page to photograph)")
+
+        ok = not findings
+        props = {"product.usable"} if ok else set()
+        self.cache.put(fp, props)
+        lines = ["USABILITY PROBE OF THE BUILD (checked by a program, not a "
+                 "model)"] + [f"- {fact}" for fact in facts]
+        if findings:
+            lines.append("Missing, to be fixed before this counts as usable:")
+            lines += [f"  {i}. {finding}" for i, finding in enumerate(findings, 1)]
+        evidence = "\n".join(lines)
+        ctx.product_evidence = evidence if findings else ""
+        blob = ctx.blobs.put(evidence)
+        return SkillResult(
+            ok=ok, claimed_props=frozenset(props),
+            claims=[("a person can operate the build" if ok else
+                     f"{len(findings)} thing(s) a person needs are missing")],
+            commands=[{"cmd": "product.probe", "exit": 0 if ok else 1,
+                       "out": blob}],
+            artifacts={"probe": blob})
+
+
+class ReviewBriefSkill:
+    """Judge the build against the requirements it froze before starting.
+
+    The brief lives in the episode directory, never the worktree: the
+    candidate writes the code, and cannot touch the statement of what the
+    code was supposed to be. Every attempt is judged against the same text.
+
+    Its verdict gates `brief.met`; its findings are worth more. "no result
+    is shown when the game ends" is something the next attempt can build,
+    which a score never is.
+    """
+
+    def __init__(self, cache, backend, brief_path: "Path"):
+        self.cache = cache
+        self.backend = backend
+        self.brief_path = Path(brief_path)
+
+    def run(self, ctx: ExecContext) -> SkillResult:
+        from .brief import check, load_brief, unmet_block
+        brief = load_brief(self.brief_path)
+        fp = content_fingerprint(ctx.worktree)
+        if brief is None:
+            self.cache.put(fp, set())
+            return SkillResult(ok=False, claimed_props=frozenset(),
+                               claims=["no brief to judge against"],
+                               commands=[])
+        ctx.say("checking the build against what it was meant to be")
+        verdicts = check(brief, ctx.worktree, self.backend)
+        if verdicts is None:
+            # Not assessed is not a verdict: a machine whose model is down
+            # must not thereby declare a build finished, or unfinished.
+            self.cache.put(fp, set())
+            ctx.brief_evidence = ""
+            return SkillResult(ok=False, claimed_props=frozenset(),
+                               claims=["the brief review could not be run"],
+                               commands=[])
+        unmet = [v for v in verdicts if not v.met]
+        evidence = unmet_block(verdicts)
+        ctx.brief_evidence = evidence
+        blob = ctx.blobs.put(evidence or "every requirement met")
+        props = set() if unmet else {"brief.met"}
+        self.cache.put(fp, props)
+        return SkillResult(
+            ok=not unmet, claimed_props=frozenset(props),
+            claims=[f"brief {brief.digest()}: "
+                    + (f"{len(unmet)} of {len(verdicts)} requirement(s) not met"
+                       if unmet else
+                       f"all {len(verdicts)} requirements met")],
+            commands=[{"cmd": "brief.review", "exit": 1 if unmet else 0,
+                       "out": blob}],
+            artifacts={"brief_review": blob})
 
 
 class ProposedSkill:
@@ -445,17 +679,25 @@ class PolicyGate:
     over the profile, over the approver, and over --yes; allow pre-approves
     a family the profile would otherwise stop on. Rules are policy, prompts
     are consent; policy outranks consent.
+
+    `taint_probe` returns the untrusted sources currently in scope (see
+    taint.py). While any are, the profile stops applying and every non-read
+    action is escalated to the approver. An explicit `allow` rule still
+    wins: that is the operator saying so in advance, which is the one thing
+    a fetched web page cannot do.
     """
 
     def __init__(self, profile: str = "supervised",
                  approver: Gate = tty_approver,
-                 rules: dict | list | None = None):
+                 rules: dict | list | None = None,
+                 taint_probe: Callable[[], list] | None = None):
         if profile not in GATED_RISKS:
             raise ValueError(f"unknown profile {profile!r} "
                              f"(choose from {sorted(GATED_RISKS)})")
         self.profile = profile
         self.approver = approver
         self.rules = self._normalize(rules)
+        self.taint_probe = taint_probe
         self.memo: dict[str, bool] = {}
         # Why the last decision came out the way it did; journaled by the
         # executor next to the GATE entry (audit trail, Kimi-rule style).
@@ -499,11 +741,21 @@ class PolicyGate:
         if decision == "allow":
             self.last_reason = reason
             return True
-        if decision != "ask" and risk not in GATED_RISKS[self.profile]:
+        sources = self.taint_probe() if self.taint_probe is not None else []
+        tainted = bool(sources) and risk in TAINT_RISKS
+        if not tainted and decision != "ask" \
+                and risk not in GATED_RISKS[self.profile]:
             return True
-        if family not in self.memo:
-            self.memo[family] = self.approver(action_name, risk)
-        return self.memo[family]
+        if tainted:
+            self.last_reason = ("untrusted content in scope: "
+                                + ", ".join(str(s) for s in sources[:3]))
+        # Keyed by taint state: a family approved before the episode read
+        # anything external must be asked again afterwards, or the memo
+        # becomes the way an injected page inherits a human's "yes".
+        key = f"{family}\x00tainted" if tainted else family
+        if key not in self.memo:
+            self.memo[key] = self.approver(action_name, risk)
+        return self.memo[key]
 
 
 class RepoExecutor:
@@ -511,18 +763,24 @@ class RepoExecutor:
                  skills: dict[str, Skill], sensors: SensorBank,
                  journal: Journal | None = None,
                  gate: Gate = attended_gate, profile: str = "attended",
-                 hooks: list[dict] | None = None):
+                 hooks: list[dict] | None = None,
+                 provenance: Provenance | None = None):
         self.ctx = ctx
         self.catalog = catalog
         self.skills = skills
         self.sensors = sensors
         self.journal = journal
         self.gate = gate
+        self.provenance = provenance
         self.profile = profile
         self.hooks = list(hooks or [])
         self.incidents = 0
         self.denials = 0
         self.steps = 0
+        # Actions this session is not permitted to run. Read by the planner
+        # (see run_episode) so a refusal prunes the arm without being
+        # mistaken for something the world model learned.
+        self.blocked: set[str] = set()
 
     # -- hooks (Claude Code / Kimi hook engine analog) -----------------------
     # Deterministic commands around actions, journaled like everything else.
@@ -586,31 +844,42 @@ class RepoExecutor:
             approved = self.gate(action_name, action.risk)
             reason = getattr(self.gate, "last_reason", None)
             if self.journal is not None:
-                self.journal.append("GATE", action=action_name,
-                                    risk=action.risk, approved=approved,
-                                    profile=self.profile, reason=reason)
+                self.journal.append(
+                    "GATE", action=action_name, risk=action.risk,
+                    approved=approved, profile=self.profile, reason=reason,
+                    tainted=(self.provenance.sources
+                             if self.provenance is not None else []))
             if not approved:
                 # SS8.1: a denial is an observation, not a crash. The state
-                # does not change, the divergence arm learns the self-loop,
-                # and useful_actions() prunes the arm from future search --
-                # the planner routes around the human's "no".
+                # does not change and the planner routes around the human's
+                # "no" -- but it routes around it because the action is
+                # blocked for the session, NOT because the world model
+                # learned a self-loop. Learning it would persist the refusal
+                # into graph.sqlite and the repo's shared l2.sqlite, where
+                # it would outlive the session that gave it.
                 self.denials += 1
+                self.blocked.add(action_name)
                 return self.sensors.probe(self.ctx.worktree)
 
         if self._fire_hooks("pre_action", action_name, action.risk):
             self.denials += 1
+            self.blocked.add(action_name)
             return self.sensors.probe(self.ctx.worktree)
 
         self.ctx.say(f"step {self.steps}: {action_name}")
         self.steps += 1
         result = self.skills[action_name].run(self.ctx)
         if self.journal is not None:
+            # `model` only when there was one: adding an empty field to
+            # every EXEC would churn journals for the majority of actions
+            # that never call a model.
             self.journal.append(
                 "EXEC", action=action_name, ok=result.ok,
                 claims=list(result.claims),
                 claimed_props=sorted(result.claimed_props),
                 commands=result.commands, artifacts=result.artifacts,
                 risk=action.risk,
+                **({"model": result.model} if result.model else {}),
             )
         self._fire_hooks("post_action", action_name, action.risk)
 
@@ -634,7 +903,7 @@ def build_coding_catalog(patch_ids: list[str], suite: str = "unit") -> Catalog:
     fails = tuple(p.replace("unit", suite) for p in TEST_FAIL_PROPS)
     pass_prop = f"tests.pass:{suite}"
     actions = [
-        Action("RunSuite", prec=frozenset(),
+        Action("RunSuite", prec=frozenset({f"tests.unknown:{suite}"}),
                add=frozenset({pass_prop}), delete=frozenset(fails),
                risk="exec", deterministic=False),
         Action("Commit",
@@ -646,7 +915,7 @@ def build_coding_catalog(patch_ids: list[str], suite: str = "unit") -> Catalog:
         actions.append(Action(
             f"ApplyPatch:{pid}",
             prec=frozenset({f"patch.queued:{pid}"}),
-            add=frozenset({f"patch.applied:{pid}"}),
+            add=frozenset({f"patch.applied:{pid}", f"tests.unknown:{suite}"}),
             delete=frozenset({f"patch.queued:{pid}", "repo.clean",
                               pass_prop, *fails}),
             risk="write"))
@@ -670,8 +939,23 @@ def ui_warn_block(kind: str, concerns) -> str:
     return "\n".join(lines)
 
 
+def ui_brief_block(brief) -> str:
+    """What the episode decided to build, rendered for the person who can
+    still say "no, not that" while it is cheap."""
+    from . import ui
+    lines = [ui.bold(f"  what this build must be  ({brief.digest()})")]
+    for requirement in brief.requirements:
+        # ui.console_safe: model text can hold anything a cp1252 console
+        # cannot encode, which would kill the command.
+        lines.append(f"    {ui.bold(requirement.id)}  "
+                     + ui.console_safe(requirement.text))
+    lines.append(ui.dim("    (frozen before the first patch; the suite still "
+                        "decides correctness)"))
+    return "\n".join(lines)
+
+
 def make_strategist(*, backend, task_text, sensors, skills, gate, journal,
-                    say, research_enabled=True, rounds=2):
+                    say, research_enabled=True, rounds=2, provenance=None):
     """The callback the planner reaches for when it has run out of moves.
 
     Returns a function (state, unmet, catalog) -> grown catalog or None.
@@ -703,6 +987,11 @@ def make_strategist(*, backend, task_text, sensors, skills, gate, journal,
             query = research_query(task_text, unmet)
             say(f"reading up on: {query}")
             text, sources = research_mod.brief(query)
+            # The moment the trust boundary is crossed. Recorded before the
+            # text is used for anything, so no action can be gated against a
+            # stale view of what is in scope.
+            if provenance is not None:
+                provenance.note(*sources)
             if journal is not None:
                 journal.append("RESEARCH", query=query, sources=sources,
                                chars=len(text))
@@ -786,6 +1075,8 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                      hooks: list[dict] | None = None,
                      progress=None,
                      seed_graph_path: str | None = None,
+                     mcp_config: dict | None = None,
+                     required_patch_slot: str | None = None,
                      ) -> tuple[EpisodeResult, RepoExecutor, Path]:
     """End-to-end journaled episode on a real repo (M2/M3).
 
@@ -833,12 +1124,59 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     if extra_actions:
         catalog = Catalog(list(catalog) + extra_actions)
 
+    # Contracted MCP tools join the catalogue as ordinary actions, so the
+    # planner reaches them the same way it reaches Commit, the gate stops on
+    # their declared risk, and the sensors check what they claim to have done.
+    # Deferred until after the catalogue exists because the effects have to be
+    # validated against this episode's sensor vocabulary, and reported rather
+    # than dropped: an operator who contracted a tool needs to hear why it is
+    # not there.
+
     def say(text: str) -> None:
         if progress is not None:
             try:
                 progress(text)
             except Exception:
                 pass
+
+    # Resolved here rather than beside the journal because the MCP skills take
+    # it at construction: a tool result has to taint the session the moment it
+    # arrives, not one action later. It has to be resolved ONCE and early --
+    # building skills against a fresh Provenance and then adopting the gate's
+    # is the two-objects bug that already bit this file twice, where the gate
+    # escalates correctly while the receipt reports a clean sheet.
+    #
+    # The gate is built by the caller (CLI, tests) and usually has no probe
+    # yet; only the runner knows which episode's provenance it should read. A
+    # gate that brought its own keeps it, and everything else adopts that one.
+    probe = getattr(gate, "taint_probe", None)
+    if isinstance(probe, Provenance):
+        provenance = probe
+    else:
+        provenance = Provenance()
+        if isinstance(gate, PolicyGate) and probe is None:
+            gate.taint_probe = provenance
+    mcp_servers, mcp_skills = {}, {}
+    if mcp_config:
+        from .goal import catalog_vocabulary
+        from .mcp import contracted_actions, load_servers
+
+        def warn(message: str) -> None:
+            say(message)
+            print(f"warning: {message}", file=sys.stderr)
+
+        mcp_servers = load_servers(mcp_config, on_error=warn)
+        if mcp_servers:
+            # The same namespace the strategist validates proposals against:
+            # every proposition the action contracts already mention, which is
+            # exactly the set the sensors are known to produce.
+            vocabulary = set(catalog_vocabulary(catalog))
+            mcp_actions, mcp_skills = contracted_actions(
+                mcp_servers, mcp_config, vocabulary, provenance=provenance,
+                on_error=warn)
+            if mcp_actions:
+                catalog = Catalog(list(catalog) + mcp_actions)
+                say(f"{len(mcp_actions)} contracted MCP action(s) available")
 
     goal_extra: dict = {}
 
@@ -864,6 +1202,7 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     sensor_list = [
         git_sensor(),
         test_status_sensor(test_cache, content_fingerprint),
+        test_unknown_sensor(test_cache, content_fingerprint),
         dir_marker_sensor("queue", "patch.queued:", queue_dir),
         dir_marker_sensor("applied", "patch.applied:", applied_dir),
     ]
@@ -880,12 +1219,43 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         sensor_list.append(pr_sensor(branch))
     if design_review:
         sensor_list.append(design_sensor(design_cache, content_fingerprint))
+    # Usability is probed, not assumed, for the kinds a program can check.
+    from .product import PROBED_KINDS
+    probe_product = bool(slots) and product_kind in PROBED_KINDS
+    product_cache = ExpensiveResultCache()
+    if probe_product:
+        sensor_list.append(product_sensor(product_cache, content_fingerprint))
+    # Before anything is built, work out what it has to be (design SS17).
+    # A one-sentence request reaches the author as one sentence unless
+    # something interrogates it first, and the author fills the silence
+    # with the smallest thing that passes.
+    wants_brief = bool(slots) and backend is not None and bool(task_text)
+    brief_cache = ExpensiveResultCache()
+    if wants_brief:
+        sensor_list.append(brief_sensor(brief_cache, content_fingerprint))
     sensors = SensorBank(sensor_list)
     ctx = ExecContext(worktree=worktree.path,
                       blobs=BlobStore(episode_dir / "blobs"),
                       test_cache=test_cache,
                       queue_dir=queue_dir, applied_dir=applied_dir,
                       progress=progress)
+    if resume:
+        ctx.suite_evidence.update(resume_suite_evidence(episode_dir))
+        ctx.product_concerns = resume_product_concerns(episode_dir)
+    brief = None
+    if wants_brief:
+        from .brief import load_brief, write_brief
+        brief_path = episode_dir / "brief.json"
+        # Written once and then held still: a resumed attempt is judged
+        # against what the first one was judged against, and the file lives
+        # outside the worktree where the candidate cannot reach it.
+        brief = load_brief(brief_path)
+        if brief is None:
+            say("working out what this actually needs to be")
+            brief = write_brief(task_text or "", product_kind, backend,
+                                brief_path)
+        if brief is not None:
+            ctx.brief_requirements = brief.as_prompt()
     skills: dict[str, Skill] = {
         "RunSuite": RunSuiteSkill(test_cmd),
         "Commit": CommitSkill("ledger: apply queued fix"),
@@ -915,6 +1285,17 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
             design_cache, threshold=design_threshold, model=design_model,
             baseline=episode_dir / "design-baseline.png")
         catalog = Catalog(list(catalog) + [review_design_action()])
+    if probe_product:
+        from .skills_llm import probe_product_action
+        skills["ProbeProduct"] = ProbeProductSkill(product_cache, product_kind)
+        catalog = Catalog(list(catalog) + [probe_product_action()])
+    if brief is not None:
+        from .skills_llm import review_brief_action
+        skills["ReviewBrief"] = ReviewBriefSkill(brief_cache, backend,
+                                                 episode_dir / "brief.json")
+        catalog = Catalog(list(catalog) + [review_brief_action()])
+    skills.update(mcp_skills)
+    # Overrides last, so a test can still stub a contracted tool.
     skills.update(skill_overrides or {})
 
     l3 = None
@@ -935,9 +1316,40 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
     with Journal(str(journal_path)) as journal:
         executor = RepoExecutor(ctx, catalog, skills, sensors,
                                 journal=journal, gate=gate, profile=profile,
-                                hooks=hooks)
+                                hooks=hooks, provenance=provenance)
         initial = sensors.probe(worktree.path)
-        if task_text is not None:
+        if brief is not None:
+            say(f"{len(brief.requirements)} requirement(s) decided up front")
+            print(ui_brief_block(brief), file=sys.stderr)
+        if required_patch_slot is not None:
+            if task_text is None or required_patch_slot not in (slots or []):
+                raise ValueError("required patch slot needs task text and an authoring slot")
+            # Iterative work needs fresh progress. A green, clean tree at the
+            # start of a subsequent run is not a completed refinement.
+            wanted = {"tests.pass:unit", "repo.clean",
+                      f"patch.applied:{required_patch_slot}"}
+            rationale = "new patch, passing suite, clean commit"
+            # A green suite is not a usable product. For the kinds a program
+            # can check, the contract also requires the probe's verdict; and
+            # once a first photograph exists, that the build looks better
+            # than it did (the judge cannot rank until it has a pair).
+            if probe_product:
+                wanted.add("product.usable")
+                rationale += ", a person can operate it"
+            # The brief can only ever raise this bar: it is conjoined with
+            # the operator's suite, never substituted for it, and it was
+            # frozen before the first patch.
+            if brief is not None:
+                wanted.add("brief.met")
+                rationale += ", meets the brief frozen before the work"
+            if design_review and (episode_dir / "design-baseline.png").is_file():
+                wanted.add("design.ok")
+                rationale += ", looks better than the starting build"
+            goal = frozenset(wanted)
+            goal_extra = {"task_text": task_text,
+                          "goal_rationale": rationale,
+                          "goal_backend": "fixed-iterative-contract"}
+        elif task_text is not None:
             if backend is None:
                 raise ValueError("task_text requires an LLM backend")
             say("compiling the goal contract")
@@ -999,6 +1411,10 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
                 say(f"{len(concerns)} thing(s) the contract does not "
                     "guarantee")
                 print(ui_warn_block(product_kind, concerns), file=sys.stderr)
+                # Advice nobody reads is not advice: the findings go in front
+                # of the model that writes the code, as evidence to close.
+                from .product import concerns_block
+                ctx.product_concerns = concerns_block(product_kind, concerns)
             if journal is not None:
                 journal.append(
                     "PRODUCT_REVIEW", kind=product_kind,
@@ -1011,12 +1427,19 @@ def run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
             strategist = make_strategist(
                 backend=backend, task_text=task_text or "", sensors=sensors,
                 skills=skills, gate=gate, journal=journal, say=say,
-                research_enabled=research)
+                research_enabled=research, provenance=provenance)
         result = run_episode(
             task, graph, wm, cfg, executor.env_step, journal=journal,
-            strategist=strategist,
+            strategist=strategist, blocked=executor.blocked,
             header_extra={"sensor_set_hash": sensors.set_hash(),
                           "strategist": bool(strategist),
+                          "inherited_taint": provenance.sources,
+                          # The bar this run was held to, inside the
+                          # hash-chained header alongside the instrument
+                          # that measured it: every segment states it, and
+                          # it cannot be edited after the fact.
+                          "brief": (brief.to_dict() if brief is not None
+                                    else None),
                           "profile": executor.profile,
                           "branch": worktree.branch,
                           "segment": segment, "resumed": bool(resume),

@@ -45,7 +45,19 @@ Respond with ONLY this JSON:
 {{"intent": "change" or "chat",
  "task": "<one-line imperative restatement if change, else empty>"}}"""
 
-MAX_TURNS_IN_PROMPT = 12
+# The transcript is fed whole. Only when it outgrows this many characters
+# (about a quarter of a small local model's window, leaving room for the
+# repository context and the answer) are the OLDEST turns folded into a
+# summary -- and the fold is journaled, so what the model was told about
+# its own past is as auditable as anything else it was told.
+DEFAULT_BUDGET_CHARS = 32_000
+
+SUMMARY_PROMPT = """Summarize the earlier part of this session for your own \
+later use, in at most 250 words. Keep every file path, command, episode \
+name, branch name and result exactly as written. Record decisions and what \
+the user asked for. Do not add anything that is not in the text.
+
+{earlier}"""
 
 
 @dataclass
@@ -74,10 +86,18 @@ class Conversation:
     turns: list[Turn] = field(default_factory=list)
     context: str = ""
     journal: Journal | None = None
+    # Older turns folded into prose once the transcript outgrew its budget.
+    summary: str = ""
+    budget_chars: int = DEFAULT_BUDGET_CHARS
     # MCP surface: qualified "server:tool" -> description, and the gated
     # executor closure (qualified, arguments) -> result text.
     tools: dict = field(default_factory=dict)
     tool_call: object = None
+    # Shared with the session's gate (see taint.py). A tool result is
+    # content from outside the trust boundary, and the conversation is
+    # where it enters -- so this is where it has to be recorded, even
+    # though what it constrains is what the planner is later allowed to do.
+    provenance: object = None
 
     def add_repo_context(self, root: Path, files: list[str] | None = None) -> None:
         parts = []
@@ -98,15 +118,54 @@ class Conversation:
             listing = "\n".join(f"- {name}: {desc}"
                                 for name, desc in sorted(self.tools.items()))
             blocks.append(TOOLS_PROTOCOL.format(tools=listing))
-        recent = self.turns[-MAX_TURNS_IN_PROMPT:]
-        if recent:
+        if self.summary:
+            blocks.append("EARLIER IN THIS SESSION (summarized)\n" + self.summary)
+        if self.turns:
             transcript = "\n\n".join(
                 f"{'User' if t.role == 'user' else 'LEDGER'}: {t.text}"
-                for t in recent
+                for t in self.turns
             )
             blocks.append("CONVERSATION SO FAR\n" + transcript)
         blocks.append(f"User: {user_text}\nLEDGER:")
         return "\n\n".join(blocks)
+
+    def _fit(self) -> None:
+        """Fold the oldest turns into the summary once the transcript
+        outgrows its budget. Folds down to half the budget so it does not
+        happen again on the very next turn. Facts the session must not
+        lose -- which episode ran and where its work is -- are carried
+        verbatim alongside whatever the model writes."""
+        total = sum(len(t.text) + 10 for t in self.turns)
+        if total <= self.budget_chars:
+            return
+        cut = 0
+        while cut < len(self.turns) and total > self.budget_chars // 2:
+            total -= len(self.turns[cut].text) + 10
+            cut += 1
+        folded, self.turns = self.turns[:cut], self.turns[cut:]
+        earlier = "\n\n".join(
+            f"{'User' if t.role == 'user' else 'LEDGER'}: {t.text}"
+            for t in folded)
+        if self.summary:
+            earlier = "Previous summary:\n" + self.summary + "\n\n" + earlier
+        try:
+            prose = self.backend.complete(
+                SUMMARY_PROMPT.format(earlier=earlier[-40_000:])).strip()
+        except Exception:
+            prose = ""
+        if not prose:
+            # No model, or a broken one: a bounded digest still beats
+            # forgetting.
+            prose = "\n".join(
+                f"- {'User' if t.role == 'user' else 'LEDGER'}: "
+                f"{t.text[:240]}" for t in folded)
+        facts = [t.text for t in folded
+                 if t.role == "assistant" and t.text.startswith("Episode ")]
+        self.summary = prose + ("\nEpisode results so far:\n"
+                                + "\n".join(facts) if facts else "")
+        if self.journal is not None:
+            self.journal.append("CHAT_SUMMARY", folded=len(folded),
+                                text=self.summary)
 
     @staticmethod
     def _tool_request(reply: str) -> tuple[str, dict] | None:
@@ -132,6 +191,7 @@ class Conversation:
 
         if self.journal is not None:
             self.journal.append("CHAT_USER", text=user_text)
+        self._fit()
         pending = user_text
         reply = ""
         for _ in range(MAX_TOOL_CALLS_PER_TURN + 1):
@@ -146,10 +206,15 @@ class Conversation:
                 self.journal.append("MCP_CALL", tool=name, arguments=args)
             result = self.tool_call(name, args)
             say("thinking about the tool result")
+            # A refusal is our own fixed string and carries nothing from the
+            # server; a TOOL ERROR still does, so it taints like any result.
+            denied = result.startswith("DENIED")
+            if self.provenance is not None and not denied:
+                self.provenance.note(f"mcp:{name}")
             if self.journal is not None:
                 self.journal.append(
                     "MCP_RESULT", tool=name, chars=len(result),
-                    denied=result.startswith("DENIED"))
+                    denied=denied)
             self.turns.append(Turn("assistant",
                                    f"[tool] {name} {json.dumps(args)}"))
             pending = (f"TOOL RESULT {name}:\n{result[:4000]}\n\n"
@@ -185,7 +250,10 @@ class Conversation:
             self.journal.append("EPISODE_RESULT",
                                 success=bool(outcome.get("success")),
                                 plan=list(outcome.get("plan", [])),
-                                escalation=outcome.get("escalation"))
+                                escalation=outcome.get("escalation"),
+                                branch=outcome.get("branch"),
+                                worktree=outcome.get("worktree"),
+                                merged=outcome.get("merged"))
         self.turns.append(Turn("user", user_text))
         self.turns.append(Turn("assistant", summary))
 
@@ -210,7 +278,8 @@ requests run as verified, journaled episodes -- right here."""
 
 
 def _run_change(conv: Conversation, runner, user_text: str, task: str,
-                input_fn, output_fn, confirm: bool, busy) -> None:
+                input_fn, output_fn, confirm: bool, busy,
+                root: Path | None = None) -> None:
     if confirm:
         try:
             resp = input_fn(f"run episode for: {task!r}? [Y/n] ")
@@ -234,6 +303,30 @@ def _run_change(conv: Conversation, runner, user_text: str, task: str,
         return
     summary = outcome.get("summary_plain", "")
     output_fn(outcome.get("summary_styled", summary))
+    # The episode's work is on its own branch in its own worktree. Until it
+    # is brought into the repository this conversation reads, the model's
+    # honest answer to "launch it" is that there is nothing here -- which
+    # is exactly what happened. Fast-forward only, gated, and journaled.
+    merge = outcome.get("merge")
+    if outcome.get("success") and merge is not None:
+        branch, worktree = outcome.get("branch"), outcome.get("worktree")
+        wanted = True
+        if not outcome.get("merge_auto"):
+            try:
+                resp = input_fn(f"bring the result into the repository "
+                                f"(fast-forward to {branch})? [Y/n] ")
+            except (EOFError, KeyboardInterrupt):
+                resp = "n"
+            wanted = resp.strip().lower() not in ("n", "no")
+        merged, detail = merge() if wanted else (False, "declined")
+        outcome["merged"] = merged
+        note = (f"Merged into the repository ({detail})." if merged else
+                f"Not merged ({detail}); the result is on branch {branch} "
+                f"in {worktree}.")
+        output_fn(note)
+        summary = f"{summary} {note}"
+        if merged and root is not None:
+            conv.add_repo_context(root)
     conv.record_episode(user_text, task, outcome, summary)
 
 
@@ -271,6 +364,7 @@ def repl(conv: Conversation, root: Path, *, input_fn=input,
             continue
         if line == "/clear":
             conv.turns.clear()
+            conv.summary = ""
             output_fn("conversation cleared")
             continue
         if line == "/tree":
@@ -311,7 +405,7 @@ def repl(conv: Conversation, root: Path, *, input_fn=input,
                           "(not a git repository)")
                 continue
             _run_change(conv, runner, line, task, input_fn, output_fn,
-                        confirm=False, busy=busy)
+                        confirm=False, busy=busy, root=root)
             continue
         if line.startswith("/"):
             output_fn(f"unknown command {line.split()[0]!r} -- /help for the list")
@@ -321,7 +415,7 @@ def repl(conv: Conversation, root: Path, *, input_fn=input,
                 intent, task = conv.classify(line)
             if intent == "change":
                 _run_change(conv, runner, line, task, input_fn, output_fn,
-                            confirm=True, busy=busy)
+                            confirm=True, busy=busy, root=root)
                 continue
         try:
             with busy("thinking") as progress:
