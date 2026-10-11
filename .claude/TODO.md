@@ -24,12 +24,16 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       algo (suffix automaton / BIT / n-queens), factor (sympy oracle; SD6+
       dropped, sympy itself needs >10 min), delaunay (exact incremental
       reference), ising (Wolff reference + exact 4x4 enumeration).
-- [ ] Run specfun (in progress), stiff, hm, algo, factor, delaunay, ising
-      one at a time with `python run.py <task>`; write each up in
-      FINDINGS.md. Then the one-shot `claude -p` baseline per task. (special functions,
-      Berlekamp-Zassenhaus, stiff Robertson, Delaunay, Hindley-Milner,
-      Project Euler, Ising) when the box has room. Then a one-shot
-      `claude -p` baseline per task for the ablation.
+- [ ] specfun: killed 10-11 00:30 after two 1800 s author timeouts
+      (FINDINGS #3). Rerun with `--author-timeout 3600`. Then stiff, hm,
+      algo, factor, delaunay, ising one at a time with `python run.py <task>`
+      (absolute path), write each up in FINDINGS.md, then the one-shot
+      `claude -p` baseline per task.
+- [ ] Impossible-task set (FINDINGS #4): squeeze (pigeonhole), crc (affine
+      vs linear), primes (1e12 in 1 s). squeeze running 10-11 00:40; then
+      crc, primes. Grade with `python grade.py <task>` and the rubric in
+      FINDINGS #4. Open harness gap: no "infeasible" reply format for the
+      author; decide whether to add one after the three runs.
 - [ ] SAT calibration note: pigeonhole(8) is out of reach for a Python CDCL
       (ref times out at 120 s) while naive DPLL does it in 2 s; keep PHP <= 7.
 

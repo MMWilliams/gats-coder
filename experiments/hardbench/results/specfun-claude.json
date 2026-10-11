@@ -1,0 +1,14 @@
+{
+ "steps": 3,
+ "author_attempts": 2,
+ "escalation": null,
+ "success": false,
+ "plan": [
+  "RunSuite",
+  "AuthorPatch:a",
+  "AuthorPatch:b"
+ ],
+ "task": "specfun",
+ "backend": "claude",
+ "killed": "2026-10-11 00:30 after two 1800 s claude CLI timeouts on AuthorPatch:a and one more in flight on slot b; 96 min wall"
+}
