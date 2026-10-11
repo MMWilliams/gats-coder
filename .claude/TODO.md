@@ -19,7 +19,14 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 - [x] hf: success, 10 min, 1 attempt, 6/6 visible, 7/7 hidden after the
       H4-square oracle was replaced (FINDINGS.md #2). sat: success, 10 min,
       1 attempt, 14/14 visible, 16/16 hidden.
-- [ ] Remaining 7 proposed tasks (special functions,
+- [x] All 10 tasks built and verified against references: rk45, hf, sat,
+      specfun (mpmath oracle), stiff (scipy oracle), hm (own HM checker),
+      algo (suffix automaton / BIT / n-queens), factor (sympy oracle; SD6+
+      dropped, sympy itself needs >10 min), delaunay (exact incremental
+      reference), ising (Wolff reference + exact 4x4 enumeration).
+- [ ] Run specfun (in progress), stiff, hm, algo, factor, delaunay, ising
+      one at a time with `python run.py <task>`; write each up in
+      FINDINGS.md. Then the one-shot `claude -p` baseline per task. (special functions,
       Berlekamp-Zassenhaus, stiff Robertson, Delaunay, Hindley-Milner,
       Project Euler, Ising) when the box has room. Then a one-shot
       `claude -p` baseline per task for the ablation.
