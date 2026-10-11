@@ -25,11 +25,18 @@ def test_h3_cation_equilateral():
     assert abs(rhf(tri, 2)["energy"] - (-1.237548)) < 1e-5
 
 
-def test_h4_square_two_occupied_orbitals():
-    sq = [("H", (0, 0, 0)), ("H", (1.6, 0, 0)), ("H", (0, 1.6, 0)), ("H", (1.6, 1.6, 0))]
-    r = rhf(sq, 4)
-    assert abs(r["energy"] - (-1.658605)) < 1e-5
-    assert abs(np.trace(r["P"] @ r["S"]) - 4.0) < 1e-8
+def test_h4_chain_and_rectangle_two_occupied_orbitals():
+    # Non-degenerate geometries only: the H4 square has a degenerate HOMO, so
+    # RHF has several stationary points and the one reached depends on the
+    # SCF algorithm, which the task does not fix. An oracle must not encode
+    # an algorithm choice.
+    chain = [("H", (0, 0, 1.8 * i)) for i in range(4)]
+    rect = [("H", (0, 0, 0)), ("H", (1.4, 0, 0)), ("H", (0, 2.6, 0)), ("H", (1.4, 2.6, 0))]
+    for atoms, E in ((chain, -2.113429), (rect, -2.129822)):
+        r = rhf(atoms, 4)
+        assert abs(r["energy"] - E) < 1e-5
+        assert abs(np.trace(r["P"] @ r["S"]) - 4.0) < 1e-8
+        assert r["orbital_energies"].shape == (4,)
 
 
 def test_two_electron_integral_symmetry_and_value():

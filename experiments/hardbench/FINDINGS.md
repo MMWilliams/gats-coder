@@ -20,3 +20,21 @@ Open: the planner gives up after two failed attempts per slot even when the
 attempt budget is 10. That is the L2 edge statistics doing their job, but a
 preflight rejection is not evidence about the world; it may deserve its own
 outcome class.
+
+Run 2 (after the fix): success in 10 min, one authoring attempt, 7/7
+visible, 8/8 hidden.
+
+## 2. A hidden oracle that encodes an algorithm choice is not an oracle (hf)
+
+Success in 10 min, one attempt, 6/6 visible, 6/7 hidden. The miss was the H4
+square (4 electrons): model -1.6017 Ha, reference -1.6586 Ha. Not a bug. The
+square has a degenerate HOMO, so RHF has several stationary points; the
+reference's plain fixed-point SCF from the core guess reaches one, the
+model's DIIS reaches another, and the task never fixed the guess or the
+algorithm. On a non-degenerate chain and rectangle the model's orbital
+energies match the reference to four decimals. The hidden test now uses
+those geometries; re-graded 7/7.
+
+Lesson for the bench: calibrate hidden tests against two independent
+implementations, not one. A value only one implementation produced may be a
+property of that implementation.

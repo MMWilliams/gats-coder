@@ -1,0 +1,35 @@
+{
+ "task": "hf",
+ "backend": "claude",
+ "wall_s": 592,
+ "ledger_exit": 0,
+ "steps": 6,
+ "author_attempts": 1,
+ "escalation": null,
+ "success": true,
+ "plan": [
+  "RunSuite",
+  "AuthorPatch:a",
+  "ApplyPatch:a",
+  "RunSuite",
+  "Commit",
+  "ReviewBrief"
+ ],
+ "visible": {
+  "passed": 6,
+  "failed": 0,
+  "summary": "6 passed in 0.16s"
+ },
+ "hidden": {
+  "passed": 7,
+  "failed": 0,
+  "summary": "7 passed (re-graded after the H4-square oracle was replaced, see FINDINGS.md #2)"
+ },
+ "stdout_tail": "onent zeta = 1 the primitive exponents are\\n  0.109818, 0.405771, 2.22766 with contraction coefficients 0.444635,\\n  0.535328, 0.154329; scale the exponents by zeta**2 and normalise each\\n  primitive by (2 alpha / pi)**0.75. Use zeta = 1.24 for H and 2.0925 for He\\n  (Szabo & Ostlund). Energies in hartree.\\n- Integrals over s-type Gaussians (Szabo & Ostlund appendix A): overlap,\\n  kinetic, nuclear attraction via the Boys function F0, and the two-electron\\n  integrals (ij|kl) in chemists' notation. Build them yourself; no scipy, no\\n  quantum chemistry packages.\\n- SCF: symmetric orthogonalisation X = S**-1/2, Fock matrix\\n  F = H_core + G with G_uv = sum_ls P_ls [(uv|ls) - 1/2 (ul|sv)],\\n  P = 2 C_occ C_occ^T, electronic energy E = 1/2 sum P (H_core + F); iterate\\n  to convergence of the energy and density.\\n\\nReturn keys: \\\"energy\\\" (total, electronic + nuclear repulsion), \\\"electronic\\\",\\n\\\"nuclear_repulsion\\\", \\\"orbital_energies\\\" (ascending numpy array), \\\"S\\\", \\\"T\\\",\\n\\\"V\\\", \\\"eri\\\" (4-index array), \\\"P\\\", \\\"iterations\\\".\\n\\nReference points: H2 at R = 1.4 bohr has total energy -1.1167 Ha and\\noccupied orbital energy -0.5782 Ha.\\n\", \"goal\": [\"brief.met\", \"tests.pass:unit\"], \"success\": true, \"plan\": [\"RunSuite\", \"AuthorPatch:a\", \"ApplyPatch:a\", \"RunSuite\", \"Commit\", \"ReviewBrief\"], \"steps\": 6, \"profile\": \"autonomous\", \"incidents\": 0, \"denials\": 0, \"llm_planning_calls\": 0, \"escalation\": null, \"journal\": \"C:\\\\Users\\\\reese\\\\ledger-bench\\\\hf-claude\\\\episode\\\\episode.jsonl\"}\n",
+ "stderr_tail": "ipy and no quantum chemistry package.\n    consistency  The returned matrices are internally consistent: eri has full 8-fold symmetry, P is symmetric, tr(PS) = N, H_core = T + V, X^T S X = I, F C = S C diag(eps), and energy = electronic + nuclear_repulsion.\n    nonconvergence  If max_iter is reached, rhf returns the last iterate with converged False and a RuntimeWarning, not an exception. Normal runs return converged True.\n    diis-stretched  DIIS makes stretched and multi-centre cases converge within the default 200 iterations.\n    extra-keys  The result dict has the required keys plus C, F, H_core, X, converged and history. len(history) == iterations.\n    scalar-types  energy, electronic and nuclear_repulsion are Python floats, iterations is an int and converged is a bool. orbital_energies is an ascending 1-D ndarray.\n    zeta-override  The `zeta` keyword overrides exponents per call and leaves the defaults untouched.\n    input-validation  Invalid input raises ValueError with a message naming the problem: odd n_electrons, n_electrons <= 0, n_electrons > 2 * n_basis, or an unknown symbol.\n    main-demo  `python hf.py` exits 0 and prints the H2 per-iteration table, H2 and HeH+ totals to 6 decimals (-1.116714, -2.860659), their orbital energies, and the H2 scan. Importing the module prints nothing.\n    performance  Each 8-fold-unique contracted ERI quartet is computed once, so 10-atom systems run quickly.\n    (frozen before the first patch; the suite still decides correctness)\n",
+ "hidden_first_grading": {
+  "passed": 6,
+  "failed": 1,
+  "summary": "1 failed, 6 passed in 0.22s"
+ }
+}
