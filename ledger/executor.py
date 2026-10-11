@@ -1552,7 +1552,10 @@ def _run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
             # own. Journal *why* so the human resumes from evidence, not
             # from a shrug.
             stuck = {}
-            if failures.stuck:
+            if failures.infeasible:
+                reason = "infeasible"
+                stuck = {"verdict": failures.infeasible}
+            elif failures.stuck:
                 reason = "stuck"
                 stuck = {"failure": failures.last, "repeat": failures.repeat,
                          "summary": failures.summary}

@@ -554,6 +554,10 @@ def cmd_run(args) -> int:
                 "  raise it: --author-timeout 3600, or set "
                 '"backend": {"author_timeout": 3600} in .ledger/config.json'))
             print()
+        if reason == "infeasible":
+            print(ui.warn("  the author argued the task cannot be done as specified:"))
+            print(ui.dim("  " + (esc.get("verdict") or "")[:600]))
+            print()
         if reason == "budget_exhausted":
             hints.append(
                 f'ledger run "{args.task}" --name {args.name} --resume '

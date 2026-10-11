@@ -27,6 +27,9 @@ NUDGE_AT = 2
 #: ...and before authoring is withdrawn and the episode escalates `stuck`.
 STUCK_AT = 5
 STUCK_PROP = "fail.stuck"
+#: The author replied INFEASIBLE with an argument; authoring is withdrawn and
+#: the episode escalates with that argument instead of spending the budget.
+INFEASIBLE_PROP = "author.infeasible"
 
 _EXC_LINE = re.compile(
     r"^(?:E\s+)?([A-Za-z_][\w.]*(?:Error|Exception|Exit|Failure))\b(?::\s*(.*))?$")
@@ -91,6 +94,8 @@ class FailureTracker:
     repeat: int = 0
     # Diffs applied since this signature first appeared: what did not work.
     attempts: list = field(default_factory=list)
+    # The author's INFEASIBLE argument, verbatim; empty until given.
+    infeasible: str = ""
 
     def observe(self, passed: bool, output: str) -> Signature | None:
         if passed:
@@ -137,17 +142,24 @@ class FailureTracker:
         except (OSError, ValueError):
             return FailureTracker()
         return FailureTracker(**{k: data[k] for k in
-                                 ("last", "phase", "summary", "repeat", "attempts")
+                                 ("last", "phase", "summary", "repeat", "attempts",
+                                  "infeasible")
                                  if k in data})
 
 
 def failure_sensor(tracker: FailureTracker) -> Sensor:
-    """Emits `fail.stuck` once one failure has survived STUCK_AT runs.
-    AuthorPatch forbids it, so a loop that verification cannot break stops
+    """Emits `fail.stuck` once one failure has survived STUCK_AT runs, and
+    `author.infeasible` once the author has argued the task cannot be done.
+    AuthorPatch forbids both, so a loop that verification cannot break stops
     spending budget and escalates instead."""
 
     def probe(root: Path) -> set:
-        return {STUCK_PROP} if tracker.stuck else set()
+        props = set()
+        if tracker.stuck:
+            props.add(STUCK_PROP)
+        if tracker.infeasible:
+            props.add(INFEASIBLE_PROP)
+        return props
 
     return Sensor(name="failure_signature", version="1",
                   cost_tier="instant", probe=probe)

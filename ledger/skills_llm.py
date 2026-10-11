@@ -27,6 +27,7 @@ from pathlib import Path
 
 from .actions import Action, Catalog
 from .executor import SkillResult, TEST_FAIL_PROPS, _run_cmd
+from .failures import INFEASIBLE_PROP
 from .llm import is_backend_unavailable
 
 _DIFF_START = re.compile(r"^(diff --git |--- |\+\+\+ )", re.MULTILINE)
@@ -49,9 +50,10 @@ REPOSITORY FILES
 
 {extra}
 
-Reply in ONE of these two formats and nothing else -- no prose, no
-explanation outside the blocks. Do not modify test files unless the task
-explicitly asks you to.
+Reply in ONE of these three formats and nothing else -- no prose, no
+explanation outside the blocks. The tests are the bar the patch is graded
+against: do not modify or delete an existing test file unless the task
+explicitly asks for test changes (new test files are fine).
 
 FORMAT A -- complete files (use this when creating a file or rewriting most
 of one; it is the easier format to get right):
@@ -72,7 +74,45 @@ headers.
 When a test traceback points to a specific line in an existing file, inspect
 the source excerpt in the prompt and use FORMAT B to correct that line and any
 directly related occurrences. Keep unrelated functions intact.
+
+FORMAT C -- when no patch can satisfy the task as specified (tests that
+contradict each other, a requirement that is provably impossible, a time
+budget no algorithm meets):
+
+INFEASIBLE: <the obstacle and the evidence for it, in plain prose>
+
+Use it only when you have an argument, not because a patch failed. FILE
+blocks for the achievable part may follow the verdict, and are applied.
 """
+
+_INFEASIBLE = re.compile(r"^\s*INFEASIBLE:\s*(.+?)(?=\n+FILE:|\Z)", re.S)
+_TEST_PATH = re.compile(
+    r"(^|/)tests?/|(^|/)(test_[^/]*|[^/]*_test)\.\w+$|(^|/)conftest\.py$")
+_TEST_EDIT_ASKED = re.compile(
+    r"\b(add|write|update|change|modify|extend|edit|adjust|rewrite|create|replace|"
+    r"delete|remove)\w*\s+(?:\w+\s+){0,3}tests?\b", re.I)
+
+
+def diff_paths(diff: str) -> list[str]:
+    """Every path a unified diff touches, deletions included."""
+    paths: list[str] = []
+    for m in re.finditer(r"^(?:diff --git a/(\S+) b/\S+|(?:---|\+\+\+) (?:[ab]/)?(.+))$",
+                         diff, re.M):
+        p = (m.group(1) or m.group(2)).strip()
+        if p != "/dev/null" and p not in paths:
+            paths.append(p)
+    return paths
+
+
+def protected_test_edits(worktree: Path, diff: str, task_text: str) -> list[str]:
+    """Existing test files the diff modifies or deletes, unless the task asks
+    for test changes. New test files pass: adding tests cannot lower the bar.
+    Hardbench crc: two contradictory tests, and the author made the suite
+    green by rewriting one; the journal certified success on a moved bar."""
+    if os.environ.get("LEDGER_ALLOW_TEST_EDITS") or _TEST_EDIT_ASKED.search(task_text):
+        return []
+    return [p for p in diff_paths(diff)
+            if _TEST_PATH.search(p) and (Path(worktree) / p).is_file()]
 
 
 STOPWORDS = frozenset("""
@@ -550,6 +590,13 @@ class AuthorPatchSkill:
                 continue
             backend_down = False
             raw_sha = ctx.blobs.put(response)
+            verdict = _INFEASIBLE.match(response)
+            if verdict:
+                # The argument is the author's claim, recorded as such; the
+                # harness certifies nothing by it except that work stopped.
+                ctx.failures.infeasible = verdict.group(1).strip()
+                claims.append("author judged the task infeasible: "
+                              + ctx.failures.infeasible[:300])
             # Whole files first: it is the format models get right, and the
             # diff we build from them is correct by construction.
             written = extract_files(response)
@@ -602,11 +649,28 @@ class AuthorPatchSkill:
             if diff is None:
                 diff = extract_diff(response)
             if diff is None:
+                if verdict:
+                    commands.append({"cmd": "llm.author_patch", "exit": 2,
+                                     "out": raw_sha})
+                    return SkillResult(ok=False, claims=claims, commands=commands,
+                                       artifacts={"verdict": raw_sha},
+                                       model=getattr(self.backend, "id", ""))
                 failure = ("response contained neither FILE: blocks nor a "
                            "unified diff")
                 claims.append(f"attempt {attempt + 1}: {failure}")
                 commands.append({"cmd": "llm.author_patch", "exit": 1,
                                  "out": raw_sha})
+                continue
+            protected = protected_test_edits(ctx.worktree, diff, self.task_text)
+            if protected:
+                failure = ("patch modifies test files the task did not ask to "
+                           "change: " + ", ".join(protected) + ". The suite is "
+                           "the bar the patch is graded against; leave those "
+                           "files as they are. If no implementation can satisfy "
+                           "them, reply INFEASIBLE: with the reason.")
+                claims.append(f"attempt {attempt + 1}: {failure}")
+                commands.append({"cmd": "author.preflight", "exit": 1,
+                                 "out": ctx.blobs.put(failure)})
                 continue
             checked = self._validate(ctx, diff)
             if not checked.ok:
@@ -717,7 +781,7 @@ def build_authoring_catalog(slots: list[str], suite: str = "unit") -> Catalog:
             # runs: relay patched the same ImportError nine times.
             f"AuthorPatch:{slot}",
             prec=frozenset({"budget.llm:ok"}),
-            forbid=frozenset({f"tests.unknown:{suite}", "fail.stuck"}),
+            forbid=frozenset({f"tests.unknown:{suite}", "fail.stuck", INFEASIBLE_PROP}),
             add=frozenset({f"patch.queued:{slot}"}),
             risk="write", deterministic=False))
         actions.append(Action(

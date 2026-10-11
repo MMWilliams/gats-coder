@@ -276,6 +276,76 @@ def test_small_diff_cap_applies_only_when_some_tests_still_pass(repo, tmp_path):
     assert any("exceeds the" in c for c in result.claims), result.claims
 
 
+def test_a_patch_that_edits_an_existing_test_file_is_refused(repo, tmp_path):
+    """The suite is the bar. Hardbench crc: two contradictory tests, and
+    the author made the suite green by rewriting one; the journal certified
+    success on a bar the patch had moved. New test files still pass."""
+    ctx = _ctx(repo, tmp_path)
+    (repo / "tests").mkdir(exist_ok=True)
+    (repo / "tests" / "test_calc.py").write_text("def test_add():\n    assert 1\n",
+                                                 encoding="utf-8")
+    impl = "FILE: calc.py\n```python\ndef add(a, b):\n    return a + b\n```\n"
+    edit = "FILE: tests/test_calc.py\n```python\ndef test_add():\n    assert 2\n```\n"
+    new = "FILE: tests/test_more.py\n```python\ndef test_more():\n    assert 1\n```\n"
+    result = AuthorPatchSkill("a", FakeBackend(impl + edit), "implement add").run(ctx)
+    assert not result.ok
+    assert any("modifies test files" in c and "tests/test_calc.py" in c
+               for c in result.claims), result.claims
+    result = AuthorPatchSkill("b", FakeBackend(impl + new), "implement add").run(ctx)
+    assert result.ok, result.claims
+    result = AuthorPatchSkill("c", FakeBackend(impl + edit),
+                              "implement add and update the tests").run(ctx)
+    assert result.ok, result.claims
+
+
+def test_an_infeasible_verdict_is_recorded_and_withdraws_authoring(repo, tmp_path):
+    """Hardbench squeeze: the author proved the task impossible in its first
+    patch and had no way to say so; four more attempts rewrote a docstring
+    until the fifth identical failure counted as stuck."""
+    from ledger.failures import INFEASIBLE_PROP, failure_sensor
+    ctx = _ctx(repo, tmp_path)
+    (repo / "calc.py").write_text("def add(a, b):\n    raise NotImplementedError\n",
+                                  encoding="utf-8")
+    verdict = "INFEASIBLE: test_a wants add(1, 1) == 2 and test_b wants add(1, 1) == 3."
+    result = AuthorPatchSkill("a", FakeBackend(verdict), "implement add").run(ctx)
+    assert not result.ok
+    assert ctx.failures.infeasible.startswith("test_a wants")
+    assert any("judged the task infeasible" in c for c in result.claims), result.claims
+    assert INFEASIBLE_PROP in failure_sensor(ctx.failures).probe(repo)
+    # The achievable part may ride along with the verdict.
+    ctx.failures.infeasible = ""
+    best = verdict + "\n\nFILE: calc.py\n```python\ndef add(a, b):\n    return a + b\n```\n"
+    result = AuthorPatchSkill("b", FakeBackend(best), "implement add").run(ctx)
+    assert result.ok, result.claims
+    assert ctx.failures.infeasible.endswith("== 3.")
+
+
+@needs_git
+def test_an_infeasible_verdict_escalates_with_the_reason(relay, tmp_path):
+    calls = []
+
+    def responder(prompt):
+        if "REPOSITORY FILES" not in prompt:
+            return json.dumps({"goal": ["tests.pass:unit", "repo.clean"],
+                               "rationale": "green"})
+        calls.append(prompt)
+        return ("INFEASIBLE: the suite imports a name no file defines and "
+                "the task forbids adding it.")
+
+    episode = tmp_path / "ep"
+    result, executor, journal_path = run_repo_episode(
+        relay, episode, None, TEST_CMD, task_text="make the suite pass",
+        backend=FakeBackend(responder), slots=["a"], max_author_attempts=12)
+    assert not result.success
+    from pathlib import Path
+    entries = [json.loads(line) for line in
+               Path(journal_path).read_text(encoding="utf-8").splitlines()]
+    esc = next(e for e in entries if e["t"] == "ESCALATION")
+    assert esc["reason"] == "infeasible"
+    assert "no file defines" in esc["verdict"]
+    assert len(calls) == 1, "the verdict must end authoring, not cost the budget"
+
+
 # -- the relay episode: stuck is detected, not paid for -------------------------
 
 @needs_git

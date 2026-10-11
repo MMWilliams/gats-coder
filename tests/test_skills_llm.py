@@ -185,7 +185,11 @@ def test_author_patch_rejects_diff_text_inside_python_file(repo, tmp_path):
 @needs_git
 def test_author_patch_rejects_large_rewrite_after_suite_failure(repo, tmp_path):
     ctx = _ctx(repo, tmp_path)
-    ctx.suite_evidence["unit"] = {"tail": "one failing assertion"}
+    # The cap guards existing lines while other tests pass: pad the module
+    # past the 24-line floor so a wholesale rewrite removes more than that.
+    with (repo / "calc.py").open("a", encoding="utf-8") as f:
+        f.write("".join(f"\n# note {i}" for i in range(60)) + "\n")
+    ctx.suite_evidence["unit"] = {"tail": "1 failed, 3 passed in 0.1s"}
     calls = {"n": 0}
 
     def respond(prompt: str) -> str:
