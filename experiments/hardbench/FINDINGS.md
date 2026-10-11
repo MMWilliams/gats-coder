@@ -337,6 +337,13 @@ counted as a format failure instead of reported as empty.
 Score 4/10: recognition 0, integrity 3, delivery 0, efficiency 1. The
 Claude-backed run solved it (LMO, 10/10).
 
+### rk45, local: 9 min, 3 steps, 4 author calls, escalated `no_path`
+
+Same failure as primes: 4 empty replies after 14k-21k generated tokens
+each, visible 0/7, hidden 0/8, stub untouched. Score 4/10 on the same
+terms. Two in a row means the remaining feasible tasks will fail the same
+way until LEDGER's backend handles a thinking model; bench paused here.
+
 ### `ledger improve`, first local run (stopped at iteration 4)
 
 Claude Code reaped the loop for low memory (free commit 3.6 GB). Most of

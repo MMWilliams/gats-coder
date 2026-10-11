@@ -1,0 +1,31 @@
+{
+ "task": "rk45",
+ "backend": "ollama",
+ "wall_s": 518,
+ "ledger_exit": 1,
+ "steps": 3,
+ "author_attempts": 2,
+ "escalation": "no_path",
+ "success": false,
+ "plan": [
+  "RunSuite",
+  "AuthorPatch:a",
+  "AuthorPatch:b"
+ ],
+ "models": [
+  "ollama:qwen3.8:27b"
+ ],
+ "independent": true,
+ "visible": {
+  "passed": 0,
+  "failed": 7,
+  "summary": "7 failed in 0.95s"
+ },
+ "hidden": {
+  "passed": 0,
+  "failed": 8,
+  "summary": "8 failed in 6.34s"
+ },
+ "stdout_tail": "n -m pytest tests -q` passes.\\n\\nFour functions, all taking and returning numpy float arrays (a scalar y0 is\\naccepted and treated as a 1-vector; `ys`/`xs`/`vs` are always 2-D,\\nshape (len(ts), dim)):\\n\\n- `dp5_step(f, t, y, h) -> (y_new, err)`: one Dormand-Prince 5(4) step.\\n  `y_new` is the 5th-order solution, `err` is the difference between the 5th-\\n  and 4th-order solutions (the embedded error estimate).\\n- `rk5_fixed(f, t0, y0, t1, h) -> y(t1)`: `round((t1 - t0) / h)` steps of\\n  `dp5_step`.\\n- `dopri45(f, t0, y0, t1, rtol=1e-6, atol=1e-9) -> (ts, ys)`: adaptive step\\n  size control on the embedded estimate (RMS of err / (atol + rtol * max(|y|,\\n  |y_new|)) must be <= 1 to accept; grow and shrink the step with the usual\\n  safety factor and limits). `ts[0] == t0` and `ts[-1] == t1` exactly, every\\n  accepted step is recorded, and `t1 < t0` integrates backward.\\n- `verlet(accel, x0, v0, t0, t1, h) -> (xs, vs)`: velocity Stormer-Verlet\\n  (kick-drift-kick), `accel(x) -> a`, `round((t1 - t0) / h)` steps, initial\\n  state included.\\n\\nThe tests measure orders of convergence and long-time energy behaviour, not\\njust values, so the methods must actually be the methods named.\\n\", \"goal\": [\"tests.pass:unit\"], \"success\": false, \"plan\": [\"RunSuite\", \"AuthorPatch:a\", \"AuthorPatch:b\"], \"steps\": 3, \"profile\": \"autonomous\", \"incidents\": 0, \"denials\": 0, \"llm_planning_calls\": 0, \"escalation\": \"no_path\", \"journal\": \"C:\\\\Users\\\\reese\\\\ledger-bench\\\\rk45-ollama\\\\episode\\\\episode.jsonl\"}\n",
+ "stderr_tail": "e (n_points, 1) for the scalar case.\n    rk5-lands-on-t1  rk5_fixed returns y evaluated at t1 exactly. It takes round((t1-t0)/h) full steps of size h, then one partial step of (t1 - t_current) if t_current != t1. For t1==t0 it returns y0 immediately.\n    dopri-convergence-order  The global error of dopri45 scales as O(rtol^5) (fifth-order). Halving rtol should reduce the global error by roughly 32x in the asymptotic regime.\n    verlet-energy-bounded  For the 2-D harmonic oscillator (a(x) = -x, x0=[1,0], v0=[0,1]), the total energy E = 0.5*|v|^2 + 0.5*|x|^2 oscillates around 1.0 with bounded amplitude over 100 periods (no secular drift), confirming symplecticness.\n    degenerate-handling  dopri45 with t1==t0 returns (array([t0]), array([y0])) with no f evaluation. rk5_fixed and verlet with t1==t0 return the initial state. h==0 in verlet/rk5_fixed returns initial state only (0 steps). No exceptions raised for these cases.\n    output-shape-2d  All functions that return arrays return 2-D float64 numpy arrays. dp5_step returns (y_new, err) each of shape (dim,). rk5_fixed returns shape (dim,). dopri45 returns (ts, ys) with ts shape (n,), ys shape (n, dim). verlet returns (xs, vs) each shape (n+1, dim).\n    f-receives-1d-array  The user-supplied f(t, y) is always called with y as a 1-D numpy float64 ndarray of shape (dim,), never as a Python float or 0-D scalar. This holds for dp5_step, rk5_fixed, and dopri45.\n    (frozen before the first patch; the suite still decides correctness)\n"
+}
