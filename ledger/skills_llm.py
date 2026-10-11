@@ -563,19 +563,24 @@ class AuthorPatchSkill:
                     if _localized(ctx.suite_evidence) and target.is_file():
                         old = target.read_text(encoding="utf-8", errors="replace").splitlines()
                         new = body.splitlines()
-                        changed = sum(max(i2 - i1, j2 - j1)
+                        # Only lines that exist can be broken, so the cap
+                        # counts old lines replaced or removed; insertions
+                        # are free. Counting insertions made a 5-line stub
+                        # with one passing environment test "localized" and
+                        # refused every implementation of it (hardbench crc).
+                        removed = sum(i2 - i1
                                       for tag, i1, i2, j1, j2 in
                                       difflib.SequenceMatcher(None, old, new).get_opcodes()
-                                      if tag != "equal")
+                                      if tag in ("replace", "delete"))
                         # Feature-building goals rewrite most of a file; the
                         # 20% default is for localized test failures.
                         limit = max(24, int(len(old) * float(os.environ.get(
                             "LEDGER_EDIT_LIMIT", "0.2"))))
-                        if changed > limit:
-                            validation_error = (f"{rel}: {changed} changed lines exceeds "
-                                            f"the {limit}-line limit for a localized "
-                                            "test failure; use a small diff and preserve "
-                                            "unrelated code")
+                        if removed > limit:
+                            validation_error = (f"{rel}: {removed} existing lines replaced "
+                                            f"or removed exceeds the {limit}-line limit "
+                                            "for a localized test failure; use a small "
+                                            "diff and preserve unrelated code")
                             break
                     try:
                         ast.parse(body, filename=rel)

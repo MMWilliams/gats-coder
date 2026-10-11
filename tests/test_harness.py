@@ -253,8 +253,9 @@ def test_author_queues_a_diff_git_rejected_once_located(repo, tmp_path):
 
 @needs_git
 def test_small_diff_cap_applies_only_when_some_tests_still_pass(repo, tmp_path):
-    """A stub module with nothing passing is built, not fixed: the whole-file
-    rewrite goes through. Once tests pass, the same rewrite is a rewrite."""
+    """The cap protects lines that exist while other tests pass. A stub is
+    free to grow (insertions break nothing, hardbench crc); a working
+    60-line module replaced wholesale under passing tests is refused."""
     ctx = _ctx(repo, tmp_path)
     (repo / "calc.py").write_text("def add(a, b):\n    raise NotImplementedError\n",
                                   encoding="utf-8")
@@ -267,6 +268,10 @@ def test_small_diff_cap_applies_only_when_some_tests_still_pass(repo, tmp_path):
     ctx.suite_evidence["unit"] = {"tail": "FAILED tests/test_calc.py::test_add\n"
                                           "1 failed, 3 passed in 0.10s", "sha": "x"}
     result = AuthorPatchSkill("b", FakeBackend(response), "implement add").run(ctx)
+    assert result.ok, result.claims
+    (repo / "calc.py").write_text(
+        "".join(f"def f{i}(x):\n    return x + {i}\n" for i in range(30)), encoding="utf-8")
+    result = AuthorPatchSkill("c", FakeBackend(response), "implement add").run(ctx)
     assert not result.ok
     assert any("exceeds the" in c for c in result.claims), result.claims
 
