@@ -251,6 +251,26 @@ def test_author_queues_a_diff_git_rejected_once_located(repo, tmp_path):
     assert (repo / "calc.py").read_text(encoding="utf-8") == FIXED
 
 
+@needs_git
+def test_small_diff_cap_applies_only_when_some_tests_still_pass(repo, tmp_path):
+    """A stub module with nothing passing is built, not fixed: the whole-file
+    rewrite goes through. Once tests pass, the same rewrite is a rewrite."""
+    ctx = _ctx(repo, tmp_path)
+    (repo / "calc.py").write_text("def add(a, b):\n    raise NotImplementedError\n",
+                                  encoding="utf-8")
+    body = "".join(f"# step {i}\n" for i in range(60)) + "\n\ndef add(a, b):\n    return a + b\n"
+    response = "FILE: calc.py\n```python\n" + body + "```\n"
+    ctx.suite_evidence["unit"] = {"tail": "FAILED tests/test_calc.py::test_add\n"
+                                          "1 failed in 0.10s", "sha": "x"}
+    result = AuthorPatchSkill("a", FakeBackend(response), "implement add").run(ctx)
+    assert result.ok, result.claims
+    ctx.suite_evidence["unit"] = {"tail": "FAILED tests/test_calc.py::test_add\n"
+                                          "1 failed, 3 passed in 0.10s", "sha": "x"}
+    result = AuthorPatchSkill("b", FakeBackend(response), "implement add").run(ctx)
+    assert not result.ok
+    assert any("exceeds the" in c for c in result.claims), result.claims
+
+
 # -- the relay episode: stuck is detected, not paid for -------------------------
 
 @needs_git

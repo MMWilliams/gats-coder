@@ -351,6 +351,17 @@ def diff_from_files(root: Path, files: list[tuple[str, str]]) -> str:
     return "".join(chunks)
 
 
+def _localized(evidence: dict) -> bool:
+    """A failure is localized when the suite still has passing tests to
+    preserve, which is what the small-diff cap protects. A suite where
+    nothing passes (a stub module, an empty file) is being built, not fixed:
+    there the cap can only forbid the implementation, which is how a bench
+    task escalated `no_path` after four rejected 150-line patches."""
+    return any(int(m.group(1)) > 0
+               for ev in evidence.values()
+               for m in [re.search(r"(\d+) passed", ev.get("tail", ""))] if m)
+
+
 @dataclass
 class PatchAttempt:
     ok: bool
@@ -549,7 +560,7 @@ class AuthorPatchSkill:
                     if not rel.endswith(".py"):
                         continue
                     target = ctx.worktree / rel
-                    if ctx.suite_evidence and target.is_file():
+                    if _localized(ctx.suite_evidence) and target.is_file():
                         old = target.read_text(encoding="utf-8", errors="replace").splitlines()
                         new = body.splitlines()
                         changed = sum(max(i2 - i1, j2 - j1)

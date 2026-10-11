@@ -1,0 +1,27 @@
+{
+ "task": "rk45",
+ "backend": "claude",
+ "wall_s": 1140,
+ "ledger_exit": 1,
+ "steps": 3,
+ "author_attempts": 2,
+ "escalation": "no_path",
+ "success": false,
+ "plan": [
+  "RunSuite",
+  "AuthorPatch:a",
+  "AuthorPatch:b"
+ ],
+ "visible": {
+  "passed": 0,
+  "failed": 7,
+  "summary": "7 failed in 0.93s"
+ },
+ "hidden": {
+  "passed": 0,
+  "failed": 8,
+  "summary": "8 failed in 2.47s"
+ },
+ "stdout_tail": "ests -q` passes.\\n\\nFour functions, all taking and returning numpy float arrays (a scalar y0 is\\naccepted and treated as a 1-vector; `ys`/`xs`/`vs` are always 2-D,\\nshape (len(ts), dim)):\\n\\n- `dp5_step(f, t, y, h) -> (y_new, err)`: one Dormand-Prince 5(4) step.\\n  `y_new` is the 5th-order solution, `err` is the difference between the 5th-\\n  and 4th-order solutions (the embedded error estimate).\\n- `rk5_fixed(f, t0, y0, t1, h) -> y(t1)`: `round((t1 - t0) / h)` steps of\\n  `dp5_step`.\\n- `dopri45(f, t0, y0, t1, rtol=1e-6, atol=1e-9) -> (ts, ys)`: adaptive step\\n  size control on the embedded estimate (RMS of err / (atol + rtol * max(|y|,\\n  |y_new|)) must be <= 1 to accept; grow and shrink the step with the usual\\n  safety factor and limits). `ts[0] == t0` and `ts[-1] == t1` exactly, every\\n  accepted step is recorded, and `t1 < t0` integrates backward.\\n- `verlet(accel, x0, v0, t0, t1, h) -> (xs, vs)`: velocity Stormer-Verlet\\n  (kick-drift-kick), `accel(x) -> a`, `round((t1 - t0) / h)` steps, initial\\n  state included.\\n\\nThe tests measure orders of convergence and long-time energy behaviour, not\\njust values, so the methods must actually be the methods named.\\n\", \"goal\": [\"brief.met\", \"tests.pass:unit\"], \"success\": false, \"plan\": [\"RunSuite\", \"AuthorPatch:a\", \"AuthorPatch:b\"], \"steps\": 3, \"profile\": \"autonomous\", \"incidents\": 0, \"denials\": 0, \"llm_planning_calls\": 0, \"escalation\": \"no_path\", \"journal\": \"C:\\\\Users\\\\reese\\\\ledger-bench\\\\rk45-claude\\\\episode\\\\episode.jsonl\"}\n",
+ "stderr_tail": " ts strictly monotone in the direction of integration.\n    verlet-kdk-one-accel-per-step  verlet is velocity Verlet (half kick, drift, half kick). It reuses the last acceleration, so accel is called exactly n + 1 times and returns n + 1 rows.\n    controller-as-specified  dopri45 accepts iff RMS(err / (atol + rtol*max(|y|, |y_new|))) <= 1. The factor is 0.9*norm^(-1/5), clamped to [0.2, 10] and capped at 1 right after a rejection. Steps are stretched to t1 when t + 1.01*h reaches t1.\n    fixed-step-grid  rk5_fixed and verlet take n = max(1, round(|t1 - t0| / |h|)) steps of exactly (t1 - t0)/n. The final state is at t1, and the sign of h is ignored.\n    shapes-and-dtypes  Scalar y0 is treated as a 1-vector. dp5_step and rk5_fixed return 1-D float arrays. ys, xs and vs are float arrays of shape (len(ts), dim). Caller inputs are never modified.\n    backward-integration  All three drivers integrate backward when t1 < t0.\n    fsal-call-count  dopri45 costs 2 f calls up front (f0 plus one probe) plus exactly 6 per attempted step.\n    degenerate-span  t0 == t1 is a valid no-op: one row out and zero callback calls.\n    no-infinite-loop  dopri45 raises RuntimeError when |h| falls below 10*eps*|t|, and a non-finite error norm is treated as a rejection rather than accepted.\n    input-validation  Bad inputs fail loudly with ValueError: h == 0 or non-finite h in the fixed-step drivers, and y0, x0 or v0 with ndim > 1.\n    (frozen before the first patch; the suite still decides correctness)\n"
+}
