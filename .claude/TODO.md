@@ -8,12 +8,18 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 
 ## Hard math/science bench (design started 2026-10-10)
 
-- [ ] Pick 3 of the proposed tasks (RK45 convergence-order, Hartree-Fock
-      STO-3G, CDCL SAT under time limits) and run them hidden-suite style:
-      visible tests for the sensors, hidden tests for grading, so the score
-      is pass@hidden not pass@visible. Compare one-shot model vs LEDGER.
-      Backend decision pending (claude CLI = subscription; Ollama = free but
-      the box is at its commit ceiling while UE is open).
+- [x] `experiments/hardbench/`: tasks rk45, hf, sat built (TASK.md + stub +
+      visible tests), hidden suites in `hidden/`, reference solutions in
+      `ref/` (all suites pass against them: 15/15, 13/13, 30/30).
+      `python run.py <task>` runs LEDGER (claude backend) on a fresh repo under
+      `~/ledger-bench/` and grades the worktree on the hidden suite ->
+      `results/<task>-<backend>.json`.
+- [ ] Run all three, then the remaining 7 proposed tasks (special functions,
+      Berlekamp-Zassenhaus, stiff Robertson, Delaunay, Hindley-Milner,
+      Project Euler, Ising) when the box has room. Then a one-shot
+      `claude -p` baseline per task for the ablation.
+- [ ] SAT calibration note: pigeonhole(8) is out of reach for a Python CDCL
+      (ref times out at 120 s) while naive DPLL does it in 2 s; keep PHP <= 7.
 
 ## Release chores (whenever the version changes)
 
