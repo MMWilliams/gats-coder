@@ -11,6 +11,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -26,9 +27,17 @@ def sh(cmd, cwd, **kw):
                           encoding="utf-8", errors="replace", **kw)
 
 
+def rmtree(path):
+    """git's object files are read-only on Windows; rmtree needs a hand."""
+    def onexc(fn, p, exc):
+        os.chmod(p, stat.S_IWRITE)
+        fn(p)
+    shutil.rmtree(path, onexc=onexc)
+
+
 def fresh_repo(task, dest):
     if dest.exists():
-        shutil.rmtree(dest)
+        rmtree(dest)
     shutil.copytree(HERE / "tasks" / task, dest)
     (dest / ".gitignore").write_text("__pycache__/\n.pytest_cache/\n.ledger/\n")
     for args in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "task"]):
@@ -74,7 +83,7 @@ def main():
     repo, out = run / "repo", run / "episode"
     fresh_repo(a.task, repo)
     if out.exists():
-        shutil.rmtree(out)
+        rmtree(out)
     task = (HERE / "tasks" / a.task / "TASK.md").read_text(encoding="utf-8")
     cmd = ["ledger", "run", task, "--repo", str(repo), "--out", str(out), "--test", VISIBLE,
            "--kind", "library", "--profile", "autonomous", "--yes", "--no-launch",
