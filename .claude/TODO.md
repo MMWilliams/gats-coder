@@ -30,6 +30,18 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       algo, factor, delaunay, ising one at a time with `python run.py <task>`
       (absolute path), write each up in FINDINGS.md, then the one-shot
       `claude -p` baseline per task.
+- [ ] RULE (reese 10-11): LEDGER solves problems alone, no Claude backend.
+      run.py now needs `--model` (local, e.g. qwen3.8:27b) and refuses
+      Claude; every result before 10-11 is Claude-backed, not LEDGER-alone.
+      Rerun the bench locally when GPU 1 is free (at 01:59 it was 31/32 GB,
+      100% busy, not ours). Contamination audit: FINDINGS #5.
+- [ ] `ledger improve` (bf033a1): self-audit + verified self-repair on branch
+      ledger/self-improve, local models only. First audit ran 10-11 ~02:00
+      (report: .ledger/improve/report.md). Known open findings it should
+      take first: cli.py undefined `repo_root` (533) and `Attempt` (1777);
+      untested research.py, signing.py, state.py, wizard.py. Start the loop
+      when GPU 1 is free: `ledger improve --model qwen3.8:27b`. Never merge
+      the branch without reese.
 - [ ] Impossible-task set (FINDINGS #4): squeeze 9/10 (honest, stuck after
       5 attempts); crc run 1 5/10 (cap refused everything, fixed 2dbc61a;
       author edited the linearity test in every response); crc run 2:
