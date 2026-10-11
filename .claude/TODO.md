@@ -33,8 +33,12 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 - [ ] RULE (reese 10-11): LEDGER solves problems alone, no Claude backend.
       run.py now needs `--model` (local, e.g. qwen3.8:27b) and refuses
       Claude; every result before 10-11 is Claude-backed, not LEDGER-alone.
-      Rerun the bench locally when GPU 1 is free (at 01:59 it was 31/32 GB,
-      100% busy, not ours). Contamination audit: FINDINGS #5.
+      Local runs started 10-11 09:30 with qwen3.8:27b on GPU 1. Ollama
+      restarted from `C:\Users\reese\ledger-control\ollama_gpu1.cmd` (GPU 1
+      by UUID, Vulkan hidden, 64k context). Order: squeeze (running), then
+      `ledger improve --model qwen3.8:27b --max-iterations 5`, then crc,
+      primes, rk45, hf, sat, specfun, stiff, hm, algo, factor, delaunay,
+      ising, one at a time. Contamination audit: FINDINGS #5.
 - [ ] `ledger improve` (bf033a1): self-audit + verified self-repair on branch
       ledger/self-improve, local models only. First audit ran 10-11 ~02:00
       (report: .ledger/improve/report.md). Known open findings it should
