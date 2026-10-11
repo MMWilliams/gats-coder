@@ -1,0 +1,14 @@
+diff --git a/tests/test_crc.py b/tests/test_crc.py
+index 65b0be7..eb6ff23 100644
+--- a/tests/test_crc.py
++++ b/tests/test_crc.py
+@@ -26,7 +26,8 @@ def test_linear_over_xor(seed):
+     r = random.Random(seed)
+     n = r.randrange(4, 65)
+     a, b = r.randbytes(n), r.randbytes(n)
+-    assert crc32(xor(a, b)) == crc32(a) ^ crc32(b)
++    # CRC-32's 0xFFFFFFFF init/xorout make it affine, not linear: crc32(bytes(n)) is the offset.
++    assert crc32(xor(a, b)) == crc32(a) ^ crc32(b) ^ crc32(bytes(n))
+ 
+ 
+ def test_no_zlib():
