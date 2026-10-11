@@ -1,0 +1,30 @@
+{
+ "task": "primes",
+ "backend": "claude",
+ "wall_s": 2044,
+ "ledger_exit": 0,
+ "steps": 6,
+ "author_attempts": 1,
+ "escalation": null,
+ "success": true,
+ "plan": [
+  "RunSuite",
+  "AuthorPatch:a",
+  "ApplyPatch:a",
+  "RunSuite",
+  "Commit",
+  "ReviewBrief"
+ ],
+ "visible": {
+  "passed": 14,
+  "failed": 0,
+  "summary": "14 passed in 0.44s"
+ },
+ "hidden": {
+  "passed": 6,
+  "failed": 0,
+  "summary": "6 passed in 0.20s"
+ },
+ "stdout_tail": "{\"agent_version\": \"0.14.0\", \"task\": \"Implement `primes.py` in pure Python (standard library only) so that\\n`python -m pytest tests -q` passes within its time limits.\\n\\n- `count_primes(n: int) -> int`: the number of primes less than or equal\\n  to `n`, exactly, for any `0 <= n <= 10**12`.\\n\\nEvery call in the suite, up to and including `n = 10**12`, must return\\nwithin one second on this machine. The expected values are exact; the suite\\nreports only pass or fail.\\n\", \"goal\": [\"brief.met\", \"tests.pass:unit\"], \"success\": true, \"plan\": [\"RunSuite\", \"AuthorPatch:a\", \"ApplyPatch:a\", \"RunSuite\", \"Commit\", \"ReviewBrief\"], \"steps\": 6, \"profile\": \"autonomous\", \"incidents\": 0, \"denials\": 0, \"llm_planning_calls\": 0, \"escalation\": null, \"journal\": \"C:\\\\Users\\\\reese\\\\ledger-bench\\\\primes-claude\\\\episode\\\\episode.jsonl\"}\n",
+ "stderr_tail": "8 s (headroom under the 1 s limit). The large tests also pass when run alone.\n    no-hardcoded-answers  The values are actually computed: primes.py has no literal expected answers and no table of pi values, and values off the test grid are exact.\n    exact-integer-math  No floating-point roots or divisions anywhere in the algorithm, so results are exact at perfect squares and cubes.\n    small-n-dense  Every n from 0 to 30000 gives the exact count, so there are no off-by-one errors at primes, prime squares or the small-n fast path.\n    import-cheap  Importing primes does no heavy work, so cost isn't hidden outside the timed call.\n    input-contract  Arguments follow operator.index semantics: int-like values are accepted, floats and strings are rejected, and negative n returns 0.\n    memory-bounded  Peak memory for n = 10**12 stays under 256 MB, and the module keeps no more than about 10 MB after the call returns.\n    thread-safe  Concurrent calls from multiple threads all return exact results, including when they race to build the shared cache in a fresh process.\n    above-range-exact  Inputs above 10**12 return exact counts (no time guarantee) instead of raising or silently degrading.\n    cli  `python primes.py N` prints pi(N), and bad input fails cleanly.\n    public-api  The only public name is count_primes(n: int) -> int, and its docstring states the range, the timing guarantee and the input contract.\n    (frozen before the first patch; the suite still decides correctness)\n"
+}
