@@ -405,3 +405,13 @@ qwen3.8:27b, both `budget_exhausted`, nothing kept:
   reverted them all; the rest failed `git apply --check` or had a syntax
   error at line 1. LEDGER's guards worked; the model can't yet produce a
   surgical edit to a 346-line module. The finding is now at its 2-try cap.
+
+Four more tries (reese's call): round 1 try 1 failed the same way (whole-file
+rewrites, syntax errors, import guard). Try 2 landed 20a19e0: a 10-line
+change in `OpenAIAPIBackend._complete` that raises "empty content from
+<url>: model returned reasoning (N chars) but no visible reply" instead of
+returning "". Minimal and correct; the test is untouched (the loop's policy
+forbids it). Authored by qwen3.8:27b alone; 2 of 4 tries used. It fixes the
+reporting, not the cause: a model that thinks past its answer still gives
+no patch, now with an honest error. Not merged; the bench still runs
+master's LEDGER.
