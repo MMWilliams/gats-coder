@@ -39,6 +39,19 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       `ledger improve --model qwen3.8:27b --max-iterations 5`, then crc,
       primes, rk45, hf, sat, specfun, stiff, hm, algo, factor, delaunay,
       ising, one at a time. Contamination audit: FINDINGS #5.
+      squeeze local: proved infeasible in 1 attempt, no code (FINDINGS #6).
+- [ ] PAUSED 10-11 ~10:30: improve loop reaped by Claude Code for low
+      memory (free commit 3.6 GB). Main cause was mine: an orphaned
+      llama-server (24.8 GB commit) from restarting Ollama without
+      unloading; killed, commit back to 22.8 GB. Iterations 1-2 crashed
+      on my quoted --check command (fixed); 3 (research.py tests) rejected
+      by the re-audit, a written test failed. Resume only on reese's go:
+      `ledger improve --model qwen3.8:27b --max-iterations 5`.
+- [ ] LEDGER bugs seen, NOT fixed (independence rule; for LEDGER to find):
+      `cli._test_cmd` splits `--test` on whitespace (quotes and spaced
+      paths break), and RunSuite lets a FileNotFoundError from an
+      unlaunchable test command crash the episode instead of recording a
+      failing suite (`executor._run_cmd` -> `sandbox.popen`).
 - [ ] `ledger improve` (bf033a1): self-audit + verified self-repair on branch
       ledger/self-improve, local models only. First audit ran 10-11 ~02:00
       (report: .ledger/improve/report.md). Known open findings it should

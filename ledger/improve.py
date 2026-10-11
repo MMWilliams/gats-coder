@@ -214,7 +214,9 @@ def _task(f: Finding) -> tuple[str, str]:
              "Remove the root cause with the smallest correct change and keep "
              "every other behaviour intact.")
     if f.kind in ("syntax", "import", "undefined"):
-        check = f'"{sys.executable}" "{Path(__file__).resolve()}" --check {f.component}'
+        # Unquoted: `ledger run --test` splits on whitespace and execs the
+        # pieces without a shell, so quotes would stay in argv[0].
+        check = f"{sys.executable} {Path(__file__).resolve()} --check {f.component}"
         return (f"Fix a defect in LEDGER's own source, found by its self-audit.\n\n"
                 f"DEFECT ({f.kind}) in {f.component}\n{f.detail}\n\n{rules}", check)
     if f.kind == "test_failure":
@@ -264,8 +266,10 @@ def run_episode(f: Finding, number: int, worktree: Path, state_dir: Path, *,
             "--json", *backend_args]
     trusted = Path(__file__).resolve().parent.parent
     p = _sh(argv, trusted, timeout=6 * 3600)
+    # Until the journal says how the episode ended, the process output is the
+    # only record: a crash journals nothing after the step that raised.
     o = Outcome(journal=str(out / "episode.jsonl"),
-                note=f"ledger exit {p.returncode}")
+                note=f"ledger exit {p.returncode}: {(p.stderr or p.stdout)[-1500:]}")
     journal = out / "episode.jsonl"
     models = set()
     if journal.is_file():
@@ -275,6 +279,8 @@ def run_episode(f: Finding, number: int, worktree: Path, state_dir: Path, *,
             if e.get("t") == "ESCALATION":
                 o.note = f"escalated {e.get('reason')}"
                 o.verdict = e.get("verdict") or ""
+            elif e.get("t") == "END":
+                o.note = f"ended, success={e.get('success')}"
     o.models = tuple(sorted(models))
     ewt = out / "worktree"
     if (ewt / ".git").exists():

@@ -305,3 +305,23 @@ there is no second chance. LEDGER's own part worked as designed: one
 attempt, the verdict in the ESCALATION record, no budget burned. Not tuning
 the harness on this, per the independence rule; recorded for the held-out
 set.
+
+### `ledger improve`, first local run (stopped at iteration 4)
+
+Claude Code reaped the loop for low memory (free commit 3.6 GB). Most of
+the pressure was an orphaned `llama-server` (24.8 GB commit) left by the
+operator restarting Ollama without unloading the model first.
+
+- Iterations 1 and 2 (the two undefined names in cli.py) never reached the
+  model: LEDGER crashed on its first RunSuite. The operator's loop passed a
+  quoted interpreter path as `--test`; LEDGER splits `--test` on whitespace
+  and execs without a shell, so `"C:\...\python.exe"` was not found, and the
+  FileNotFoundError escaped RunSuite and killed the episode. The loop's
+  command is fixed; the two LEDGER bugs (whitespace split, unhandled launch
+  failure) are left for LEDGER under the independence rule.
+- Iteration 3 (research.py has no tests): the local model wrote
+  `tests/test_audit_research.py`, the episode ran out of its 4 authoring
+  attempts, and the loop still tried the result: the trusted re-audit found
+  `TestNoNetwork::test_execute_research_completes` failing and rolled it
+  back. The gate held.
+- Iteration 4 (state.py) was running when the loop was stopped.

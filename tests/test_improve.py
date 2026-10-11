@@ -133,6 +133,21 @@ def test_a_fix_that_breaks_something_else_is_rolled_back(toy):
     assert (wt / "ledger" / "bad.py").read_text(encoding="utf-8") == BAD
 
 
+def test_the_grading_command_survives_ledgers_whitespace_split(tmp_path):
+    """`ledger run --test` is split on whitespace and run without a shell.
+    The first improve run quoted the interpreter path, every episode died
+    with WinError 2 on its first RunSuite, and nothing was authored."""
+    import shutil
+    import sys
+
+    from ledger.improve import _task
+    _, test = _task(Finding("undefined", "ledger/bad.py", "x", "x"))
+    argv = test.split()
+    assert '"' not in test
+    assert shutil.which(argv[0]) or argv[0] == sys.executable
+    assert argv[-2:] == ["--check", "ledger/bad.py"]
+
+
 def test_claude_may_not_solve_ledgers_own_problems(toy):
     from ledger.improve import independent_backend
     assert independent_backend(["--backend", "ollama", "--model", "qwen3.8:27b"]) == ""
