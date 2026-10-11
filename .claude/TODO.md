@@ -14,7 +14,9 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       `python run.py <task>` runs LEDGER (claude backend) on a fresh repo under
       `~/ledger-bench/` and grades the worktree on the hidden suite ->
       `results/<task>-<backend>.json`.
-- [ ] Run all three, then the remaining 7 proposed tasks (special functions,
+- [x] rk45 run 1 found the small-diff cap bug (FINDINGS.md #1, fixed 2e17298);
+      run 2: success, 10 min, 1 authoring attempt, 7/7 visible, 8/8 hidden.
+- [ ] Run hf and sat, then the remaining 7 proposed tasks (special functions,
       Berlekamp-Zassenhaus, stiff Robertson, Delaunay, Hindley-Milner,
       Project Euler, Ising) when the box has room. Then a one-shot
       `claude -p` baseline per task for the ablation.
