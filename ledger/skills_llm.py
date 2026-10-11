@@ -75,14 +75,12 @@ When a test traceback points to a specific line in an existing file, inspect
 the source excerpt in the prompt and use FORMAT B to correct that line and any
 directly related occurrences. Keep unrelated functions intact.
 
-FORMAT C -- when no patch can satisfy the task as specified (tests that
-contradict each other, a requirement that is provably impossible, a time
-budget no algorithm meets):
+FORMAT C -- when you can argue that no patch can satisfy the task as
+specified:
 
-INFEASIBLE: <the obstacle and the evidence for it, in plain prose>
+INFEASIBLE: <the argument, in plain prose>
 
-Use it only when you have an argument, not because a patch failed. FILE
-blocks for the achievable part may follow the verdict, and are applied.
+FILE blocks may follow the verdict, and are applied.
 """
 
 _INFEASIBLE = re.compile(r"^\s*INFEASIBLE:\s*(.+?)(?=\n+FILE:|\Z)", re.S)
@@ -664,10 +662,8 @@ class AuthorPatchSkill:
             protected = protected_test_edits(ctx.worktree, diff, self.task_text)
             if protected:
                 failure = ("patch modifies test files the task did not ask to "
-                           "change: " + ", ".join(protected) + ". The suite is "
-                           "the bar the patch is graded against; leave those "
-                           "files as they are. If no implementation can satisfy "
-                           "them, reply INFEASIBLE: with the reason.")
+                           "change: " + ", ".join(protected) + ". Leave existing "
+                           "test files as they are.")
                 claims.append(f"attempt {attempt + 1}: {failure}")
                 commands.append({"cmd": "author.preflight", "exit": 1,
                                  "out": ctx.blobs.put(failure)})
