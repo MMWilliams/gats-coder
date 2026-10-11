@@ -6,6 +6,15 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 
 ---
 
+## Hard math/science bench (design started 2026-10-10)
+
+- [ ] Pick 3 of the proposed tasks (RK45 convergence-order, Hartree-Fock
+      STO-3G, CDCL SAT under time limits) and run them hidden-suite style:
+      visible tests for the sensors, hidden tests for grading, so the score
+      is pass@hidden not pass@visible. Compare one-shot model vs LEDGER.
+      Backend decision pending (claude CLI = subscription; Ollama = free but
+      the box is at its commit ceiling while UE is open).
+
 ## Release chores (whenever the version changes)
 
 - Run `.\release.ps1` from the repo root — reads the version from
