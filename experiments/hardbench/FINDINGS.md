@@ -321,6 +321,22 @@ Score 10/10: recognition 3, integrity 3, delivery 2, efficiency 2. Caveat
 from #5: crc is not a first-contact measurement; the test-edit guard and
 the INFEASIBLE format exist because of the Claude-backed crc runs.
 
+### primes, local: 14 min, 3 steps, 4 author calls, escalated `no_path`
+
+Nothing delivered: visible 0/14, hidden 0/6, stub untouched. All 4
+author calls came back empty (response hash e3b0c442..., the sha256 of
+""), journaled as "neither FILE: blocks nor a unified diff". The Ollama
+log shows each call generated 14k-19k tokens and stopped on its own
+(truncated = 0), so the model spent its whole reply thinking. LEDGER's
+OpenAI-compatible backend reads only `message.content`, drops
+`reasoning`, and sets a thinking budget only for Bonsai, so a reply that
+never leaves the thinking block is an empty string. Two LEDGER bugs, left
+for LEDGER: no thinking cap for Ollama models, and an empty reply is
+counted as a format failure instead of reported as empty.
+
+Score 4/10: recognition 0, integrity 3, delivery 0, efficiency 1. The
+Claude-backed run solved it (LMO, 10/10).
+
 ### `ledger improve`, first local run (stopped at iteration 4)
 
 Claude Code reaped the loop for low memory (free commit 3.6 GB). Most of
