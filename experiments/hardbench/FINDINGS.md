@@ -325,3 +325,30 @@ operator restarting Ollama without unloading the model first.
   `TestNoNetwork::test_execute_research_completes` failing and rolled it
   back. The gate held.
 - Iteration 4 (state.py) was running when the loop was stopped.
+
+### `ledger improve`, second local run (5 iterations, 58 min)
+
+All 5 episodes journaled `ollama:qwen3.8:27b` only. Audit before:
+535 passed, 1 skipped; 2 undefined, 3 untested. 2 commits accepted on
+`ledger/self-improve`, 3 rejected.
+
+- [4] cli.py `Attempt` undefined: rejected, the episode changed nothing.
+- [5] cli.py `repo_root` undefined: accepted (d9af53b), but only half of it
+  is a real fix. `repo_root = root` inside `cmd_run` is right. It also added
+  two module-level lint silencers: `repo_root = Path(__file__)...` (dead,
+  shadowed) and `Attempt = AgentSpec`, which is wrong (the annotation means
+  `modes.Attempt`; the right fix is a TYPE_CHECKING import). That alias
+  closed the `Attempt` finding as a side effect. Loophole in the loop's
+  acceptance check: "the lint finding is gone and nothing new appeared"
+  can be met by a wrong definition. Runtime is unaffected (the annotation
+  is a string), so the suite stays green. Escalated `budget_exhausted` yet
+  the diff passed the trusted re-audit, which is what the loop grades.
+- [6] state.py untested: rejected, the change edited state.py and
+  introduced an undefined `os`.
+- [7] wizard.py untested: accepted (0481dfd), `tests/test_audit_wizard.py`,
+  37 tests, 55 asserts, no skips, passes.
+- [8] research.py untested (2nd try): rejected again, a written test
+  (`test_to_text_unescapes_entities`) failed the re-audit.
+
+Grade: 1 clean commit, 1 partly gamed, the gate caught 2 bad changes.
+Neither commit is merged; the branch needs reese's review.
