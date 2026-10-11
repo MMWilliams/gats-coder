@@ -1,0 +1,28 @@
+{
+ "task": "sat",
+ "backend": "claude",
+ "wall_s": 598,
+ "ledger_exit": 0,
+ "steps": 4,
+ "author_attempts": 1,
+ "escalation": null,
+ "success": true,
+ "plan": [
+  "RunSuite",
+  "AuthorPatch:a",
+  "ApplyPatch:a",
+  "RunSuite"
+ ],
+ "visible": {
+  "passed": 14,
+  "failed": 0,
+  "summary": "14 passed in 0.75s"
+ },
+ "hidden": {
+  "passed": 16,
+  "failed": 0,
+  "summary": "16 passed in 2.80s"
+ },
+ "stdout_tail": "\"0.14.0\", \"task\": \"Implement `sat.py`: a complete SAT solver in pure Python (standard library\\nonly) fast enough that `python -m pytest tests -q` passes within its time\\nlimits.\\n\\n`solve(n_vars, clauses, time_limit=10.0) -> list[int] | None`\\n\\n- `clauses` is a list of clauses in DIMACS style: each clause a list of\\n  non-zero ints, literal `v` for variable v true, `-v` for false, variables\\n  numbered 1..n_vars. Clauses may contain duplicate literals, tautologies\\n  (`v` and `-v` together) and may be empty (an empty clause is unsatisfiable).\\n  Not every variable has to appear.\\n- Satisfiable: return a complete assignment as a list of n_vars literals, one\\n  per variable in order (`v` or `-v`), that satisfies every clause.\\n- Unsatisfiable: return `None`.\\n- If the solver has not finished when `time_limit` seconds have elapsed,\\n  raise `TimeoutError`.\\n\\nThe test instances include random 3-SAT at the satisfiability threshold with\\nup to 150 variables and pigeonhole formulas. Plain DPLL without clause\\nlearning does not finish those inside the limits; conflict-driven clause\\nlearning with two watched literals and an activity-based decision heuristic\\ndoes, comfortably.\\n\", \"goal\": [\"tests.pass:unit\"], \"success\": true, \"plan\": [\"RunSuite\", \"AuthorPatch:a\", \"ApplyPatch:a\", \"RunSuite\"], \"steps\": 4, \"profile\": \"autonomous\", \"incidents\": 0, \"denials\": 0, \"llm_planning_calls\": 0, \"escalation\": null, \"journal\": \"C:\\\\Users\\\\reese\\\\ledger-bench\\\\sat-claude\\\\episode\\\\episode.jsonl\"}\n",
+ "stderr_tail": "utError, never returning None or a partial answer, and raises within 0.5 s of the limit, even for budgets as small as 0.05 s.\n    edge-inputs  Edge inputs behave per spec: an empty clause gives None, an empty clause list gives a full assignment, n_vars=0 with no clauses gives [], duplicate literals and tautologies are accepted, and literals that are 0 or have |lit| > n_vars raise ValueError.\n    stdlib-single-file  The solver is the single file sat.py and imports only standard-library modules.\n    no-mutation-reentrant  solve() leaves the caller's clause lists unmodified and keeps no module-level mutable state.\n    deterministic  The same input always gives the same output, independent of hash seed or process.\n    cdcl-core  The search is CDCL with first-UIP clause learning and non-chronological backjumping, two watched literals per clause, VSIDS-style decayed activity on a heap, phase saving, Luby restarts, and periodic learned-clause deletion that never removes a clause that's currently a reason for an assignment.\n    scales  Setup and propagation scale roughly linearly: large easy instances don't hit quadratic work.\n    cli  `python sat.py file.cnf [-t S]` reads DIMACS and prints standard result lines with standard exit codes.\n    unused-negative  Variables that appear in no clause are returned as -v.\n    timeout-stats  The TimeoutError message reports elapsed time, conflicts, decisions and restarts.\n    (frozen before the first patch; the suite still decides correctness)\n"
+}

@@ -16,7 +16,10 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       `results/<task>-<backend>.json`.
 - [x] rk45 run 1 found the small-diff cap bug (FINDINGS.md #1, fixed 2e17298);
       run 2: success, 10 min, 1 authoring attempt, 7/7 visible, 8/8 hidden.
-- [ ] Run hf and sat, then the remaining 7 proposed tasks (special functions,
+- [x] hf: success, 10 min, 1 attempt, 6/6 visible, 7/7 hidden after the
+      H4-square oracle was replaced (FINDINGS.md #2). sat: success, 10 min,
+      1 attempt, 14/14 visible, 16/16 hidden.
+- [ ] Remaining 7 proposed tasks (special functions,
       Berlekamp-Zassenhaus, stiff Robertson, Delaunay, Hindley-Milner,
       Project Euler, Ising) when the box has room. Then a one-shot
       `claude -p` baseline per task for the ablation.
