@@ -390,3 +390,18 @@ All 5 episodes journaled `ollama:qwen3.8:27b` only. Audit before:
 
 Grade: 1 clean commit, 1 partly gamed, the gate caught 2 bad changes.
 Neither commit is merged; the branch needs reese's review.
+
+### `ledger improve`, third run: the thinking-reply bug (reese chose "LEDGER fixes it")
+
+The operator filed the bug as a failing test only
+(`tests/test_llm_thinking_reply.py`, 5cb2339 on `ledger/self-improve`): a
+reply whose `content` is empty and whose `reasoning` holds the thinking must
+come back as usable text or as an error that says why. Two episodes on
+qwen3.8:27b, both `budget_exhausted`, nothing kept:
+
+- The model engaged (6 of 8 calls produced a patch), but each patch rewrote
+  `ledger/llm.py` whole through FILE: blocks and dropped `extract_json` and
+  other names that brief.py and chat.py import. LEDGER's import guard
+  reverted them all; the rest failed `git apply --check` or had a syntax
+  error at line 1. LEDGER's guards worked; the model can't yet produce a
+  surgical edit to a 346-line module. The finding is now at its 2-try cap.
