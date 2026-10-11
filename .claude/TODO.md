@@ -25,7 +25,8 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       dropped, sympy itself needs >10 min), delaunay (exact incremental
       reference), ising (Wolff reference + exact 4x4 enumeration).
 - [ ] specfun: killed 10-11 00:30 after two 1800 s author timeouts
-      (FINDINGS #3). Rerun with `--author-timeout 3600`. Then stiff, hm,
+      (FINDINGS #3). Rerun; run.py now passes `--author-timeout 0` (no
+      deadline, reese's call 10-11). Then stiff, hm,
       algo, factor, delaunay, ising one at a time with `python run.py <task>`
       (absolute path), write each up in FINDINGS.md, then the one-shot
       `claude -p` baseline per task.

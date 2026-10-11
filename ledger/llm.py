@@ -287,11 +287,14 @@ def with_timeout(backend, seconds: int):
     the goal compiler and the planner's L3 layer, and a long authoring
     deadline must not become a long deadline for everything else -- a hung
     backend would then stall the run for half an hour before anyone noticed.
+
+    `seconds=0` removes the deadline: the authoring call waits as long as
+    the model takes.
     """
     if backend is None or not hasattr(backend, "_timeout"):
         return backend
     clone = copy.copy(backend)
-    clone._timeout = int(seconds)
+    clone._timeout = int(seconds) or None
     return clone
 
 

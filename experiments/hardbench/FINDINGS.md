@@ -46,7 +46,8 @@ Killed after 96 min with nothing authored: both attempts on slot a hit
 Seven special functions to 1e-12 in pure Python is more than the claude
 backend writes in one 30-minute print-mode call; the harness has no way to
 carry a partial file across calls, so each attempt starts from the stub.
-Rerun with `--author-timeout 3600` when the box is free. A task this size may
+`--author-timeout 0` now means no deadline and run.py passes it; rerun when
+the box is free. A task this size may
 need decomposition into one slot per function, which LEDGER cannot do on its
 own.
 

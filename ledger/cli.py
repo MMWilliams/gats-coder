@@ -448,9 +448,10 @@ def cmd_run(args) -> int:
             root, episode_dir, None, _test_cmd(args, cfg_file),
             cfg=_plan_config(args, cfg_file),
             gate=gate, profile=profile, max_author_attempts=author_budget,
-            author_timeout=(getattr(args, "author_timeout", None)
-                            or (cfg_file.get("backend") or {}).get(
-                                "author_timeout")),
+            author_timeout=next(
+                (t for t in (getattr(args, "author_timeout", None),
+                             (cfg_file.get("backend") or {}).get("author_timeout"))
+                 if t is not None), None),
             strategise=(getattr(args, "strategise", False)
                         or bool(cfg_file.get("strategise"))),
             research=getattr(args, "research", True),
@@ -1979,9 +1980,9 @@ def build_parser() -> argparse.ArgumentParser:
                         f"(default: config, then {DEFAULT_AUTHOR_ATTEMPTS})")
     p.add_argument("--author-timeout", dest="author_timeout", type=int,
                    default=None, metavar="SECONDS",
-                   help="deadline for one authoring call. Writing a whole "
-                        "app takes far longer than compiling a goal, so this "
-                        "is separate from the backend timeout")
+                   help="deadline for one authoring call; 0 means none. "
+                        "Writing a whole app takes far longer than compiling "
+                        "a goal, so this is separate from the backend timeout")
     p.add_argument("--strategise", "--strategize", dest="strategise",
                    action="store_true",
                    help="when nothing in the catalogue reaches the goal, "

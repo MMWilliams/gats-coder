@@ -88,7 +88,7 @@ def main():
     cmd = ["ledger", "run", task, "--repo", str(repo), "--out", str(out), "--test", VISIBLE,
            "--kind", "library", "--profile", "autonomous", "--yes", "--no-launch",
            "--no-product-review", "--backend", a.backend, "--max-steps", str(a.max_steps),
-           "--max-author-attempts", str(a.attempts), "--author-timeout", "1800", "--json"]
+           "--max-author-attempts", str(a.attempts), "--author-timeout", "0", "--json"]
     t0 = time.time()
     p = sh(cmd, repo, timeout=4 * 3600)
     res = {"task": a.task, "backend": a.backend, "wall_s": round(time.time() - t0),

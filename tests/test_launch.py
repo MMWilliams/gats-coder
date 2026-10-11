@@ -141,6 +141,16 @@ def test_authoring_gets_its_own_longer_deadline():
     assert longer is not base
 
 
+def test_author_timeout_zero_means_no_deadline():
+    # specfun on the hardbench: every 1800 s attempt timed out and the
+    # episode wrote nothing. 0 lets the call run as long as the model takes.
+    from ledger.llm import FakeBackend, with_timeout
+    base = FakeBackend("hi")
+    base._timeout = 600
+    assert with_timeout(base, 0)._timeout is None
+    assert base._timeout == 600
+
+
 def test_a_backend_without_a_timeout_is_passed_through():
     from ledger.llm import with_timeout
     assert with_timeout(None, 1800) is None

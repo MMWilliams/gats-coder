@@ -1369,7 +1369,8 @@ def _run_repo_episode(repo_root: Path | str, episode_dir: Path | str,
         # game the CLI hit 600s eight times running and the episode spent
         # its entire budget without a line of code being written.
         from .llm import AUTHOR_TIMEOUT, with_timeout
-        author_backend = with_timeout(backend, author_timeout or AUTHOR_TIMEOUT)
+        author_backend = with_timeout(
+            backend, AUTHOR_TIMEOUT if author_timeout is None else author_timeout)
         for slot in sorted(slots):
             skills[f"AuthorPatch:{slot}"] = AuthorPatchSkill(
                 slot, author_backend, task_text or "", context_files,
