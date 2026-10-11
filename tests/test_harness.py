@@ -296,6 +296,10 @@ def test_a_patch_that_edits_an_existing_test_file_is_refused(repo, tmp_path):
     result = AuthorPatchSkill("c", FakeBackend(impl + edit),
                               "implement add and update the tests").run(ctx)
     assert result.ok, result.claims
+    # self_heal's own task says "do not edit tests": a prohibition, not leave.
+    result = AuthorPatchSkill("d", FakeBackend(impl + edit),
+                              "implement add; do not edit tests").run(ctx)
+    assert not result.ok, result.claims
 
 
 def test_an_infeasible_verdict_is_recorded_and_withdraws_authoring(repo, tmp_path):

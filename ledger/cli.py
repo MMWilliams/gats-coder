@@ -2236,7 +2236,48 @@ def build_parser() -> argparse.ArgumentParser:
     p = sub.add_parser("stats", help="show a persisted graph's statistics")
     p.add_argument("graph")
     p.set_defaults(fn=cmd_stats)
+
+    p = sub.add_parser("improve", help=(
+        "audit LEDGER's own source and fix what it finds, one verified "
+        "commit at a time on branch ledger/self-improve"))
+    p.add_argument("--source", default=None,
+                   help="LEDGER checkout to improve (default: this installation's)")
+    p.add_argument("--audit-only", action="store_true",
+                   help="write the component report and stop")
+    p.add_argument("--max-iterations", type=int, default=None,
+                   help="stop after N fixes attempted (default: until every "
+                        "finding is fixed or tried twice)")
+    p.add_argument("--pause", type=float, default=0,
+                   help="seconds between iterations")
+    p.add_argument("--test-timeout", type=int, default=2400,
+                   help="deadline for one run of the whole test suite")
+    p.add_argument("--author-timeout", type=int, default=0,
+                   help="deadline for one authoring call; 0 means none")
+    add_backend(p)
+    p.set_defaults(fn=cmd_improve)
     return ap
+
+
+def cmd_improve(args) -> int:
+    from .improve import improve, independent_backend
+    source = Path(args.source or Path(__file__).resolve().parent.parent)
+    # LEDGER fixes itself with a local model, never Claude.
+    backend = args.backend or "ollama"
+    backend_args = ["--backend", backend]
+    for flag, value in (("--model", args.model), ("--base-url", args.base_url)):
+        if value:
+            backend_args += [flag, value]
+    refusal = independent_backend(backend_args)
+    if not args.audit_only and (refusal or (backend == "ollama" and not args.model)):
+        print(ui.warn("  " + (refusal or "pass --model with a local model "
+                                         "(see `ollama list`)")))
+        return 2
+    result = improve(source, max_iterations=args.max_iterations,
+                     audit_only=args.audit_only, pause=args.pause,
+                     test_timeout=args.test_timeout, backend_args=backend_args,
+                     author_timeout=args.author_timeout)
+    print(json.dumps(result))
+    return 0
 
 
 def _welcome() -> int:

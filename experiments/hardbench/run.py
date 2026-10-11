@@ -1,6 +1,9 @@
 """Run a hardbench task through LEDGER, then grade it on the hidden suite.
 
-    python run.py rk45 [--backend claude] [--max-steps 40] [--attempts 10]
+    python run.py rk45 --model qwen3.8:27b [--backend ollama] [--max-steps 40]
+
+LEDGER solves the task alone: Claude backends are refused (reese, 2026-10-11),
+and the journal is checked afterwards for any Claude model id.
 
 The repo LEDGER sees holds TASK.md, the stub and the visible tests only. The
 hidden suite lives here and is run against the episode worktree afterwards,
@@ -56,9 +59,10 @@ def pytest_counts(worktree, target):
 
 
 def journal_stats(path):
-    actions, esc, end = [], None, None
+    actions, esc, end, models = [], None, None, set()
     for line in path.read_text(encoding="utf-8").splitlines():
         e = json.loads(line)
+        models.update(str(e[k]) for k in ("model", "goal_backend") if e.get(k))
         if e.get("t") == "EXEC":
             actions.append(e["action"])
         elif e.get("t") == "ESCALATION":
@@ -68,17 +72,22 @@ def journal_stats(path):
     return {"steps": len(actions),
             "author_attempts": sum(a.startswith("AuthorPatch") for a in actions),
             "escalation": esc.get("reason") if esc else None,
-            "success": bool(end and end.get("success")), "plan": actions}
+            "success": bool(end and end.get("success")), "plan": actions,
+            "models": sorted(models),
+            "independent": not any(re.search(r"claude|anthropic", m, re.I) for m in models)}
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("task")
-    ap.add_argument("--backend", default="claude")
+    ap.add_argument("--backend", default="ollama")
+    ap.add_argument("--model", required=True, help="local model, e.g. qwen3.8:27b")
     ap.add_argument("--max-steps", type=int, default=40)
     ap.add_argument("--attempts", type=int, default=10)
     ap.add_argument("--tag", default="")
     a = ap.parse_args()
+    if re.search(r"claude|anthropic", f"{a.backend} {a.model}", re.I):
+        sys.exit("LEDGER must solve the task alone: no Claude backend")
     run = WORK / f"{a.task}-{a.backend}{a.tag}"
     repo, out = run / "repo", run / "episode"
     fresh_repo(a.task, repo)
@@ -87,7 +96,7 @@ def main():
     task = (HERE / "tasks" / a.task / "TASK.md").read_text(encoding="utf-8")
     cmd = ["ledger", "run", task, "--repo", str(repo), "--out", str(out), "--test", VISIBLE,
            "--kind", "library", "--profile", "autonomous", "--yes", "--no-launch",
-           "--no-product-review", "--backend", a.backend, "--max-steps", str(a.max_steps),
+           "--no-product-review", "--backend", a.backend, "--model", a.model, "--max-steps", str(a.max_steps),
            "--max-author-attempts", str(a.attempts), "--author-timeout", "0", "--json"]
     t0 = time.time()
     p = sh(cmd, repo, timeout=4 * 3600)

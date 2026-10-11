@@ -89,6 +89,7 @@ _TEST_PATH = re.compile(
 _TEST_EDIT_ASKED = re.compile(
     r"\b(add|write|update|change|modify|extend|edit|adjust|rewrite|create|replace|"
     r"delete|remove)\w*\s+(?:\w+\s+){0,3}tests?\b", re.I)
+_NEGATED = re.compile(r"(?:\bnot|\bnever|\bno|\bwithout|n't)\s+(?:\w+\s+){0,2}$", re.I)
 
 
 def diff_paths(diff: str) -> list[str]:
@@ -107,7 +108,11 @@ def protected_test_edits(worktree: Path, diff: str, task_text: str) -> list[str]
     for test changes. New test files pass: adding tests cannot lower the bar.
     Hardbench crc: two contradictory tests, and the author made the suite
     green by rewriting one; the journal certified success on a moved bar."""
-    if os.environ.get("LEDGER_ALLOW_TEST_EDITS") or _TEST_EDIT_ASKED.search(task_text):
+    # "do not edit the tests" names the same verb as "edit the tests": a
+    # negated request is a prohibition, not permission.
+    asked = any(not _NEGATED.search(task_text[max(0, m.start() - 30):m.start()])
+                for m in _TEST_EDIT_ASKED.finditer(task_text))
+    if os.environ.get("LEDGER_ALLOW_TEST_EDITS") or asked:
         return []
     return [p for p in diff_paths(diff)
             if _TEST_PATH.search(p) and (Path(worktree) / p).is_file()]
