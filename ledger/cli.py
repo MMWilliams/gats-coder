@@ -37,6 +37,8 @@ from .world_model import LayeredWorldModel
 
 DEFAULT_TEST_CMD = ["python", "-m", "pytest", "-q"]
 DEFAULT_AUTHOR_ATTEMPTS = 6
+repo_root = Path(__file__).resolve().parent.parent
+Attempt = AgentSpec
 
 
 # -- helpers -----------------------------------------------------------------
@@ -407,6 +409,7 @@ def _launch_if_asked(args, cfg, repo_root):
 
 def cmd_run(args) -> int:
     root = Path(args.repo).resolve()
+    repo_root = root
     if not (root / ".git").exists():
         return _fail(f"{root} is not a git repository")
     cfg_file = _config(root)

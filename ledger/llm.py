@@ -250,7 +250,16 @@ class OpenAIAPIBackend:
         choices = resp.get("choices") or []
         if not choices:
             raise RuntimeError(f"no choices in response from {self._base}")
-        return str((choices[0].get("message") or {}).get("content") or "")
+        message = choices[0].get("message") or {}
+        content = str(message.get("content") or "")
+        if not content.strip():
+            reasoning = message.get("reasoning")
+            if reasoning:
+                raise RuntimeError(
+                    f"empty content from {self._base}: model returned "
+                    f"reasoning ({len(str(reasoning))} chars) but no visible reply"
+                )
+        return content
 
     def health_check(self, timeout: float = 5.0) -> bool:
         """Cheap reachability probe (no completion tokens spent).
