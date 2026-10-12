@@ -40,13 +40,24 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       primes, rk45, hf, sat, specfun, stiff, hm, algo, factor, delaunay,
       ising, one at a time. Contamination audit: FINDINGS #5.
       squeeze local: proved infeasible in 1 attempt, no code (FINDINGS #6).
-- [ ] PAUSED 10-11 ~10:30: improve loop reaped by Claude Code for low
-      memory (free commit 3.6 GB). Main cause was mine: an orphaned
-      llama-server (24.8 GB commit) from restarting Ollama without
-      unloading; killed, commit back to 22.8 GB. Iterations 1-2 crashed
-      on my quoted --check command (fixed); 3 (research.py tests) rejected
-      by the re-audit, a written test failed. Resume only on reese's go:
-      `ledger improve --model qwen3.8:27b --max-iterations 5`.
+- [ ] Local bench PAUSED 10-11 18:15 after rk45: crc 10/10, primes 4/10,
+      rk45 4/10. primes and rk45 got 4 EMPTY author replies each (qwen3.8
+      thought 14k-21k tokens, LEDGER's OpenAI backend reads only `content`,
+      thinking budget only for Bonsai). reese chose "LEDGER fixes it": bug
+      filed as failing test 5cb2339 on ledger/self-improve; improve run 3
+      failed 2/2 (model rewrites llm.py whole, drops extract_json, guards
+      revert). 4 more tries: FIXED by LEDGER alone in 20a19e0 (raises a
+      clear "empty content ... reasoning" error). Branch MERGED into main
+      10-11 on reese's go (573 passed). Still in main from d9af53b: the wrong
+      `Attempt = AgentSpec` alias in cli.py. Root cause (unbounded thinking)
+      still open; next: file it as a failing test for `ledger improve`. Then hf, sat, specfun,
+      stiff, hm, algo, factor, delaunay, ising.
+- [ ] `ledger improve` run 2 done 10-11 17:45 (FINDINGS #6): branch
+      ledger/self-improve has d9af53b (cli.py repo_root, real fix plus a WRONG
+      `Attempt = AgentSpec` lint silencer) and 0481dfd (wizard tests, clean).
+      reese to review before any merge. Loophole: acceptance only checks the
+      lint finding is gone. Trap: the Ollama desktop app autostarts an
+      UNPINNED server on 11434; kill it and start ollama_gpu1.cmd first.
 - [ ] LEDGER bugs seen, NOT fixed (independence rule; for LEDGER to find):
       `cli._test_cmd` splits `--test` on whitespace (quotes and spaced
       paths break), and RunSuite lets a FileNotFoundError from an

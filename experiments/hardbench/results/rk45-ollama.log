@@ -1,0 +1,29 @@
+{
+ "task": "rk45",
+ "backend": "ollama",
+ "wall_s": 518,
+ "ledger_exit": 1,
+ "steps": 3,
+ "author_attempts": 2,
+ "escalation": "no_path",
+ "success": false,
+ "plan": [
+  "RunSuite",
+  "AuthorPatch:a",
+  "AuthorPatch:b"
+ ],
+ "models": [
+  "ollama:qwen3.8:27b"
+ ],
+ "independent": true,
+ "visible": {
+  "passed": 0,
+  "failed": 7,
+  "summary": "7 failed in 0.95s"
+ },
+ "hidden": {
+  "passed": 0,
+  "failed": 8,
+  "summary": "8 failed in 6.34s"
+ }
+}

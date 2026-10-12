@@ -1,0 +1,29 @@
+{
+ "task": "primes",
+ "backend": "ollama",
+ "wall_s": 862,
+ "ledger_exit": 1,
+ "steps": 3,
+ "author_attempts": 2,
+ "escalation": "no_path",
+ "success": false,
+ "plan": [
+  "RunSuite",
+  "AuthorPatch:a",
+  "AuthorPatch:b"
+ ],
+ "models": [
+  "ollama:qwen3.8:27b"
+ ],
+ "independent": true,
+ "visible": {
+  "passed": 0,
+  "failed": 14,
+  "summary": "14 failed in 0.20s"
+ },
+ "hidden": {
+  "passed": 0,
+  "failed": 6,
+  "summary": "6 failed in 0.19s"
+ }
+}
