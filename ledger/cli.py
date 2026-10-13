@@ -38,7 +38,7 @@ from .world_model import LayeredWorldModel
 DEFAULT_TEST_CMD = ["python", "-m", "pytest", "-q"]
 DEFAULT_AUTHOR_ATTEMPTS = 6
 repo_root = Path(__file__).resolve().parent.parent
-Attempt = AgentSpec
+from .modes import Attempt
 
 
 # -- helpers -----------------------------------------------------------------
