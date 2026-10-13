@@ -50,7 +50,12 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       clear "empty content ... reasoning" error). Branch MERGED into main
       10-11 on reese's go (573 passed). Still in main from d9af53b: the wrong
       `Attempt = AgentSpec` alias in cli.py. Root cause (unbounded thinking)
-      still open; next: file it as a failing test for `ledger improve`. Then hf, sat, specfun,
+      still open; next: file it as a failing test for `ledger improve`.
+      DONE 10-12: bug tests 8b8a122; LEDGER fixed both alone (retry with
+      reasoning_effort none; real modes.Attempt import) + state.py tests;
+      merged 276fc2e (595 passed). primes rerun (--tag=-run2) REAPED 10-13
+      for low memory (UnrealEditor 30 GB + my model 27.7 GB); model
+      unloaded. Restart only on reese's go, then rk45 and the other 9. Then hf, sat, specfun,
       stiff, hm, algo, factor, delaunay, ising.
 - [ ] `ledger improve` run 2 done 10-11 17:45 (FINDINGS #6): branch
       ledger/self-improve has d9af53b (cli.py repo_root, real fix plus a WRONG
