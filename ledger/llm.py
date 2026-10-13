@@ -255,10 +255,24 @@ class OpenAIAPIBackend:
         if not content.strip():
             reasoning = message.get("reasoning")
             if reasoning:
-                raise RuntimeError(
-                    f"empty content from {self._base}: model returned "
-                    f"reasoning ({len(str(reasoning))} chars) but no visible reply"
-                )
+                # Recover: retry with thinking disabled so the model
+                # produces a visible reply instead of exhausting budget.
+                retry_payload = dict(payload)
+                retry_payload["reasoning_effort"] = "none"
+                resp2 = _post_json(
+                    f"{self._base}/chat/completions", headers, retry_payload,
+                    self._timeout)
+                choices2 = resp2.get("choices") or []
+                if not choices2:
+                    raise RuntimeError(
+                        f"no choices in recovery response from {self._base}")
+                message2 = choices2[0].get("message") or {}
+                content2 = str(message2.get("content") or "")
+                if not content2.strip():
+                    raise RuntimeError(
+                        f"empty content from {self._base} even after "
+                        f"recovery with reasoning_effort=none")
+                return content2
         return content
 
     def health_check(self, timeout: float = 5.0) -> bool:
