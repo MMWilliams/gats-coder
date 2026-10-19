@@ -93,6 +93,79 @@ COLOR = _detect_color()
 UNICODE = _detect_unicode()
 
 
+def _detect_truecolor() -> bool:
+    """24-bit colour where the terminal says so; 256-colour otherwise
+    (every terminal that speaks ANSI at all speaks that)."""
+    if os.environ.get("COLORTERM", "").lower() in ("truecolor", "24bit"):
+        return True
+    return bool(os.environ.get("WT_SESSION")) or os.environ.get(
+        "TERM_PROGRAM") in ("iTerm.app", "vscode", "WezTerm", "ghostty", "Hyper")
+
+
+TRUECOLOR = _detect_truecolor()
+
+# The palette. Violet into cyan is LEDGER's mark; the rest carry meaning
+# (green verified, amber attention, red refused) and never decoration.
+THEME = {
+    "violet": (139, 92, 246), "indigo": (99, 102, 241), "cyan": (34, 211, 238),
+    "green": (74, 222, 128), "amber": (251, 191, 36), "red": (248, 113, 113),
+    "pink": (244, 114, 182), "gray": (125, 125, 140), "white": (236, 236, 244),
+    "slate": (71, 85, 105),
+}
+
+
+def _sgr(color: tuple[int, int, int], bg: bool = False) -> str:
+    r, g, b = color
+    if TRUECOLOR:
+        return f"{48 if bg else 38};2;{r};{g};{b}"
+    n = 16 + 36 * round(r / 255 * 5) + 6 * round(g / 255 * 5) + round(b / 255 * 5)
+    return f"{48 if bg else 38};5;{n}"
+
+
+def rgb(text: str, color, *, bold: bool = False, bg=None) -> str:
+    """Text in a theme colour (a THEME name or an (r, g, b) triple)."""
+    if not COLOR or not text:
+        return text
+    fg = THEME[color] if isinstance(color, str) else color
+    codes = [_sgr(fg)]
+    if bg is not None:
+        codes.append(_sgr(THEME[bg] if isinstance(bg, str) else bg, bg=True))
+    if bold:
+        codes.insert(0, "1")
+    return f"\x1b[{';'.join(codes)}m{text}\x1b[0m"
+
+
+def _mix(a, b, t: float):
+    return tuple(round(x + (y - x) * t) for x, y in zip(a, b))
+
+
+def gradient(text: str, start="violet", end="cyan", *, bold: bool = False,
+             phase: float = 0.0) -> str:
+    """`text` swept from one colour to another, character by character.
+    `phase` rotates the sweep, which is all an animation needs."""
+    if not COLOR or not text:
+        return text
+    a = THEME[start] if isinstance(start, str) else start
+    b = THEME[end] if isinstance(end, str) else end
+    n = max(1, len(text) - 1)
+    out = []
+    for i, ch in enumerate(text):
+        if ch == " ":
+            out.append(ch)
+            continue
+        t = (i / n + phase) % 2.0
+        t = t if t <= 1.0 else 2.0 - t          # ping-pong, no hard seam
+        out.append(f"\x1b[{'1;' if bold else ''}{_sgr(_mix(a, b, t))}m{ch}")
+    return "".join(out) + "\x1b[0m"
+
+
+def badge(text: str, kind: str = "violet") -> str:
+    """A filled pill: ` PERMISSIONS OFF ` on red, ` resumed ` on violet."""
+    if not COLOR:
+        return f"[{text}]"
+    return rgb(f" {text} ", (15, 15, 20), bold=True, bg=kind)
+
+
 def diagnostics() -> list[tuple[str, str, bool]]:
     """(label, detail, healthy) rows explaining what this console got and
     why -- so 'the UI looks different in my terminal' is answerable."""
@@ -162,23 +235,23 @@ def style(text: str, *names: str) -> str:
 
 
 def ok(text: str) -> str:
-    return style(text, "bright_green")
+    return rgb(text, "green")
 
 
 def bad(text: str) -> str:
-    return style(text, "bright_red")
+    return rgb(text, "red")
 
 
 def warn(text: str) -> str:
-    return style(text, "bright_yellow")
+    return rgb(text, "amber")
 
 
 def accent(text: str) -> str:
-    return style(text, "bright_cyan")
+    return rgb(text, "cyan")
 
 
 def dim(text: str) -> str:
-    return style(text, "gray")
+    return rgb(text, "gray")
 
 
 def bold(text: str) -> str:
@@ -259,6 +332,37 @@ def table(rows: list[list[str]], header: list[str] | None = None,
     for i, r in enumerate(rows):
         lines.append(render(r, False, i == highlight))
     return "\n".join(lines)
+
+
+def panel(title: str, lines: list[str], *, color: str = "slate",
+          width: int | None = None, title_color: str = "white") -> str:
+    """A rounded box around `lines` with a title in its top edge. Widths come
+    from the visible text, so styled content keeps the box square."""
+    if width is None:
+        import shutil
+        width = min(max(40, shutil.get_terminal_size().columns) - 1, 96)
+    tl, tr, bl, br, h, v = ("╭", "╮", "╰", "╯", "─", "│") if UNICODE         else ("+", "+", "+", "+", "-", "|")
+    inner = width - 4
+    head = f"{h} " + rgb(title, title_color, bold=True) + " " if title else h
+    top = rgb(tl, color) + rgb(head[:1], color) + head[1:]         + rgb(h * max(1, width - 2 - visible_len(head)) + tr, color)
+    out = [top]
+    for line in lines:
+        for chunk in _wrap_visible(line, inner):
+            pad = " " * max(0, inner - visible_len(chunk))
+            out.append(rgb(v, color) + " " + chunk + pad + " " + rgb(v, color))
+    out.append(rgb(bl + h * (width - 2) + br, color))
+    return "\n".join(out)
+
+
+def _wrap_visible(line: str, room: int) -> list[str]:
+    """Split a possibly styled line so no piece is wider than `room`.
+    Plain lines wrap on spaces; styled ones are kept whole when they fit
+    and otherwise cut on their plain text (losing the styling of that line
+    beats a broken frame)."""
+    if visible_len(line) <= room:
+        return [line]
+    import textwrap
+    return textwrap.wrap(plain(line), room) or [""]
 
 
 def next_steps(*commands: str) -> str:

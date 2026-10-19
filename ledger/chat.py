@@ -253,7 +253,8 @@ class Conversation:
                                 escalation=outcome.get("escalation"),
                                 branch=outcome.get("branch"),
                                 worktree=outcome.get("worktree"),
-                                merged=outcome.get("merged"))
+                                merged=outcome.get("merged"),
+                                summary=summary)
         self.turns.append(Turn("user", user_text))
         self.turns.append(Turn("assistant", summary))
 
@@ -272,6 +273,8 @@ HELP = """Commands:
   /tree              re-read the repository file list
   /clear             forget the conversation (keeps repo context)
   /save <path>       write the transcript to a file
+  /status            model, permissions, session, where keys live
+  /sessions          earlier sessions here (resume: ledger -r <n>)
   /exit              leave chat
 Plain messages are routed automatically: questions get answers, change
 requests run as verified, journaled episodes -- right here."""
@@ -331,7 +334,8 @@ def _run_change(conv: Conversation, runner, user_text: str, task: str,
 
 
 def repl(conv: Conversation, root: Path, *, input_fn=input,
-         output_fn=print, runner=None, busy=None, greet=True) -> int:
+         output_fn=print, runner=None, busy=None, greet=True,
+         commands: dict | None = None) -> int:
     """Interactive loop -- the one session for everything. `input_fn` /
     `output_fn` are injected so the loop is testable without a terminal;
     `runner` (task_text -> outcome dict) executes change episodes inline;
@@ -406,6 +410,9 @@ def repl(conv: Conversation, root: Path, *, input_fn=input,
                 continue
             _run_change(conv, runner, line, task, input_fn, output_fn,
                         confirm=False, busy=busy, root=root)
+            continue
+        if commands and line in commands:
+            output_fn(commands[line]())
             continue
         if line.startswith("/"):
             output_fn(f"unknown command {line.split()[0]!r} -- /help for the list")

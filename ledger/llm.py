@@ -20,6 +20,9 @@ import urllib.request
 from pathlib import Path
 from typing import Callable, Protocol
 
+from . import credentials
+from .credentials import scrub
+
 
 def kill_process_tree(pid: int) -> None:
     """Kill a process and everything it spawned.
@@ -126,7 +129,7 @@ class ClaudeCLIBackend:
             stderr=subprocess.PIPE, text=True, encoding="utf-8",
             errors="replace")
         try:
-            out, err = proc.communicate(prompt, timeout=self._timeout)
+            out, err = proc.communicate(scrub(prompt), timeout=self._timeout)
         except subprocess.TimeoutExpired:
             # The shim is cmd.exe and the model runs as its grandchild, so
             # killing the direct child alone orphans a running model call
@@ -148,15 +151,17 @@ def _post_json(url: str, headers: dict, payload: dict,
                timeout: int) -> dict:
     """POST JSON, return parsed JSON. stdlib-only on purpose -- the package
     has zero dependencies and provider SDKs would change that."""
+    # The prompt is scrubbed of every key LEDGER knows: a key pasted into a
+    # chat, or sitting in a file the model was shown, is not sent anywhere.
     req = urllib.request.Request(
         url, method="POST",
-        data=json.dumps(payload).encode("utf-8"),
+        data=scrub(json.dumps(payload)).encode("utf-8"),
         headers={"content-type": "application/json", **headers})
     try:
         with urllib.request.urlopen(req, timeout=timeout) as resp:
             return json.loads(resp.read().decode("utf-8", errors="replace"))
     except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")[:300]
+        body = scrub(exc.read().decode("utf-8", errors="replace")[:300])
         raise RuntimeError(f"{url} -> HTTP {exc.code}: {body}") from exc
     except urllib.error.URLError as exc:
         raise RuntimeError(f"{url} unreachable: {exc.reason}") from exc
@@ -168,18 +173,15 @@ class AnthropicAPIBackend:
     def __init__(self, model: str = "claude-sonnet-5",
                  api_key: str | None = None,
                  base_url: str | None = None, timeout: int = 180,
-                 max_tokens: int = 8192):
+                 max_tokens: int = 8192, trusted_url: bool = False):
         # Environment first (an exported key is a deliberate override for
-        # this shell), then whatever `ledger setup` stored. Before the store
-        # existed, the only way to configure this was an environment
-        # variable that vanished with the terminal.
-        from .credentials import get as _stored_key
-        self._key = api_key or _stored_key("anthropic")
-        if not self._key:
-            raise RuntimeError(
-                "no Anthropic key: set ANTHROPIC_API_KEY, or run "
-                "`ledger setup --key anthropic`")
+        # this shell), then whatever `ledger setup` stored -- and either only
+        # to a host the key is bound to (see credentials.key_for_url).
         self._base = (base_url or "https://api.anthropic.com").rstrip("/")
+        self._key = api_key or credentials.key_for_url(
+            "anthropic", self._base, trusted_url)
+        if not self._key:
+            raise RuntimeError(_no_key("anthropic", self._base))
         self._model = model
         self._timeout = timeout
         self._max_tokens = max_tokens
@@ -207,10 +209,15 @@ class OpenAIAPIBackend:
 
     def __init__(self, model: str, api_key: str | None = None,
                  base_url: str = "https://api.openai.com/v1",
-                 timeout: int = 180, id_prefix: str = "openai"):
-        from .credentials import get as _stored_key
-        self._key = api_key if api_key is not None else _stored_key("openai")
+                 timeout: int = 180, id_prefix: str = "openai",
+                 trusted_url: bool = False):
         self._base = base_url.rstrip("/")
+        if api_key is None:
+            # The key follows the host: DeepSeek's key to DeepSeek, Groq's to
+            # Groq, and nobody's to a host the repository config named.
+            provider = credentials.provider_for_url(self._base) or "openai"
+            api_key = credentials.key_for_url(provider, self._base, trusted_url)
+        self._key = api_key
         self._model = model
         self._timeout = timeout
         self.id = f"{id_prefix}:{model}"
@@ -321,11 +328,25 @@ def with_timeout(backend, seconds: int):
     return clone
 
 
+def _no_key(provider: str, base: str) -> str:
+    """Why there is no key to send, and the one command that fixes it."""
+    import urllib.parse
+    host = urllib.parse.urlparse(base).hostname or base
+    if credentials.get(provider) and host not in credentials.bound_hosts(provider):
+        return (f"not sending your {provider} key to {host}: that address is "
+                "not the provider's and you have not bound the key to it. "
+                f"If you trust it: ledger setup --key {provider} --host {host}")
+    var = credentials.ENV_VAR.get(provider, "")
+    return (f"no {provider} key: run `ledger setup --key {provider}`"
+            + (f" (or export {var})" if var else ""))
+
+
 def resolve_backend(kind: str, model: str | None = None,
                     base_url: str | None = None,
-                    timeout: int | None = None):
+                    timeout: int | None = None, trusted_url: bool = False):
     """One resolver for every surface (run/chat/review/session specs).
-    Returns None for kind='none'."""
+    Returns None for kind='none'. `trusted_url`: the base URL came from the
+    user (a flag, or ~/.ledger/config.json), not from a repository."""
     kind = (kind or "claude").lower()
     if kind == "none":
         return None
@@ -334,7 +355,8 @@ def resolve_backend(kind: str, model: str | None = None,
     if kind == "anthropic":
         return AnthropicAPIBackend(model=model or "claude-sonnet-5",
                                    base_url=base_url,
-                                   timeout=timeout or 300)
+                                   timeout=timeout or 300,
+                                   trusted_url=trusted_url)
     if kind == "openai":
         if not model:
             raise RuntimeError("backend 'openai' needs a model "
@@ -342,7 +364,8 @@ def resolve_backend(kind: str, model: str | None = None,
         return OpenAIAPIBackend(model=model,
                                 base_url=base_url
                                 or "https://api.openai.com/v1",
-                                timeout=timeout or 300)
+                                timeout=timeout or 300,
+                                trusted_url=trusted_url)
     if kind == "ollama":
         if not model:
             raise RuntimeError("backend 'ollama' needs a model "

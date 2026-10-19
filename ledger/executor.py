@@ -23,7 +23,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Protocol
 
-from . import sandbox
+from . import credentials, sandbox
 from .actions import Action, Catalog
 from .failures import (FailureTracker, broken_imports, failure_sensor,
                        importers_of, tracked_python)
@@ -87,6 +87,9 @@ _SECRET_PATTERNS = [
     (re.compile(r"(?i)(bearer\s+)[a-z0-9_.=+/-]{16,}"), r"\1[REDACTED]"),
     (re.compile(r"\bgh[pousr]_[A-Za-z0-9]{20,}\b"), "[REDACTED]"),
     (re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b"), "[REDACTED]"),
+    (re.compile(r"\bgsk_[A-Za-z0-9]{20,}\b"), "[REDACTED]"),
+    (re.compile(r"\bxai-[A-Za-z0-9]{20,}\b"), "[REDACTED]"),
+    (re.compile(r"\bAIza[0-9A-Za-z_-]{35}\b"), "[REDACTED]"),
     (re.compile(r"\bAKIA[0-9A-Z]{16}\b"), "[REDACTED]"),
     (re.compile(r"(?i)((?:api[_-]?key|access[_-]?token|auth[_-]?token|"
                 r"secret|password|passwd)\s*[=:]\s*)[^\s'\"]{8,}"),
@@ -95,6 +98,9 @@ _SECRET_PATTERNS = [
 
 
 def redact_secrets(text: str) -> str:
+    # Exact values first: a key LEDGER loaded is removed whatever its shape,
+    # including shapes no pattern below anticipates.
+    text = credentials.scrub(text)
     for pattern, replacement in _SECRET_PATTERNS:
         text = pattern.sub(replacement, text)
     return text
@@ -541,7 +547,8 @@ class ProposedSkill:
         ctx.say(f"{self.name}: {self.command}")
         try:
             proc = subprocess.run(self.command, cwd=ctx.worktree, shell=True,
-                                  capture_output=True, text=True, timeout=900)
+                                  capture_output=True, text=True, timeout=900,
+                                  env=credentials.child_env())
         except subprocess.SubprocessError as exc:
             return SkillResult(ok=False, claimed_props=frozenset(),
                                claims=[f"{self.name} could not run: {exc}"],

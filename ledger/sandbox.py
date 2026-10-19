@@ -106,7 +106,10 @@ def _new_job():
 
 def popen(cmd, **kwargs) -> Job:
     """Start `cmd` inside a fresh job. Fails closed: a process that cannot
-    be contained is not started."""
+    be contained is not started. Provider API keys are stripped from its
+    environment: whatever it runs came from the repository."""
+    from .credentials import child_env
+    kwargs["env"] = child_env(kwargs.get("env"))
     if not _WINDOWS:
         return Job(subprocess.Popen(cmd, start_new_session=True, **kwargs))
     handle = _new_job()

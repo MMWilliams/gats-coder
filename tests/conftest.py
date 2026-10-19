@@ -19,6 +19,18 @@ TEST_CMD = [sys.executable, "-m", "pytest", "-q", "--no-header",
             "-p", "no:cacheprovider"]
 
 
+@pytest.fixture(autouse=True)
+def _isolated_vault(monkeypatch):
+    """Keep tests out of the real keychain (DPAPI keeps nothing outside the
+    file, so it is safe), and start each test knowing no secrets."""
+    from ledger import credentials
+    if sys.platform != "win32":
+        monkeypatch.setenv("LEDGER_VAULT", "file")
+    credentials._LOADED.clear()
+    yield
+    credentials._LOADED.clear()
+
+
 def _git(root, *args):
     subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
                    check=True)

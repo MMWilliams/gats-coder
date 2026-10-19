@@ -22,6 +22,16 @@ def _entry_hash(entry_without_h: dict) -> str:
     return hashlib.sha256(canonical(entry_without_h).encode("utf-8")).hexdigest()
 
 
+def _scrubbed(value, redact):
+    if isinstance(value, str):
+        return redact(value)
+    if isinstance(value, dict):
+        return {k: _scrubbed(v, redact) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_scrubbed(v, redact) for v in value]
+    return value
+
+
 def runs(entries: list) -> list[list]:
     """A journal's runs, in order, one per HEADER.
 
@@ -59,9 +69,13 @@ class Journal:
         self._fh = open(path, "a", encoding="utf-8", newline="\n")
 
     def append(self, t: str, **payload) -> str:
-        entry = {"i": self._i, "t": t, "prev": self._prev, **payload}
         if "h" in payload:
             raise ValueError("'h' is a reserved journal field")
+        # Journals are made to be shared (bug reports, audits, receipts), so
+        # no credential is ever written into one -- chat text included.
+        from .executor import redact_secrets
+        payload = _scrubbed(payload, redact_secrets)
+        entry = {"i": self._i, "t": t, "prev": self._prev, **payload}
         h = _entry_hash(entry)
         entry["h"] = h
         self._fh.write(canonical(entry) + "\n")

@@ -129,8 +129,10 @@ def _choose_backend(echo) -> dict | None:
             if not key:
                 echo("   nothing entered, skipping")
                 return None
-            path = credentials.put(provider, key)
-            echo(f"   {ui.OK} saved to {path} {ui.dim('(owner-readable only)')}")
+            credentials.put(provider, key)
+            echo(f"   {ui.OK} sealed in {credentials.describe(credentials.vault())}")
+            echo(ui.dim("     it never leaves this machine except to "
+                        + ", ".join(sorted(credentials.PROVIDER_HOSTS.get(provider, ())))))
         backend_id = "anthropic" if provider == "anthropic" else "openai"
         cfg = {"backend": {"id": backend_id}}
         base = {"deepseek": "https://api.deepseek.com/v1",

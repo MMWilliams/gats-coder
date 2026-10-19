@@ -22,6 +22,8 @@ import socket
 import subprocess
 import sys
 import webbrowser
+
+from .credentials import child_env
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -108,9 +110,10 @@ def launch(root: Path | str, command: str | None = None,
         if plan.kind == "explicit":
             # A user-supplied string goes through the shell so that pipes and
             # && behave the way they do when typed.
-            subprocess.Popen(plan.note, cwd=str(root), shell=True)
+            subprocess.Popen(plan.note, cwd=str(root), shell=True,
+                             env=child_env())
         else:
-            subprocess.Popen(plan.command, cwd=str(root),
+            subprocess.Popen(plan.command, cwd=str(root), env=child_env(),
                              stdout=subprocess.DEVNULL,
                              stderr=subprocess.DEVNULL)
     except OSError:

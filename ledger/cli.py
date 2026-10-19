@@ -59,7 +59,8 @@ def _backend(args, cfg: dict | None = None):
     timeout = block.get("timeout")
     try:
         return resolve_backend(kind, model, base_url,
-                               int(timeout) if timeout else None)
+                               int(timeout) if timeout else None,
+                               trusted_url=_user_chose(args, base_url))
     except RuntimeError as exc:
         # Nothing configured anywhere means this is a first run, not a
         # broken one. Making someone read an error, find the setup command
@@ -85,10 +86,22 @@ def _backend(args, cfg: dict | None = None):
                             new_block.get("id") or new_block.get("kind")
                             or "claude",
                             new_block.get("model"), new_block.get("base_url"),
-                            None)
+                            None, trusted_url=_user_chose(args, new_block.get("base_url")))
                     except RuntimeError as retry_exc:
                         raise SystemExit(str(retry_exc))
         raise SystemExit(str(exc))
+
+
+def _user_chose(args, base_url: str | None) -> bool:
+    """Whether `base_url` came from the user -- the command line, or their own
+    ~/.ledger/config.json -- rather than a repository's committed config,
+    which anyone can write and which must never steer a key elsewhere."""
+    if not base_url:
+        return False
+    if getattr(args, "base_url", None) == base_url:
+        return True
+    home = _read_config(Path.home() / ".ledger" / "config.json").get("backend")
+    return isinstance(home, dict) and home.get("base_url") == base_url
 
 
 def _read_config(p: Path) -> dict:
@@ -734,10 +747,8 @@ def _chat_runner(root: Path, args, cfg_file: dict, backend, provenance=None):
                  f"[{result.steps} steps, {executor.incidents} incidents"
                  + (f", escalated: {reason}" if reason else "") + "]. "
                  f"Its work is on branch {branch} in {worktree}.")
-        styled = "\n".join(filter(None, [
-            ui.headline(result.success,
-                        f"episode {name} {ui.DASH} goal reached",
-                        f"episode {name} {ui.DASH} goal NOT reached"),
+        rows = list(filter(None, [
+            ui.headline(result.success, "goal reached", "goal NOT reached"),
             ui.kv("plan", ui.plan_chain(result.plan)),
             ui.kv("verify",
                   (ui.ok(f"{ui.OK} 0 incidents") if executor.incidents == 0
@@ -745,9 +756,12 @@ def _chat_runner(root: Path, args, cfg_file: dict, backend, provenance=None):
                   + (f"  {ui.warn(str(executor.denials) + ' denials')}"
                      if executor.denials else "")),
             ui.kv("escalated", ui.bad(reason)) if reason else "",
+            ui.kv("branch", ui.accent(branch)),
             ui.kv("journal", ui.dim(str(journal_path))),
             ui.dim(f"  audit: ledger vis {journal_path}"),
         ]))
+        styled = ui.panel(f"episode  {name}", rows,
+                          color="green" if result.success else "red")
         from .repo import fast_forward
         return {"success": result.success, "plan": result.plan,
                 "steps": result.steps, "incidents": executor.incidents,
@@ -764,6 +778,88 @@ def _chat_runner(root: Path, args, cfg_file: dict, backend, provenance=None):
     return runner
 
 
+def _session_commands(args, root: Path, backend, journal_path: Path,
+                      profile: str) -> dict:
+    """/status and /sessions: what this session is, and what came before."""
+    from . import credentials, sessions
+
+    def status() -> str:
+        skip = getattr(args, "dangerously_skip_permissions", False)
+        rows = [
+            ui.kv("model", ui.rgb(getattr(backend, "id", "?"), "violet")),
+            ui.kv("profile", profile),
+            ui.kv("permissions", ui.bad("OFF (every gate bypassed)") if skip
+                  else ui.ok("on: gated actions ask first")),
+            ui.kv("session", journal_path.stem),
+            ui.kv("transcript", ui.dim(str(journal_path))),
+            ui.kv("keys", ui.dim(credentials.describe(credentials.vault())
+                                 + "; never sent to tests, hooks or prompts")),
+        ]
+        return ui.panel("status", rows, color="violet")
+
+    def listing() -> str:
+        found = sessions.listing(root)[:12]
+        if not found:
+            return "no earlier sessions in this project"
+        rows = [f"{ui.accent(str(i).rjust(2))}  {s.title}  "
+                + ui.dim(f"{s.age()} {ui.SEP} {s.turns} messages {ui.SEP} {s.id}")
+                for i, s in enumerate(found, 1)]
+        rows.append(ui.dim("resume one with: ledger --resume <number or id>"))
+        return ui.panel("sessions", rows, color="violet")
+
+    return {"/status": status, "/sessions": listing}
+
+
+def _branch(root: Path) -> str:
+    proc = subprocess.run(["git", "branch", "--show-current"], cwd=root,
+                          capture_output=True, text=True)
+    return proc.stdout.strip() if proc.returncode == 0 else ""
+
+
+def _first_then(first: str | None, read):
+    """An input function that answers `first` once, then defers to `read` --
+    `ledger "fix the login bug"` starts the session already working."""
+    pending = [first] if first else []
+
+    def inner(prompt: str = "> ") -> str:
+        if pending:
+            text = pending.pop()
+            print(ui.accent("❯ " if ui.UNICODE else "> ") + text)
+            return text
+        return read(prompt)
+    return inner
+
+
+def _pick_session(root: Path, want):
+    """The session to resume: None for a new one, False when the one asked
+    for does not exist. `want`: None new, "" latest, "?" pick, else an id."""
+    from . import sessions, tui
+    if want is None:
+        return None
+    if want == "?" and tui.interactive():
+        found = sessions.listing(root)[:12]
+        if not found:
+            print(ui.dim("no earlier sessions here; starting a new one"))
+            return None
+        print(ui.rule("sessions"))
+        for i, s in enumerate(found, 1):
+            print(f"  {ui.accent(str(i).rjust(2))}  {s.title}  "
+                  + ui.dim(f"{s.age()} {ui.SEP} {s.turns} messages {ui.SEP} {s.id}"))
+        try:
+            choice = input(ui.dim("resume which? [1] ")).strip() or "1"
+        except (EOFError, KeyboardInterrupt):
+            return False
+        want = choice
+    picked = sessions.find(root, None if want in ("", "?") else want)
+    if picked is None:
+        if want in ("", "?"):
+            print(ui.dim("no earlier sessions here; starting a new one"))
+            return None
+        _fail(f"no session matching {want!r} (ledger --resume lists them)")
+        return False
+    return picked
+
+
 def cmd_chat(args) -> int:
     root = Path(args.repo).resolve()
     cfg_file = _config(root)
@@ -773,9 +869,16 @@ def cmd_chat(args) -> int:
         return _fail(str(exc))
     if backend is None:
         return _fail("chat requires an LLM backend (--backend claude)")
-    journal = None
+    from . import sessions
+    resumed = None
     if args.journal:
-        journal = Journal(args.journal)
+        journal_path = Path(args.journal)
+    else:
+        resumed = _pick_session(root, getattr(args, "resume", None))
+        if resumed is False:
+            return 1
+        journal_path = resumed.path if resumed else sessions.new_path(root)
+    journal = Journal(str(journal_path))
     # One view of what untrusted content is in scope, shared by the tool
     # gate, the conversation, and every episode the session launches. A
     # tool result read at 10:01 has to still constrain the episode started
@@ -784,6 +887,7 @@ def cmd_chat(args) -> int:
     provenance = Provenance()
     conv = Conversation(backend=backend, journal=journal,
                         provenance=provenance)
+    restored = sessions.restore(conv, resumed.path) if resumed else 0
     chat_cfg = cfg_file.get("chat")
     if isinstance(chat_cfg, dict) and chat_cfg.get("context_chars"):
         conv.budget_chars = int(chat_cfg["context_chars"])
@@ -840,9 +944,18 @@ def cmd_chat(args) -> int:
             extra = f" {ui.SEP} {len(conv.tools)} MCP tools" if conv.tools else ""
             if getattr(args, "voice", False):
                 extra += f" {ui.SEP} voice"
-            print(tui.banner(root.name, profile,
-                             getattr(backend, "id", "?") + extra))
-            editor = tui.LineEditor(tui.COMMANDS)
+            skip = bool(getattr(args, "dangerously_skip_permissions", False))
+            tui.show_banner(
+                repo=root.name, profile=profile,
+                backend_id=getattr(backend, "id", "?") + extra, skip=skip,
+                session=journal_path.stem,
+                resumed=(resumed.title, restored) if resumed else None,
+                branch=_branch(root) if is_repo else "")
+            editor = tui.LineEditor(tui.COMMANDS, title=(
+                "permissions off" if skip else f"ledger {ui.SEP} {profile}"),
+                danger=skip)
+        elif resumed:
+            print(f"resumed {resumed.id} ({restored} exchanges)")
 
         if getattr(args, "voice", False):
             vs = _voice_session(args, cfg_file, editor)
@@ -854,9 +967,14 @@ def cmd_chat(args) -> int:
                         runner=runner, busy=tui.spinner, greet=False)
 
         if editor is not None:
-            return repl(conv, root, input_fn=editor.read,
-                        runner=runner, busy=tui.spinner, greet=False)
-        return repl(conv, root, runner=runner)
+            return repl(conv, root,
+                        input_fn=_first_then(getattr(args, "prompt", None), editor.read),
+                        runner=runner, busy=tui.spinner, greet=False,
+                        output_fn=tui.say,
+                        commands=_session_commands(args, root, backend,
+                                                   journal_path, profile))
+        return repl(conv, root, input_fn=_first_then(getattr(args, "prompt", None), input),
+                    runner=runner)
     finally:
         if journal is not None:
             journal.close()
@@ -1054,7 +1172,10 @@ def cmd_setup(args) -> int:
             env = credentials.ENV_VAR.get(provider, "")
             live = os.environ.get(env) if env else None
             note = ui.dim(f"  ({env} is set and wins)") if live else ""
+            hosts = ", ".join(sorted(credentials.bound_hosts(provider)))
             print(f"  {provider:<12} {masked}{note}")
+            print(ui.dim(f"  {'':<12} in {credentials.where(provider)}"))
+            print(ui.dim(f"  {'':<12} sent only to {hosts}"))
         return 0
 
     if args.forget:
@@ -1069,12 +1190,22 @@ def cmd_setup(args) -> int:
         # Read it rather than take it as an argument: a key on the command
         # line lands in shell history and in the process list, where it
         # outlives the terminal.
+        hosts = [h.strip() for h in (args.host or "").split(",") if h.strip()]
+        if hosts and not getattr(args, "replace", False) and credentials.where(provider):
+            # Binding a host to a key you already stored needs no re-typing.
+            credentials.bind(provider, hosts)
+            print(f"{ui.OK} your {provider} key may now also go to "
+                  f"{', '.join(hosts)}")
+            return 0
         key = getpass.getpass(f"paste your {provider} key (hidden): ").strip()
         if not key:
             print("nothing entered", file=sys.stderr)
             return 1
-        path = credentials.put(provider, key)
-        print(f"{ui.OK} saved to {path} {ui.dim('(owner-readable only)')}")
+        credentials.put(provider, key, hosts=hosts)
+        print(f"{ui.OK} sealed in {credentials.where(provider)}")
+        print(ui.dim("  sent only to "
+                     + ", ".join(sorted(credentials.bound_hosts(provider)))
+                     + "; never written to journals, prompts or child processes"))
         return 0
 
     return wizard.run(want_voice=args.voice)
@@ -2067,11 +2198,22 @@ def build_parser() -> argparse.ArgumentParser:
                    help="answer gates in a running `ledger app` "
                         "window instead of at the terminal "
                         "(env LEDGER_APP_URL)")
+    p.add_argument("prompt", nargs="?", default=None,
+                   help="start the session with this message")
     p.add_argument("--repo", default=".")
-    p.add_argument("--ask", default=None, help="one-shot question, no REPL")
+    p.add_argument("--ask", "-p", "--print", dest="ask", default=None,
+                   help="one-shot question, no REPL")
+    p.add_argument("-c", "--continue", dest="resume", action="store_const",
+                   const="", help="continue this project's latest session")
+    p.add_argument("--resume", "-r", dest="resume", nargs="?", const="?",
+                   default=None, metavar="ID",
+                   help="resume a session: an id, a number from the list, "
+                        "or nothing to pick from a list")
     p.add_argument("--context", default=None,
                    help="comma-separated files to inline")
-    p.add_argument("--journal", default=None, help="journal the conversation")
+    p.add_argument("--journal", default=None,
+                   help="journal the conversation here instead of the "
+                        "session store")
     p.add_argument("--profile", default=None, choices=sorted(GATED_RISKS),
                    help="autonomy profile for inline episodes")
     p.add_argument("--yes", action="store_true",
@@ -2145,6 +2287,12 @@ def build_parser() -> argparse.ArgumentParser:
                    metavar="PROVIDER",
                    help="just store an API key for PROVIDER and exit "
                         "(anthropic, openai, deepseek, groq)")
+    p.add_argument("--host", default=None, metavar="HOST[,HOST]",
+                   help="with --key: also allow this API host (a gateway you "
+                        "run) to receive the key. Provider hosts are built in")
+    p.add_argument("--replace", action="store_true",
+                   help="with --key --host: type a new key instead of binding "
+                        "the stored one")
     p.add_argument("--forget", default=None, metavar="PROVIDER",
                    help="delete a stored API key")
     p.add_argument("--list-keys", dest="list_keys", action="store_true",
@@ -2320,6 +2468,21 @@ def _welcome() -> int:
 
 def main(argv=None) -> int:
     parser = build_parser()
+    argv = list(sys.argv[1:] if argv is None else argv)
+    commands = parser._subparsers._group_actions[0].choices
+    # Bare `ledger`, `ledger -c`, `ledger "fix the login bug"`: the session,
+    # the way `claude` and `codex` start. Subcommands and -h/-V still work.
+    if not argv or (argv[0] not in commands
+                    and argv[0] not in ("-h", "--help", "-V", "--version")):
+        if "--backend" not in argv and not _config(Path(".").resolve()).get("backend"):
+            # First launch: setup is the session's first screen, not an
+            # error to read and a command to retype.
+            from . import tui, wizard
+            if not tui.interactive():
+                return _welcome()
+            if wizard.run() != 0:
+                return 1
+        argv = ["chat", *argv]
     args = parser.parse_args(argv)
     if getattr(args, "cmd", None) is None:
         return _welcome()

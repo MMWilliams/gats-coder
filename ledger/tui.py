@@ -26,6 +26,8 @@ COMMANDS = [
     ("/tree", "refresh the repository file list"),
     ("/clear", "forget the conversation"),
     ("/save", "write the transcript to a file"),
+    ("/status", "model, permissions, session"),
+    ("/sessions", "earlier sessions in this project"),
     ("/exit", "leave the session"),
 ]
 
@@ -43,15 +45,190 @@ def frame_width() -> int:
     return min(max(40, shutil.get_terminal_size().columns) - 1, 96)
 
 
-def banner(repo: str, profile: str, backend_id: str) -> str:
-    bar = "▌" if ui.UNICODE else "|"
-    dot = " · " if ui.UNICODE else " - "
-    line = "─" if ui.UNICODE else "-"
-    head = (ui.accent(bar) + " " + ui.bold("LEDGER") + "  "
-            + ui.dim(dot.join([repo, f"profile {profile}", backend_id])))
-    tip = ui.dim("ask about the repo, or say what to change "
-                 f"{ui.DASH} changes run as verified episodes")
-    return "\n".join([head, tip, ui.dim(line * frame_width())])
+# The wordmark: three rows of half-blocks, 24 columns, LEDGER.
+WORDMARK = (
+    "█   █▀▀ █▀▄ █▀▀▀ █▀▀ █▀█",
+    "█   █▀▀ █ █ █ ▀█ █▀▀ █▀▄",
+    "▀▀▀ ▀▀▀ ▀▀  ▀▀▀▀ ▀▀▀ ▀ ▀",
+) if ui.UNICODE else ("LEDGER",)
+
+
+def _animate() -> bool:
+    import os
+    return interactive() and not os.environ.get("LEDGER_NO_ANIMATION") \
+        and not os.environ.get("CI")
+
+
+def banner(repo: str, profile: str, backend_id: str, *, skip: bool = False,
+           session: str = "", resumed: tuple[str, int] | None = None,
+           branch: str = "", phase: float = 0.0) -> str:
+    """The session's first screen: the mark, then one line of facts that
+    matter -- where you are, which model, and what it may do unasked."""
+    from . import AGENT_VERSION
+    sep = ui.dim(f" {ui.SEP} ")
+    where = ui.bold(repo) + (ui.dim(" on ") + ui.accent(branch) if branch else "")
+    facts = sep.join([where, ui.rgb(backend_id, "violet"),
+                      ui.dim("profile ") + profile])
+    if ui.UNICODE:
+        mark = [ui.gradient(row, "violet", "cyan", bold=True, phase=phase)
+                for row in WORDMARK]
+    else:
+        mark = [ui.bold("LEDGER")]
+    tag = (ui.bold("LEDGER") + " " + ui.dim(f"v{AGENT_VERSION}") + "  "
+           + ui.dim("audit-first coding agent: every claim checked, "
+                    "every step on the record"))
+    lines = [""] + ["  " + row for row in mark] + ["", "  " + tag, "  " + facts]
+    if resumed:
+        title, count = resumed
+        lines.append("  " + ui.badge("resumed", "violet") + " "
+                     + ui.console_safe(title) + ui.dim(f"  ({count} messages)"))
+    if skip:
+        lines.append("  " + ui.badge("PERMISSIONS OFF", "red") + " "
+                     + ui.bad("every gate, prompt and policy rule is bypassed"))
+    tip = ui.dim(f"  ask about the code, or say what to change {ui.SEP} "
+                 f"/help {ui.SEP} /status")
+    if session:
+        tip += ui.dim(f" {ui.SEP} session {session[-4:]}")
+    lines += [tip, ui.dim(("─" if ui.UNICODE else "-") * frame_width())]
+    return "\n".join(lines)
+
+
+def show_banner(**kwargs) -> None:
+    """Print the banner, with a quarter-second colour sweep across the mark
+    on a real terminal (LEDGER_NO_ANIMATION=1 or CI turns it off)."""
+    text = banner(**kwargs)
+    if not (_animate() and ui.UNICODE and ui.COLOR):
+        print(text)
+        return
+    height = len(WORDMARK) + 1
+    sys.stdout.write("\x1b[?25l")
+    try:
+        for step in range(14):
+            frame = banner(**{**kwargs, "phase": 1.0 - step / 13})
+            rows = frame.split("\n")[:height]
+            if step:
+                sys.stdout.write(f"\x1b[{height}A")
+            sys.stdout.write("\n".join(r + "\x1b[K" for r in rows) + "\n")
+            sys.stdout.flush()
+            time.sleep(0.018)
+        sys.stdout.write(f"\x1b[{height}A")
+        sys.stdout.write(text + "\n")
+    finally:
+        sys.stdout.write("\x1b[?25h")
+        sys.stdout.flush()
+
+
+# -- rendering model replies -----------------------------------------------------
+
+_KEYWORDS = {
+    "python": "and as assert async await break class continue def del elif else "
+              "except finally for from global if import in is lambda None "
+              "nonlocal not or pass raise return True False try while with yield "
+              "match case self",
+    "js": "async await break case catch class const continue default delete do "
+          "else export extends false finally for from function if import in "
+          "instanceof let new null return super switch this throw true try "
+          "typeof undefined var void while yield interface type enum implements",
+    "rust": "as async await break const continue crate dyn else enum extern false "
+            "fn for if impl in let loop match mod move mut pub ref return self "
+            "Self static struct super trait true type unsafe use where while",
+    "go": "break case chan const continue default defer else fallthrough for func "
+          "go goto if import interface map package range return select struct "
+          "switch type var nil true false",
+    "sh": "if then else elif fi for while do done case esac function in export "
+          "local return echo cd",
+}
+_ALIASES = {"py": "python", "python3": "python", "javascript": "js", "ts": "js",
+            "typescript": "js", "jsx": "js", "tsx": "js", "rs": "rust",
+            "bash": "sh", "shell": "sh", "zsh": "sh", "console": "sh",
+            "golang": "go"}
+
+
+def highlight(code: str, lang: str) -> str:
+    """One line of code, coloured: keywords, strings, comments, numbers.
+    A regex tokenizer, not a parser -- enough to read by, never wrong in a
+    way that changes what the code says (the text itself is untouched)."""
+    import re
+    lang = _ALIASES.get(lang.lower(), lang.lower())
+    if not ui.COLOR or lang not in _KEYWORDS and lang not in ("json", "toml",
+                                                               "yaml", "c", "cpp",
+                                                               "java"):
+        return code
+    words = set(_KEYWORDS.get(lang, _KEYWORDS["js"]).split())
+    comment = r"#.*" if lang in ("python", "sh", "toml", "yaml") else r"//.*"
+    token = re.compile(
+        rf"(?P<c>{comment})|(?P<s>\"(?:\\.|[^\"\\])*\"|'(?:\\.|[^'\\])*'|`[^`]*`)"
+        r"|(?P<n>\b\d[\d_.]*\b)|(?P<w>\b[A-Za-z_][A-Za-z0-9_]*\b)")
+    out, last = [], 0
+    for m in token.finditer(code):
+        out.append(code[last:m.start()])
+        text = m.group(0)
+        if m.group("c"):
+            out.append(ui.rgb(text, "gray"))
+        elif m.group("s"):
+            out.append(ui.rgb(text, "green"))
+        elif m.group("n"):
+            out.append(ui.rgb(text, "amber"))
+        elif text in words:
+            out.append(ui.rgb(text, "pink"))
+        elif code[m.end():m.end() + 1] == "(":
+            out.append(ui.rgb(text, "cyan"))
+        else:
+            out.append(text)
+        last = m.end()
+    out.append(code[last:])
+    return "".join(out)
+
+
+def _inline(text: str) -> str:
+    import re
+    text = re.sub(r"`([^`]+)`", lambda m: ui.rgb(m.group(1), "cyan"), text)
+    return re.sub(r"\*\*([^*]+)\*\*", lambda m: ui.bold(m.group(1)), text)
+
+
+def render(text: str) -> str:
+    """A model reply as the terminal should show it: fenced code framed and
+    highlighted, diffs in red and green, headings and bullets styled.
+    Identity when colour is off, so piped output is exactly what was said."""
+    if not ui.COLOR:
+        return text
+    bar = ui.rgb("│" if ui.UNICODE else "|", "slate")
+    out, lang, in_code = [], "", False
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            if not in_code:
+                in_code, lang = True, stripped[3:].strip()
+                label = ui.rgb(f" {lang or 'code'} ", "gray")
+                out.append(ui.rgb("╭─" if ui.UNICODE else "+-", "slate") + label)
+            else:
+                in_code = False
+                out.append(ui.rgb("╰─" if ui.UNICODE else "+-", "slate"))
+            continue
+        if in_code:
+            if lang == "diff" or (not lang and line[:1] in "+-@" and line[:3] != "---"):
+                color = {"+": "green", "-": "red", "@": "cyan"}.get(line[:1])
+                body = ui.rgb(line, color) if color else line
+            else:
+                body = highlight(line, lang)
+            out.append(f"{bar} {body}")
+            continue
+        if stripped.startswith("#"):
+            out.append(ui.gradient(stripped.lstrip("#").strip(), "violet", "cyan",
+                                   bold=True))
+        elif stripped[:2] in ("- ", "* "):
+            indent = line[:len(line) - len(line.lstrip())]
+            out.append(indent + ui.rgb(ui.DOT if ui.UNICODE else "*", "violet")
+                       + " " + _inline(stripped[2:]))
+        else:
+            out.append(_inline(line))
+    return "\n".join(out)
+
+
+def say(text: str = "") -> None:
+    """The session's output function: replies rendered, everything safe for
+    this console."""
+    print(ui.console_safe(render(text)))
 
 
 # -- spinner -----------------------------------------------------------------
@@ -82,8 +259,28 @@ class Progress:
         secs = self.elapsed()
         clock = f"{secs:.0f}s" if secs < 60 \
             else f"{int(secs // 60)}m{int(secs % 60):02d}s"
-        return (f"{ui.accent(frame)} {self.label} "
+        # The frame drifts violet to cyan and back; a highlight sweeps the
+        # label, so a long wait still visibly moves.
+        t = (secs * 0.6) % 2.0
+        t = t if t <= 1.0 else 2.0 - t
+        tint = tuple(round(a + (b - a) * t) for a, b in
+                     zip(ui.THEME["violet"], ui.THEME["cyan"]))
+        return (f"{ui.rgb(frame, tint, bold=True)} {shimmer(self.label, secs)} "
                 f"{ui.dim(clock)}{ui.dim(f' {ui.SEP} ctrl+c to interrupt')}")
+
+
+def shimmer(text: str, secs: float) -> str:
+    """`text` with a soft band of light passing over it."""
+    if not ui.COLOR:
+        return text
+    head = (secs * 14) % (len(text) + 8) - 4
+    base, glow = ui.THEME["gray"], ui.THEME["white"]
+    out = []
+    for i, ch in enumerate(text):
+        k = max(0.0, 1.0 - abs(i - head) / 4.0)
+        out.append(ui.rgb(ch, tuple(round(a + (b - a) * k)
+                                    for a, b in zip(base, glow))))
+    return "".join(out)
 
 
 # The live indicator, so anything that needs the terminal (a gate asking
@@ -349,10 +546,13 @@ class LineEditor:
     keypress, and collapses to a clean one-line `❯ text` after submit so
     the transcript stays tidy."""
 
-    def __init__(self, commands=COMMANDS):
+    def __init__(self, commands=COMMANDS, title: str = "session",
+                 danger: bool = False):
         self.state = EditorState(commands)
+        self.title = title
+        self.danger = danger
 
-    def frame(self, title: str = "session") -> tuple[list[str], int]:
+    def frame(self, title: str | None = None) -> tuple[list[str], int]:
         """The three frame lines plus the cursor's 1-based screen column.
         Pure string work -- no terminal required, so it is testable."""
         width = frame_width()
@@ -366,21 +566,27 @@ class LineEditor:
         start = max(0, self.state.cursor - room + 1)
         shown = self.state.buffer[start:start + room]
 
+        title = self.title if title is None else title
         head = f"{tl}{h} {title} "
         top = head + h * max(1, width - len(head) - 1) + tr
+        edge = "red" if self.danger else "violet"
 
         body_text = prompt + shown
         pad = " " * max(0, inner - len(body_text))
-        mid = (ui.dim(v) + " " + ui.accent(prompt) + shown + pad + " "
-               + ui.dim(v))
+        mid = (ui.rgb(v, edge) + " " + ui.gradient(prompt, "violet", "cyan",
+                                                    bold=True)
+               + shown + pad + " " + ui.rgb(v, edge))
 
         hint = self.state.hint(budget=max(4, width - 6))
         hint_room = max(0, width - 6 - ui.visible_len(hint))
-        foot = (ui.dim(bl + h) + " " + hint + " "
-                + ui.dim(h * hint_room + h + br))
+        foot = (ui.rgb(bl + h, edge) + " " + hint + " "
+                + ui.rgb(h * hint_room + h + br, edge))
         # cursor: 1(border) + 1(pad) + prompt + offset into the window
         col = 3 + len(prompt) + (self.state.cursor - start)
-        return [ui.dim(top), mid, foot], col
+        top_line = (ui.rgb(f"{tl}{h} ", edge)
+                    + ui.rgb(title, edge, bold=True)
+                    + ui.rgb(" " + h * max(1, width - len(head) - 1) + tr, edge))
+        return [top_line, mid, foot], col
 
     def _draw(self, first: bool) -> None:
         lines, col = self.frame()

@@ -9,9 +9,65 @@ believed: deterministic sensors produce the propositions that form state, so a
 model claiming "tests pass" while the suite is red becomes a journaled
 incident rather than a state transition. Every episode replays bit-exact.
 
+## Install
+
+```
+curl -fsSL https://kyberos.ai/ledger/install.sh | sh        # macOS, Linux
+irm https://kyberos.ai/ledger/install.ps1 | iex             # Windows PowerShell
+```
+
+One line, no admin rights. The installer checks the wheel's SHA-256 against
+`latest.json` and refuses a mismatch, installs into its own environment
+(`~/.ledger/venv`), and puts `ledger` on your PATH. Run it again to upgrade.
+
+## Launch
+
+```
+cd your-project
+ledger                                   # the session, like `claude` or `codex`
+ledger "fix the failing login test"      # start it with a first message
+ledger -c                                # continue this project's last session
+ledger --resume                          # pick an earlier session from a list
+ledger -r 2                              # ...or name it: number, id, or short tag
+ledger -p "what does src/app.py do?"     # one answer, no session (scripts, CI)
+ledger --dangerously-skip-permissions    # no gates at all (sandboxes only)
+```
+
+The first launch walks through choosing a model (Claude CLI, an API key, or a
+local model through Ollama). Sessions are saved per project under
+`~/.ledger/sessions/` (owner-only, outside the repo), so nothing you discuss
+lands in a commit. Inside a session: `/status` shows the model, permissions
+and where keys live; `/sessions` lists earlier ones; `/help` the rest.
+
+## Your API keys
+
+A key you give LEDGER stays on your machine and goes to exactly one place:
+its provider.
+
+- **Sealed at rest** by the OS: Windows DPAPI (encrypted to your account; a
+  copied file is useless elsewhere), the macOS Keychain, or the Linux Secret
+  Service. Only where none exists does it fall back to an owner-only file,
+  and setup says so. Older plaintext stores are sealed on first read.
+- **Sent only to the provider's own API host, over HTTPS** (Anthropic to
+  api.anthropic.com, Groq to api.groq.com, ...). A base URL that comes from a
+  repository's `.ledger/config.json` never receives a key, so cloning a
+  hostile repo and running `ledger` cannot redirect it. Your own gateway?
+  Bind it yourself: `ledger setup --key openai --host gateway.example.com`.
+- **Never inherited** by anything LEDGER runs for a repository: test suites,
+  hooks, MCP servers and launched apps get an environment with every provider
+  key removed.
+- **Never written or forwarded**: every key LEDGER loads is scrubbed by exact
+  value from journals, blobs, receipts, session transcripts, error messages
+  and the prompts it sends to a model, whatever the key looks like.
+- **Never on the command line**: keys are typed at a hidden prompt
+  (`ledger setup --key <provider>`), never accepted as an argument, and shown
+  masked (`ledger setup --list-keys`). Remove one with `--forget <provider>`.
+
+## From source
+
 ```
 pip install -e .[dev]
-pytest                      # 170 tests
+pytest
 python -m ledger.cli demo   # paper's 100-task suite: SR / optimality / calls / variance
 ```
 
@@ -38,8 +94,8 @@ makes zero model calls. Patch prompts carry the failing suite output, a
 deterministic selection of relevant files (no embeddings — same repo state,
 same files), and layered `AGENTS.md` / `LEDGER.md` instructions
 (`~/.ledger/AGENTS.md` first, repo root second — the closer file wins).
-Journaled command output is secret-redacted (bearer/API tokens, GitHub/AWS
-keys, private-key blocks) before it is content-addressed.
+Journals are secret-redacted on write (every loaded key by exact value, plus
+bearer/API tokens, GitHub/AWS keys, private-key blocks); see "Your API keys".
 
 ## Autonomy profiles (risk gates)
 

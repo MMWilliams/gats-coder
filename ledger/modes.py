@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from .credentials import child_env
+
 
 PLAN_SECTIONS = (
     "Problem and scope", "Architecture", "Domain contracts", "Evidence and verification",
@@ -152,7 +154,8 @@ def command_acceptor(command: str, trusted_root: Path,
         try:
             completed = subprocess.run(
                 [*argv, str(attempt.worktree)], cwd=trusted_root,
-                capture_output=True, text=True, timeout=timeout)
+                capture_output=True, text=True, timeout=timeout,
+                env=child_env())
             code, stdout, stderr = (completed.returncode, completed.stdout,
                                     completed.stderr)
         except subprocess.TimeoutExpired:

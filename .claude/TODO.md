@@ -6,6 +6,27 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 
 ---
 
+## v0.15.0 (2026-10-19): one-line install, launch like `claude`, sealed keys, new UI
+
+- [x] Installers: `curl -fsSL https://kyberos.ai/ledger/install.sh | sh`,
+      `irm https://kyberos.ai/ledger/install.ps1 | iex`; own venv in
+      ~/.ledger/venv, PATH set, sha256 enforced. Tested: Windows, WSL Ubuntu,
+      tampered manifest refused. NOT tested on macOS (Keychain vault path too).
+- [x] Bare `ledger` = the session; `-c`, `--resume [n|id|tag]`, `-p`,
+      `ledger "first message"`, `--dangerously-skip-permissions`; sessions in
+      ~/.ledger/sessions/<project>/; /status, /sessions.
+- [x] Keys: DPAPI/Keychain/Secret Service vault (v1 plaintext migrates),
+      host-bound (repo config can't redirect a key), stripped from repo
+      subprocesses, exact-value scrub in journals/prompts/errors.
+- [ ] macOS: run install.sh + `ledger setup --key` on a Mac (Keychain via
+      `security -i` is unit-untested on real hardware).
+- [ ] Site still publishes no install command (kyberos CLAUDE.md: LEDGER sold
+      as enterprise access). Advertising the one-liners is reese's call; goes
+      to docs/STRATEGY-2026.md first.
+- [ ] Side effect 10-19: the first install.ps1 test hit a lookup bug and ran
+      `winget install Python.Python.3.12` (user scope). Uninstall if unwanted:
+      `winget uninstall Python.Python.3.12`.
+
 ## Hard math/science bench (design started 2026-10-10)
 
 - [x] `experiments/hardbench/`: tasks rk45, hf, sat built (TASK.md + stub +
