@@ -135,3 +135,10 @@ def test_sessions_list_newest_first_and_skip_empty_ones(home, project):
     p = sessions.new_path(project)
     p.write_text(json.dumps({"t": "CHAT_USER", "text": "hello"}) + "\n")
     assert [s.title for s in sessions.listing(project)] == ["hello"]
+
+
+def test_help_works_before_setup(home, project, capsys):
+    with pytest.raises(SystemExit) as exc:
+        cli.main(["-c", "--help"])
+    assert exc.value.code == 0
+    assert "--continue" in capsys.readouterr().out

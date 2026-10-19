@@ -2474,7 +2474,9 @@ def main(argv=None) -> int:
     # the way `claude` and `codex` start. Subcommands and -h/-V still work.
     if not argv or (argv[0] not in commands
                     and argv[0] not in ("-h", "--help", "-V", "--version")):
-        if "--backend" not in argv and not _config(Path(".").resolve()).get("backend"):
+        asks_help = "-h" in argv or "--help" in argv
+        if not asks_help and "--backend" not in argv \
+                and not _config(Path(".").resolve()).get("backend"):
             # First launch: setup is the session's first screen, not an
             # error to read and a command to retype.
             from . import tui, wizard
