@@ -7,7 +7,7 @@ Demo repo: `python talk/demo/make_demo_repo.py <dir>`. Rehearsed 2026-10-21 on
 qwen3.8:27b (GPU 1): goal reached in 4 steps, 1 min 58 s, one-line fix;
 verify-chain, why, replay OK; one edited field gives "chain BROKEN: entry 17".
 Needs `--test "python3 -m pytest -q"` here (default python has no pytest).
-30-min slot including Q&A; see the timing map.
+25-min talk, 10 slides; see the timing map.
 
 One idea the room should leave with: reliability over long horizons doesn't come
 from a smarter model, it comes from a harness that never trusts the model's
@@ -15,13 +15,30 @@ claims about the world and can prove what happened afterwards.
 
 ---
 
-## Timing map (30 min slot: 21 slides, about 21 min of talk, 8-9 min Q&A)
+## Timing map (25 min talk, 10 slides, about 2.5 min each; Q&A after)
 
 The deck shows each main slide's target start time and a running clock
-(bottom right; T resets the clock). Everything after the close is backup.
+(bottom right; T resets it). Everything after the close is backup.
 
 | # | Slide | Starts at |
 | --- | --- | --- |
+| 1 | Title + cold open (pre-started run or recording) | 0:00 |
+| 2 | Long, risky work breaks agents (curve, confidence is not evidence, risk-averse questions) | 3:00 |
+| 3 | GATS: layers + stress test | 5:30 |
+| 4 | Addendum: a claim nothing checked (preprint vs repo vs live Llama) | 8:00 |
+| 5 | LEDGER: plan, skill, sensors, journal; incidents; gates | 10:00 |
+| 6 | The answer to the title: why, replay, tamper | 13:00 |
+| 7 | Evidence: graded problem solving + the reward hack | 15:00 |
+| 8 | Where harnesses go: product, RL environment, gated self-improvement | 17:30 |
+| 9 | Habits for any coding agent: two laws, four tips | 20:00 |
+| 10 | Close + predictions | 23:00, done by 25:00 |
+
+Backup, in order: addendum A1-A3, then the detail slides behind each main
+slide (curve, risk, GATS, scaling limit, inversion, state, altitudes, safety,
+trust, hardbench, local results, reward hack, bench lessons, RL, self-improvement,
+predictions, two laws, tips 1-4 with full prompts, verification ladder).
+
+--- | --- | --- |
 | 1 | Cold open (pre-started run or recording) | 0:00 |
 | 2 | Title | 2:00 |
 | 3 | Reliability compounds | 2:20 |
@@ -273,4 +290,4 @@ PlanBench (48 vs 63 of 150 failed the broad claim; v2.1 78/90 vs 32/90).
 
 ## To decide
 - Show the install one-liner? (Landmine 5)
-- Addendum is backup by default (no time in 30 min); slide 6 footnote points to it.
+- Addendum is main slide 4; A2-A3 detail stays in backup.
