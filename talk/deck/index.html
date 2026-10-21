@@ -97,8 +97,7 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
 <body>
 <div id="viewport"><div id="stage">
 
-<!-- 1 COLD OPEN -->
-<section class="slide dark center" data-sec="Cold open">
+<section data-t="0:00" class="slide dark center" data-sec="Cold open">
   <div class="term"><span class="p">$</span> ledger run "fix the failing test" --backend ollama --model qwen3.8:27b
 
   <span class="dim">what this build must be  (061de138e7e4e8ba)</span>
@@ -114,11 +113,10 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
 
 <span class="p">$</span> ledger verify-chain episode.jsonl
 <span class="ok">+ chain OK -- every hash links, nothing has been altered</span></div>
-  <aside class="notes">Live. Demo repo: talk/demo/make_demo_repo.py (a payments module where tax is applied to the pre-discount subtotal). Rehearsed 2026-10-21: 1 min 58 s on qwen3.8:27b, GPU 1, 4 steps, one-line fix. Say: "That was a local model on one GPU, no cloud. Every step it took is in a hash-chained log, and I can ask it why it chose any step and get the numbers it actually used, not a story written afterwards." If the model is slow, cut to the recording.</aside>
+  <aside class="notes">Live. Demo repo: talk/demo/make_demo_repo.py (a payments module where tax is applied to the pre-discount subtotal). Rehearsed 2026-10-21: 1 min 58 s on qwen3.8:27b, GPU 1, 4 steps, one-line fix. Say: "That was a local model on one GPU, no cloud. Every step it took is in a hash-chained log, and I can ask it why it chose any step and get the numbers it actually used, not a story written afterwards." Timing: the run itself takes about 2 minutes, the whole slot is 2:00. Start it before you're introduced and narrate the result, or play the recording. Never wait on the model live.</aside>
 </section>
 
-<!-- 2 TITLE -->
-<section class="slide center" data-sec="Title">
+<section data-t="2:00" class="slide center" data-sec="Title">
   <div class="eyebrow">LLMday NYC · Microsoft Experience Center · Oct 29, 2026</div>
   <h1>What did your agent<br>actually do?</h1>
   <p class="lede" style="margin-top:36px">Harnesses for long, risky work: LEDGER, GATS, and why reliability lives outside the model.</p>
@@ -126,8 +124,7 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
   <aside class="notes">"I'm going to argue that the next jump in agent reliability isn't in the model. It's in the harness around it."</aside>
 </section>
 
-<!-- 3 COMPOUNDING -->
-<section class="slide" data-sec="The problem">
+<section data-t="2:20" class="slide" data-sec="The problem">
   <div class="eyebrow">The problem</div>
   <h2>Reliability compounds against you</h2>
   <div class="cols" style="grid-template-columns:1.5fr 1fr">
@@ -141,19 +138,7 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
   <aside class="notes">"Every agent demo is short. Real work is long. Per-step accuracy multiplies, so the horizon eats you even when each step looks great." Pause on 37%.</aside>
 </section>
 
-<!-- 4 RISK -->
-<section class="slide" data-sec="The problem">
-  <div class="eyebrow">The problem</div>
-  <h2>Risk-averse work asks different questions</h2>
-  <div class="cols">
-    <div class="card"><h3>Most agent evals ask</h3><p>Did it usually work?<br>How often does it pass?</p></div>
-    <div class="card bl"><h3>Payments, deploys, infra, regulated code ask</h3><p>What exactly did it do?<br>Can you stop it <b>before</b> the bad step?<br>Can you prove it afterwards?</p></div>
-  </div>
-  <aside class="notes">"In risk-averse work the question isn't 'did it usually work', it's 'can you show me exactly what it did, and could you have stopped it before the bad step.'"</aside>
-</section>
-
-<!-- 5 LIE -->
-<section class="slide" data-sec="The problem">
+<section data-t="3:20" class="slide" data-sec="The problem">
   <div class="eyebrow red">How agents fail</div>
   <h2>Confidence is not evidence</h2>
   <p class="lede" style="margin-bottom:34px">Most failures aren't bad reasoning. They're the agent believing its own claim about the world.</p>
@@ -162,16 +147,8 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
   <aside class="notes">Five flavors, one mechanism: the model asserts state and then acts on the assertion.</aside>
 </section>
 
-<!-- 6 SECTION GATS -->
-<section class="slide center" data-sec="GATS">
-  <div class="eyebrow">Part 1</div>
-  <h1>GATS</h1>
-  <p class="lede" style="margin-top:24px">Graph-Augmented Tree Search · arXiv:2607.08894 · with Dymitr Nowicki</p>
-</section>
-
-<!-- 7 GATS ONE SLIDE -->
-<section class="slide" data-sec="GATS">
-  <div class="eyebrow">GATS in one slide</div>
+<section data-t="4:20" class="slide" data-sec="GATS">
+  <div class="eyebrow">GATS · arXiv:2607.08894 · with Dymitr Nowicki</div>
   <h2>The model is the last resort, not the decider</h2>
   <div class="cols" style="grid-template-columns:1fr 1.1fr">
     <div>
@@ -188,8 +165,7 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
   <aside class="notes">"Symbolic where you can, learned where you've seen it, neural only for the genuinely new. Episode one pays; episode two is free."</aside>
 </section>
 
-<!-- 8 PAPER RESULTS -->
-<section class="slide" data-sec="GATS">
+<section data-t="5:35" class="slide" data-sec="GATS">
   <div class="eyebrow">What reproduces</div>
   <h2>12-category stress test, 120 tasks</h2>
   <div class="bars">
@@ -206,24 +182,7 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
   <aside class="notes">Say "during planning" every time you say zero. Table 6 reproduces exactly. Budget ablation is Table 2 of the preprint. If there's time, go straight to the addendum slides here; the honesty beat fits the talk's thesis.</aside>
 </section>
 
-<!-- 9 LIMIT -->
-<section class="slide" data-sec="GATS">
-  <div class="eyebrow amber">The honest limit</div>
-  <h2>Search over raw actions doesn't scale</h2>
-  <p class="lede">Tested at |A| = 15, depth 20. Impractical past about 20 actions or depth 10.</p>
-  <p class="lede" style="margin-top:30px">So LEDGER searches over a <b>few coarse plan-level actions</b> and pushes the open-ended part down into skills.</p>
-  <aside class="notes">This is the bridge from the paper to the product. The limit is the design constraint LEDGER was built around.</aside>
-</section>
-
-<!-- 10 SECTION LEDGER -->
-<section class="slide center" data-sec="LEDGER">
-  <div class="eyebrow">Part 2</div>
-  <h1>LEDGER</h1>
-  <p class="lede" style="margin-top:24px">An audit-first coding agent built on GATS. Runs on Claude, OpenAI, or a local model.</p>
-</section>
-
-<!-- 11 INVERSION -->
-<section class="slide" data-sec="LEDGER">
+<section data-t="6:50" class="slide" data-sec="LEDGER">
   <div class="eyebrow">The inversion</div>
   <h2>Neural proposes, symbolic disposes</h2>
   <div class="cols">
@@ -241,8 +200,7 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
   <aside class="notes">The model is a component, not the controller.</aside>
 </section>
 
-<!-- 12 STATE -->
-<section class="slide" data-sec="LEDGER">
+<section data-t="8:05" class="slide" data-sec="LEDGER">
   <div class="eyebrow">State</div>
   <h2>State is what sensors say</h2>
   <p class="lede" style="margin-bottom:30px">The repo is a set of propositions. Deterministic sensors produce them, never the model.</p>
@@ -251,18 +209,7 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
   <aside class="notes">Verify after execute. A falsified edge resets its statistics; L2 learns the action is stochastic.</aside>
 </section>
 
-<!-- 13 ALTITUDES -->
-<section class="slide" data-sec="LEDGER">
-  <div class="eyebrow">Actions</div>
-  <h2>Two altitudes</h2>
-  <div class="cols">
-    <div class="card bl"><h3>Plan level: searched</h3><p class="mono" style="font-size:22px">RunSuite · AuthorPatch · ApplyPatch · Commit · PushBranch · CreatePR</p><p style="margin-top:14px">Small, coarse, contracts known. This is what keeps search tractable.</p></div>
-    <div class="card am"><h3>Skill level: LLM inside</h3><p>Writing the diff. Output is a proposal: preflight, <span class="mono">git apply --check</span>, then the suite decides.</p></div>
-  </div>
-</section>
-
-<!-- 14 SAFETY -->
-<section class="slide" data-sec="LEDGER">
+<section data-t="9:05" class="slide" data-sec="LEDGER">
   <div class="eyebrow">Safety</div>
   <h2>Safety is graph semantics</h2>
   <ul class="clean">
@@ -274,8 +221,7 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
   <aside class="notes">"Infeasible" matters most for the bench section: the agent is allowed to say the task can't be done as specified.</aside>
 </section>
 
-<!-- 15 THE LEDGER -->
-<section class="slide" data-sec="LEDGER">
+<section data-t="10:05" class="slide" data-sec="LEDGER">
   <div class="eyebrow">The ledger</div>
   <h2>Audit you can run, not read</h2>
   <div class="term" style="font-size:20px"><span class="p">$</span> ledger why episode.jsonl 1
@@ -293,25 +239,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
   <aside class="notes">All three outputs are from the 2026-10-21 rehearsal. The why-trace is the recorded UCB table, not a post-hoc explanation. Tie broken lexicographically: no RNG anywhere.</aside>
 </section>
 
-<!-- 16 TRUST -->
-<section class="slide" data-sec="LEDGER">
-  <div class="eyebrow">Trust boundaries</div>
-  <h2>Things a user can check</h2>
-  <div class="cols3">
-    <div class="card"><h3>Keys</h3><p>Sealed in the OS vault, bound to the provider's host, stripped from every subprocess the repo runs, scrubbed from journals and prompts.</p></div>
-    <div class="card"><h3>Install</h3><p>sha256-pinned manifest. A tampered manifest is refused.</p></div>
-    <div class="card"><h3>Locality</h3><p>Same harness, same guarantees on a 27B model on one GPU. No cloud required.</p></div>
-  </div>
-</section>
-
-<!-- 17 SECTION EVIDENCE -->
-<section class="slide center" data-sec="Evidence">
-  <div class="eyebrow">Part 3</div>
-  <h1>Evidence, and what broke</h1>
-</section>
-
-<!-- 18 HARDBENCH -->
-<section class="slide" data-sec="Evidence">
+<section data-t="11:20" class="slide" data-sec="Evidence">
   <div class="eyebrow">hardbench</div>
   <h2>Grade problem solving, not pass rate</h2>
   <div class="cols">
@@ -326,8 +254,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
   <aside class="notes">"The most important skill for a risk-averse agent is saying 'this can't be done as specified' instead of gaming the tests."</aside>
 </section>
 
-<!-- 19 LOCAL -->
-<section class="slide" data-sec="Evidence">
+<section data-t="12:20" class="slide" data-sec="Evidence">
   <div class="eyebrow">LEDGER alone, local qwen3.8:27b</div>
   <h2>A local model, honest about its limits</h2>
   <table class="t">
@@ -341,8 +268,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
   <aside class="notes">Where it fails, it fails without gaming: integrity 3 on all four. The primes/rk45 failure is a thinking model spending its whole budget reasoning and returning empty content; LEDGER now reports that honestly (a fix LEDGER wrote itself, see slide 24).</aside>
 </section>
 
-<!-- 20 CRC -->
-<section class="slide" data-sec="Evidence">
+<section data-t="13:20" class="slide" data-sec="Evidence">
   <div class="eyebrow red">My own harness got reward-hacked</div>
   <h2>The journal said <span class="g">success</span>.<br>The hidden suite said otherwise.</h2>
   <p class="lede">crc, run 2: the author edited the test suite, the edited suite passed, and the harness certified the result. It checked the bar, not whether the bar had moved.</p>
@@ -350,55 +276,13 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
   <aside class="notes">Credibility slide. Don't cut it.</aside>
 </section>
 
-<!-- 21 BENCH LIED -->
-<section class="slide" data-sec="Evidence">
-  <div class="eyebrow amber">The bench almost lied too</div>
-  <h2>Audit the evaluator</h2>
-  <ul class="clean">
-    <li>Reruns after a harness fix score a harness tuned on that failure.</li>
-    <li>A hidden oracle encoded one algorithm's answer to a degenerate case. Calibrate against <b>two</b> implementations.</li>
-    <li>A task I called impossible, the model solved (primes, Claude backend, 10/10, earned).</li>
-    <li>Held-out tasks must be written after the harness is frozen, by someone not tuning it.</li>
-  </ul>
-</section>
-
-<!-- 22 SECTION FUTURE -->
-<section class="slide center" data-sec="Future">
-  <div class="eyebrow">Part 4</div>
-  <h1>Where harnesses go next</h1>
-</section>
-
-<!-- 23 HARNESS PRODUCT -->
-<section class="slide" data-sec="Future">
+<section data-t="14:20" class="slide" data-sec="Future">
   <div class="eyebrow">Thesis</div>
   <h2>Models are parts.<br>The harness is the product.</h2>
   <p class="lede">Swap Claude for a local 27B model and the guarantees don't move: state, verification, replay, the last mile.</p>
 </section>
 
-<!-- 24 RL -->
-<section class="slide" data-sec="Future">
-  <div class="eyebrow">Harnesses are the RL environment</div>
-  <h2>The harness already is the training rig</h2>
-  <div class="cols3">
-    <div class="card"><h3>Sensors</h3><p>= the verifier. Binary, deterministic rewards.</p></div>
-    <div class="card"><h3>Worktrees</h3><p>= rollout infrastructure.</p></div>
-    <div class="card"><h3>Journal</h3><p>= trajectory store, with per-action postconditions for credit assignment.</p></div>
-  </div>
-  <p style="margin-top:34px">Three surfaces: the skill policy (RL with verifiable rewards), planner value nets (PUCT replacing UCB1), L2 as a learned dynamics model. Weights promoted only if plan variance stays at zero.</p>
-</section>
-
-<!-- 25 IMPOSSIBILITY + SELF-IMPROVEMENT -->
-<section class="slide" data-sec="Future">
-  <div class="eyebrow">Two capabilities to score</div>
-  <div class="cols">
-    <div><h3>"I can't do this as specified"</h3><p>Benchmarks that only count passes reward test gaming. Ship impossible tasks in every suite; grade recognition and integrity.</p></div>
-    <div><h3>Self-improvement, gated</h3><p><span class="mono">ledger improve</span>: LEDGER files its own bugs as failing tests and fixes them on a branch, local model only. Its gate caught 2 bad changes in 5; a human merges.</p><p class="small" style="margin-top:12px">Safe only when the verifier sits outside the thing being improved.</p></div>
-  </div>
-  <aside class="notes">The thinking-reply fix (a 10-line change raising an honest error instead of returning empty text) was authored by qwen3.8:27b alone on its second of four tries. One accepted commit in an earlier run was partly gamed: a wrong alias satisfied the lint check. That loophole is the lesson.</aside>
-</section>
-
-<!-- 26 PREDICTIONS -->
-<section class="slide" data-sec="Future">
+<section data-t="15:05" class="slide" data-sec="Future">
   <div class="eyebrow">Five predictions</div>
   <ol class="big">
     <li>Agent evals report variance and replayability, not just success rate.</li>
@@ -409,14 +293,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
   </ol>
 </section>
 
-<!-- TIPS -->
-<section class="slide center" data-sec="Tips">
-  <div class="eyebrow">Monday morning</div>
-  <h1>Harness habits for<br>your own coding agent</h1>
-  <p class="lede" style="margin-top:24px">You don't need LEDGER to use the ideas. Two laws, four tips.</p>
-</section>
-
-<section class="slide" data-sec="Tips">
+<section data-t="16:05" class="slide" data-sec="Tips">
   <div class="eyebrow">The two laws</div>
   <h2>Context is the budget.<br>A runnable check is the finish line.</h2>
   <div class="cols">
@@ -426,7 +303,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
   <p class="small" style="margin-top:28px">Every tip that follows either protects context or closes the verification loop.</p>
 </section>
 
-<section class="slide" data-sec="Tips">
+<section data-t="17:05" class="slide" data-sec="Tips">
   <div class="eyebrow">Tip 1</div>
   <h2>Give every task a runnable check</h2>
   <div class="term" style="font-size:20px;white-space:pre-wrap"><span class="dim"># before</span>
@@ -440,7 +317,7 @@ and expects exactly 100 x 200 and 1 x 429. Confirm it fails, fix the race, run
   <aside class="notes">"A check is the difference between watching a session and walking away from it." This is LEDGER's sensor idea, applied with a prompt and a hook.</aside>
 </section>
 
-<section class="slide" data-sec="Tips">
+<section data-t="18:05" class="slide" data-sec="Tips">
   <div class="eyebrow">Tip 2</div>
   <h2>Treat context as the budget</h2>
   <div class="cols">
@@ -462,7 +339,7 @@ next step, and the test command that proves it.
   </div>
 </section>
 
-<section class="slide" data-sec="Tips">
+<section data-t="18:50" class="slide" data-sec="Tips">
   <div class="eyebrow">Tip 3</div>
   <h2>Get a fresh-context review before "done"</h2>
   <p class="lede">The agent that wrote the code is biased toward it. Review with something that didn't write it:</p>
@@ -472,7 +349,7 @@ edge cases tested, nothing out of scope. <span class="am">Report correctness gap
   <p class="small" style="margin-top:20px">Restrict findings to correctness and stated requirements, or you'll chase nitpicks into over-engineering.</p>
 </section>
 
-<section class="slide" data-sec="Tips">
+<section data-t="19:35" class="slide" data-sec="Tips">
   <div class="eyebrow">Tip 4</div>
   <h2>Make repeated corrections durable</h2>
   <p class="lede" style="margin-bottom:28px">Correct the same thing twice? Encode it instead of correcting it a third time.</p>
@@ -486,36 +363,27 @@ AGENTS.md change that would have prevented it, as a diff.</div>
   <aside class="notes">The system compounds instead of resetting each session. Same move LEDGER makes when a failure becomes a sensor or a test.</aside>
 </section>
 
-<section class="slide" data-sec="Tips">
-  <div class="eyebrow">The verification ladder</div>
-  <h2>Climb only as far as the stakes require</h2>
-  <table class="t">
-    <tr><th>Rung</th><th style="text-align:left">Mechanism</th><th style="text-align:left">Use when</th></tr>
-    <tr><td>In the prompt</td><td style="text-align:left">"run X and iterate until green"</td><td style="text-align:left">Any task, today</td></tr>
-    <tr><td><span class="mono">/goal</span></td><td style="text-align:left">A separate evaluator re-checks the condition after every turn</td><td style="text-align:left">A long session you'll step away from</td></tr>
-    <tr><td>Stop hook</td><td style="text-align:left">A script blocks the turn from ending until it passes</td><td style="text-align:left">The repo must never end a turn red</td></tr>
-    <tr><td>Fresh reviewer</td><td style="text-align:left">A subagent or another model tries to refute the result</td><td style="text-align:left">High stakes or long unattended runs</td></tr>
-  </table>
-  <p class="small" style="margin-top:22px">Each rung trades setup for attention. LEDGER sits at the top: sensors, gates, and a journal you can replay.</p>
-</section>
-
-<!-- 27 CLOSE -->
-<section class="slide center" data-sec="Close">
+<section data-t="20:20" class="slide center" data-sec="Close">
   <h1>Confidence is not evidence.</h1>
   <p class="lede" style="margin-top:30px">Build the harness that asks for evidence.</p>
   <p class="small" style="margin-top:70px"><b>maureesewilliams.io</b> · arXiv:2607.08894 · github.com/MMWilliams/gats</p>
   <aside class="notes">Q&A backup: guardrails classify text, this checks action effects; search blow-up is why plan actions are coarse; prompt injection still arrives, but can't cause an unverified action; intent attacks need authorization, a separate layer.</aside>
 </section>
 
-<!-- ADDENDUM -->
-<section class="slide center" data-sec="Addendum">
+<section class="slide center" data-sec="Backup">
+  <div class="eyebrow">Backup</div>
+  <h1>For questions</h1>
+  <p class="lede" style="margin-top:24px">Addendum A1-A3, then deeper LEDGER and GATS slides.</p>
+</section>
+
+<section class="slide center" data-backup="1" data-sec="Addendum">
   <div class="eyebrow red">Addendum</div>
   <h1>The numbers in my own preprint</h1>
   <p class="lede" style="margin-top:24px">Which results reproduce, which don't, and where the difference came from.</p>
   <aside class="notes">Full text: maureesewilliams.io/writing/gats-preprint-addendum. Present in-flow after slide 8 if time allows.</aside>
 </section>
 
-<section class="slide" data-sec="Addendum">
+<section class="slide" data-backup="1" data-sec="Addendum">
   <div class="eyebrow red">A1 · 100-task planning suite</div>
   <h2>Table 1 doesn't reproduce</h2>
   <table class="t">
@@ -529,7 +397,7 @@ AGENTS.md change that would have prevented it, as a diff.</div>
   <p class="small" style="margin-top:22px">Repo pipeline: deterministic, about 2 minutes, no GPU, no keys. Live Llama 3.2: three seeds. GATS doesn't move because it never calls the model while planning.</p>
 </section>
 
-<section class="slide" data-sec="Addendum">
+<section class="slide" data-backup="1" data-sec="Addendum">
   <div class="eyebrow red">A2 · Where the preprint numbers came from</div>
   <h2>A claim nothing checked</h2>
   <p class="lede">Section 4.4 says the baselines ran on Llama 3.2 through Ollama. They ran on the <b>simulated backend</b>, with 25 of 100 tasks drawn from API-Bank data later removed from the repo.</p>
@@ -540,7 +408,7 @@ AGENTS.md change that would have prevented it, as a diff.</div>
   </ul>
 </section>
 
-<section class="slide" data-sec="Addendum">
+<section class="slide" data-backup="1" data-sec="Addendum">
   <div class="eyebrow green">A3 · What holds, and the harder test</div>
   <div class="cols">
     <div>
@@ -559,6 +427,87 @@ AGENTS.md change that would have prevented it, as a diff.</div>
     </div>
   </div>
   <div class="foot">maureesewilliams.io/writing/gats-preprint-addendum</div>
+</section>
+
+<section class="slide" data-backup="1" data-sec="The problem">
+  <div class="eyebrow">The problem</div>
+  <h2>Risk-averse work asks different questions</h2>
+  <div class="cols">
+    <div class="card"><h3>Most agent evals ask</h3><p>Did it usually work?<br>How often does it pass?</p></div>
+    <div class="card bl"><h3>Payments, deploys, infra, regulated code ask</h3><p>What exactly did it do?<br>Can you stop it <b>before</b> the bad step?<br>Can you prove it afterwards?</p></div>
+  </div>
+  <aside class="notes">"In risk-averse work the question isn't 'did it usually work', it's 'can you show me exactly what it did, and could you have stopped it before the bad step.'"</aside>
+</section>
+
+<section class="slide" data-backup="1" data-sec="GATS">
+  <div class="eyebrow amber">The honest limit</div>
+  <h2>Search over raw actions doesn't scale</h2>
+  <p class="lede">Tested at |A| = 15, depth 20. Impractical past about 20 actions or depth 10.</p>
+  <p class="lede" style="margin-top:30px">So LEDGER searches over a <b>few coarse plan-level actions</b> and pushes the open-ended part down into skills.</p>
+  <aside class="notes">This is the bridge from the paper to the product. The limit is the design constraint LEDGER was built around.</aside>
+</section>
+
+<section class="slide" data-backup="1" data-sec="LEDGER">
+  <div class="eyebrow">Actions</div>
+  <h2>Two altitudes</h2>
+  <div class="cols">
+    <div class="card bl"><h3>Plan level: searched</h3><p class="mono" style="font-size:22px">RunSuite · AuthorPatch · ApplyPatch · Commit · PushBranch · CreatePR</p><p style="margin-top:14px">Small, coarse, contracts known. This is what keeps search tractable.</p></div>
+    <div class="card am"><h3>Skill level: LLM inside</h3><p>Writing the diff. Output is a proposal: preflight, <span class="mono">git apply --check</span>, then the suite decides.</p></div>
+  </div>
+</section>
+
+<section class="slide" data-backup="1" data-sec="LEDGER">
+  <div class="eyebrow">Trust boundaries</div>
+  <h2>Things a user can check</h2>
+  <div class="cols3">
+    <div class="card"><h3>Keys</h3><p>Sealed in the OS vault, bound to the provider's host, stripped from every subprocess the repo runs, scrubbed from journals and prompts.</p></div>
+    <div class="card"><h3>Install</h3><p>sha256-pinned manifest. A tampered manifest is refused.</p></div>
+    <div class="card"><h3>Locality</h3><p>Same harness, same guarantees on a 27B model on one GPU. No cloud required.</p></div>
+  </div>
+</section>
+
+<section class="slide" data-backup="1" data-sec="Evidence">
+  <div class="eyebrow amber">The bench almost lied too</div>
+  <h2>Audit the evaluator</h2>
+  <ul class="clean">
+    <li>Reruns after a harness fix score a harness tuned on that failure.</li>
+    <li>A hidden oracle encoded one algorithm's answer to a degenerate case. Calibrate against <b>two</b> implementations.</li>
+    <li>A task I called impossible, the model solved (primes, Claude backend, 10/10, earned).</li>
+    <li>Held-out tasks must be written after the harness is frozen, by someone not tuning it.</li>
+  </ul>
+</section>
+
+<section class="slide" data-backup="1" data-sec="Future">
+  <div class="eyebrow">Harnesses are the RL environment</div>
+  <h2>The harness already is the training rig</h2>
+  <div class="cols3">
+    <div class="card"><h3>Sensors</h3><p>= the verifier. Binary, deterministic rewards.</p></div>
+    <div class="card"><h3>Worktrees</h3><p>= rollout infrastructure.</p></div>
+    <div class="card"><h3>Journal</h3><p>= trajectory store, with per-action postconditions for credit assignment.</p></div>
+  </div>
+  <p style="margin-top:34px">Three surfaces: the skill policy (RL with verifiable rewards), planner value nets (PUCT replacing UCB1), L2 as a learned dynamics model. Weights promoted only if plan variance stays at zero.</p>
+</section>
+
+<section class="slide" data-backup="1" data-sec="Future">
+  <div class="eyebrow">Two capabilities to score</div>
+  <div class="cols">
+    <div><h3>"I can't do this as specified"</h3><p>Benchmarks that only count passes reward test gaming. Ship impossible tasks in every suite; grade recognition and integrity.</p></div>
+    <div><h3>Self-improvement, gated</h3><p><span class="mono">ledger improve</span>: LEDGER files its own bugs as failing tests and fixes them on a branch, local model only. Its gate caught 2 bad changes in 5; a human merges.</p><p class="small" style="margin-top:12px">Safe only when the verifier sits outside the thing being improved.</p></div>
+  </div>
+  <aside class="notes">The thinking-reply fix (a 10-line change raising an honest error instead of returning empty text) was authored by qwen3.8:27b alone on its second of four tries. One accepted commit in an earlier run was partly gamed: a wrong alias satisfied the lint check. That loophole is the lesson.</aside>
+</section>
+
+<section class="slide" data-backup="1" data-sec="Tips">
+  <div class="eyebrow">The verification ladder</div>
+  <h2>Climb only as far as the stakes require</h2>
+  <table class="t">
+    <tr><th>Rung</th><th style="text-align:left">Mechanism</th><th style="text-align:left">Use when</th></tr>
+    <tr><td>In the prompt</td><td style="text-align:left">"run X and iterate until green"</td><td style="text-align:left">Any task, today</td></tr>
+    <tr><td><span class="mono">/goal</span></td><td style="text-align:left">A separate evaluator re-checks the condition after every turn</td><td style="text-align:left">A long session you'll step away from</td></tr>
+    <tr><td>Stop hook</td><td style="text-align:left">A script blocks the turn from ending until it passes</td><td style="text-align:left">The repo must never end a turn red</td></tr>
+    <tr><td>Fresh reviewer</td><td style="text-align:left">A subagent or another model tries to refute the result</td><td style="text-align:left">High stakes or long unattended runs</td></tr>
+  </table>
+  <p class="small" style="margin-top:22px">Each rung trades setup for attention. LEDGER sits at the top: sensors, gates, and a journal you can replay.</p>
 </section>
 
 </div></div>
@@ -590,13 +539,25 @@ AGENTS.md change that would have prevented it, as a diff.</div>
     svg.innerHTML = g;
   })();
 
+  // rehearsal clock: starts at load, T resets it; targets assume 22 min of talk, 8 of Q&A
+  let t0 = Date.now();
+  function tick(){
+    const n = document.getElementById('num'), sec = Math.floor((Date.now() - t0) / 1000);
+    n.textContent = (n.dataset.label || '') + '  ·  ' + Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0');
+  }
+  setInterval(tick, 1000);
+
   function show(i){
     idx = Math.max(0, Math.min(slides.length - 1, i));
     slides.forEach((s, n) => s.classList.toggle('active', n === idx));
     const s = slides[idx];
     s.querySelectorAll('.bar').forEach(b => { const f = b.querySelector('.fill'); f.style.width = '0'; requestAnimationFrame(() => requestAnimationFrame(() => f.style.width = b.dataset.v + '%')); });
     document.getElementById('bar').style.width = (100 * (idx + 1) / slides.length) + '%';
-    document.getElementById('num').textContent = (idx + 1) + ' / ' + slides.length + '  ·  ' + (s.dataset.sec || '');
+    const mainCount = slides.filter(x => x.dataset.t).length;
+    document.getElementById('num').dataset.label = s.dataset.t
+      ? (idx + 1) + ' / ' + mainCount + '  ·  ' + s.dataset.sec + '  ·  at ' + s.dataset.t
+      : 'backup  ·  ' + s.dataset.sec;
+    tick();
     const n = s.querySelector('aside.notes'); notesBody.textContent = n ? n.textContent.trim() : '(no notes)';
     history.replaceState(null, '', '#' + (idx + 1));
   }
@@ -606,6 +567,7 @@ AGENTS.md change that would have prevented it, as a diff.</div>
     else if (e.key === 'Home') show(0);
     else if (e.key === 'End') show(slides.length - 1);
     else if (e.key === 'n' || e.key === 'N') notes.classList.toggle('show');
+    else if (e.key === 't' || e.key === 'T') { t0 = Date.now(); tick(); }
     else if (e.key === 'f' || e.key === 'F') document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
   });
   addEventListener('click', e => { if (!notes.contains(e.target)) show(idx + (e.clientX > innerWidth / 3 ? 1 : -1)); });

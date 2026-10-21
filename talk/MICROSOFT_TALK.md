@@ -7,7 +7,7 @@ Demo repo: `python talk/demo/make_demo_repo.py <dir>`. Rehearsed 2026-10-21 on
 qwen3.8:27b (GPU 1): goal reached in 4 steps, 1 min 58 s, one-line fix;
 verify-chain, why, replay OK; one edited field gives "chain BROKEN: entry 17".
 Needs `--test "python3 -m pytest -q"` here (default python has no pytest).
-Cut list at the bottom gets it to 20 min; the appendix stretches it to 45.
+30-min slot including Q&A; see the timing map.
 
 One idea the room should leave with: reliability over long horizons doesn't come
 from a smarter model, it comes from a harness that never trusts the model's
@@ -15,10 +15,39 @@ claims about the world and can prove what happened afterwards.
 
 ---
 
-## Timing map
+## Timing map (30 min slot: 21 slides, about 21 min of talk, 8-9 min Q&A)
 
-| Section | Time | Slides |
+The deck shows each main slide's target start time and a running clock
+(bottom right; T resets the clock). Everything after the close is backup.
+
+| # | Slide | Starts at |
 | --- | --- | --- |
+| 1 | Cold open (pre-started run or recording) | 0:00 |
+| 2 | Title | 2:00 |
+| 3 | Reliability compounds | 2:20 |
+| 4 | Confidence is not evidence | 3:20 |
+| 5 | GATS in one slide | 4:20 |
+| 6 | Stress test (mention the addendum) | 5:35 |
+| 7 | Neural proposes, symbolic disposes | 6:50 |
+| 8 | State is what sensors say | 8:05 |
+| 9 | Safety is graph semantics | 9:05 |
+| 10 | Audit you can run (why, replay, tamper) | 10:05 |
+| 11 | Grade problem solving | 11:20 |
+| 12 | Local model results | 12:20 |
+| 13 | The harness got reward-hacked | 13:20 |
+| 14 | The harness is the product | 14:20 |
+| 15 | Five predictions | 15:05 |
+| 16 | Two laws | 16:05 |
+| 17-20 | Tips 1-4 | 17:05, 18:05, 18:50, 19:35 |
+| 21 | Close | 20:20, done by 21:00 |
+
+Backup, in order: addendum A1-A3, risk-averse questions, scaling limit, two
+altitudes, trust boundaries, audit the evaluator, RL training rig,
+impossibility and self-improvement, verification ladder.
+
+If running long, cut: 8 (state), 14 (harness is product), tip 3.
+
+--- | --- | --- |
 | 0 Cold open (live) | 0:00-2:30 | 1-2 |
 | 1 The problem: long horizon x risk | 2:30-6:00 | 3-5 |
 | 2 GATS, the paper | 6:00-11:00 | 6-9 |
@@ -236,9 +265,6 @@ claims about the world and can prove what happened afterwards.
 - Determinism with a stochastic LLM? Plans are deterministic; skill outputs are
   journaled as blobs, so replay is bit-exact.
 
-## Cut list (to 20 min)
-Slides 7, 9, 15, 19, 23.
-
 ## Addendum (deck slides 28-31)
 A1 table: preprint vs repo pipeline vs live Llama 3.2. A2: provenance (simulated
 backend + 25 API-Bank tasks; calls 13.3/17.5/36.9; ReAct optimality 0.54; LATS
@@ -247,4 +273,4 @@ PlanBench (48 vs 63 of 150 failed the broad claim; v2.1 78/90 vs 32/90).
 
 ## To decide
 - Show the install one-liner? (Landmine 5)
-- Present the addendum in-flow after slide 8 or as backup at the end.
+- Addendum is backup by default (no time in 30 min); slide 6 footnote points to it.
