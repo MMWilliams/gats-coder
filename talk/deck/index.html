@@ -409,6 +409,96 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
   </ol>
 </section>
 
+<!-- TIPS -->
+<section class="slide center" data-sec="Tips">
+  <div class="eyebrow">Monday morning</div>
+  <h1>Harness habits for<br>your own coding agent</h1>
+  <p class="lede" style="margin-top:24px">You don't need LEDGER to use the ideas. Two laws, four tips.</p>
+</section>
+
+<section class="slide" data-sec="Tips">
+  <div class="eyebrow">The two laws</div>
+  <h2>Context is the budget.<br>A runnable check is the finish line.</h2>
+  <div class="cols">
+    <div class="card am"><h3>Law 1: context degrades as it fills</h3><p>Every file read and command output lands in the window. As it fills, the agent drops early instructions: 40 files and six suite runs in, it ignores the "no mocks" rule from turn 2.</p></div>
+    <div class="card g"><h3>Law 2: a check closes the loop</h3><p>Without a pass/fail signal, the agent stops when the work <i>looks</i> done, and you become the verifier. With one, it iterates until the check passes.</p></div>
+  </div>
+  <p class="small" style="margin-top:28px">Every tip that follows either protects context or closes the verification loop.</p>
+</section>
+
+<section class="slide" data-sec="Tips">
+  <div class="eyebrow">Tip 1</div>
+  <h2>Give every task a runnable check</h2>
+  <div class="term" style="font-size:20px;white-space:pre-wrap"><span class="dim"># before</span>
+fix the rate limiter, it lets too many requests through
+
+<span class="dim"># after</span>
+Write a failing test in tests/rateLimiter.test.ts that fires 101 concurrent requests
+and expects exactly 100 x 200 and 1 x 429. Confirm it fails, fix the race, run
+<span class="ok">`pnpm test rateLimiter`</span> until green. <span class="am">End with the test output.</span></div>
+  <p style="margin-top:26px">A concrete repro, a test that fails first, a scoped command, and evidence demanded instead of a claim. To make it unskippable, put <span class="mono">make check</span> in a <b>Stop hook</b>: exit code 2 blocks the turn from ending until it passes.</p>
+  <aside class="notes">"A check is the difference between watching a session and walking away from it." This is LEDGER's sensor idea, applied with a prompt and a hook.</aside>
+</section>
+
+<section class="slide" data-sec="Tips">
+  <div class="eyebrow">Tip 2</div>
+  <h2>Treat context as the budget</h2>
+  <div class="cols">
+    <ul class="clean">
+      <li><b>One task per session.</b> <span class="mono">/clear</span> between unrelated tasks.</li>
+      <li><b>After two failed corrections,</b> start fresh with a better prompt.</li>
+      <li><b>Send investigation to subagents</b> so file dumps never enter the main thread.</li>
+      <li><b>Handoff:</b> session bloated, work not done? Write state to disk and restart clean.</li>
+    </ul>
+    <div>
+      <div class="term" style="font-size:19px;white-space:pre-wrap">Use subagents to investigate how token refresh
+works and whether we have OAuth utilities to reuse.
+Return file:line refs and a 10-line summary.</div>
+      <div class="term" style="font-size:19px;white-space:pre-wrap;margin-top:18px">Write HANDOFF.md: goal, files changed, decisions
+and why, approaches that failed and why, the exact
+next step, and the test command that proves it.
+<span class="dim"># fresh session:</span> @HANDOFF.md continue from the next step</div>
+    </div>
+  </div>
+</section>
+
+<section class="slide" data-sec="Tips">
+  <div class="eyebrow">Tip 3</div>
+  <h2>Get a fresh-context review before "done"</h2>
+  <p class="lede">The agent that wrote the code is biased toward it. Review with something that didn't write it:</p>
+  <div style="margin:26px 0"><span class="chip">/code-review subagent</span><span class="chip">a second session</span><span class="chip">Codex /review on Claude's branch</span></div>
+  <div class="term" style="font-size:20px;white-space:pre-wrap">Use a subagent to review the diff against PLAN.md: every requirement implemented,
+edge cases tested, nothing out of scope. <span class="am">Report correctness gaps only.</span></div>
+  <p class="small" style="margin-top:20px">Restrict findings to correctness and stated requirements, or you'll chase nitpicks into over-engineering.</p>
+</section>
+
+<section class="slide" data-sec="Tips">
+  <div class="eyebrow">Tip 4</div>
+  <h2>Make repeated corrections durable</h2>
+  <p class="lede" style="margin-bottom:28px">Correct the same thing twice? Encode it instead of correcting it a third time.</p>
+  <div class="cols3">
+    <div class="card bl"><h3>Judgment rule</h3><p>One line in <span class="mono">AGENTS.md</span>. <span class="mono">CLAUDE.md</span> can just <span class="mono">@AGENTS.md</span> so both tools share it.</p></div>
+    <div class="card am"><h3>Repeated workflow</h3><p>A skill.</p></div>
+    <div class="card g"><h3>Mechanical rule</h3><p>A hook.</p></div>
+  </div>
+  <div class="term" style="font-size:19px;white-space:pre-wrap;margin-top:26px">You hoisted the lazy import in workers/ twice. Propose the smallest one-line
+AGENTS.md change that would have prevented it, as a diff.</div>
+  <aside class="notes">The system compounds instead of resetting each session. Same move LEDGER makes when a failure becomes a sensor or a test.</aside>
+</section>
+
+<section class="slide" data-sec="Tips">
+  <div class="eyebrow">The verification ladder</div>
+  <h2>Climb only as far as the stakes require</h2>
+  <table class="t">
+    <tr><th>Rung</th><th style="text-align:left">Mechanism</th><th style="text-align:left">Use when</th></tr>
+    <tr><td>In the prompt</td><td style="text-align:left">"run X and iterate until green"</td><td style="text-align:left">Any task, today</td></tr>
+    <tr><td><span class="mono">/goal</span></td><td style="text-align:left">A separate evaluator re-checks the condition after every turn</td><td style="text-align:left">A long session you'll step away from</td></tr>
+    <tr><td>Stop hook</td><td style="text-align:left">A script blocks the turn from ending until it passes</td><td style="text-align:left">The repo must never end a turn red</td></tr>
+    <tr><td>Fresh reviewer</td><td style="text-align:left">A subagent or another model tries to refute the result</td><td style="text-align:left">High stakes or long unattended runs</td></tr>
+  </table>
+  <p class="small" style="margin-top:22px">Each rung trades setup for attention. LEDGER sits at the top: sensors, gates, and a journal you can replay.</p>
+</section>
+
 <!-- 27 CLOSE -->
 <section class="slide center" data-sec="Close">
   <h1>Confidence is not evidence.</h1>
