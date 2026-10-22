@@ -3,10 +3,10 @@
 Oct 29, 2026, Microsoft Experience Center. 30 min, Intermediate (accepted CFP).
 Deck: talk/deck/index.html (N notes, F fullscreen, arrows); `python talk/deck/build.py`
 writes slide PNGs, a contact sheet and deck.pdf to talk/deck/out/.
-Demo repo: `python talk/demo/make_demo_repo.py <dir>`. Rehearsed 2026-10-21 on
-qwen3.8:27b (GPU 1): goal reached in 4 steps, 1 min 58 s, one-line fix;
-verify-chain, why, replay OK; one edited field gives "chain BROKEN: entry 17".
-Needs `--test "python3 -m pytest -q"` here (default python has no pytest).
+No live demo (no time in 25 min). Slides 1 and 6 show real output from the
+2026-10-21 run (talk/demo/make_demo_repo.py, qwen3.8:27b on GPU 1: 4 steps,
+1 min 58 s, one-line fix; verify-chain, why, replay OK; one edited field gives
+"chain BROKEN: entry 17").
 25-min talk, 10 slides; see the timing map.
 
 One idea the room should leave with: reliability over long horizons doesn't come
@@ -22,7 +22,7 @@ The deck shows each main slide's target start time and a running clock
 
 | # | Slide | Starts at |
 | --- | --- | --- |
-| 1 | Title + cold open (pre-started run or recording) | 0:00 |
+| 1 | Title + claim, real run output on screen | 0:00 |
 | 2 | Long, risky work breaks agents (curve, confidence is not evidence, risk-averse questions) | 3:00 |
 | 3 | GATS: layers + stress test | 5:30 |
 | 4 | Addendum: a claim nothing checked (preprint vs repo vs live Llama) | 8:00 |
@@ -38,53 +38,14 @@ slide (curve, risk, GATS, scaling limit, inversion, state, altitudes, safety,
 trust, hardbench, local results, reward hack, bench lessons, RL, self-improvement,
 predictions, two laws, tips 1-4 with full prompts, verification ladder).
 
---- | --- | --- |
-| 1 | Cold open (pre-started run or recording) | 0:00 |
-| 2 | Title | 2:00 |
-| 3 | Reliability compounds | 2:20 |
-| 4 | Confidence is not evidence | 3:20 |
-| 5 | GATS in one slide | 4:20 |
-| 6 | Stress test (mention the addendum) | 5:35 |
-| 7 | Neural proposes, symbolic disposes | 6:50 |
-| 8 | State is what sensors say | 8:05 |
-| 9 | Safety is graph semantics | 9:05 |
-| 10 | Audit you can run (why, replay, tamper) | 10:05 |
-| 11 | Grade problem solving | 11:20 |
-| 12 | Local model results | 12:20 |
-| 13 | The harness got reward-hacked | 13:20 |
-| 14 | The harness is the product | 14:20 |
-| 15 | Five predictions | 15:05 |
-| 16 | Two laws | 16:05 |
-| 17-20 | Tips 1-4 | 17:05, 18:05, 18:50, 19:35 |
-| 21 | Close | 20:20, done by 21:00 |
-
-Backup, in order: addendum A1-A3, risk-averse questions, scaling limit, two
-altitudes, trust boundaries, audit the evaluator, RL training rig,
-impossibility and self-improvement, verification ladder.
-
-If running long, cut: 8 (state), 14 (harness is product), tip 3.
-
---- | --- | --- |
-| 0 Cold open (live) | 0:00-2:30 | 1-2 |
-| 1 The problem: long horizon x risk | 2:30-6:00 | 3-5 |
-| 2 GATS, the paper | 6:00-11:00 | 6-9 |
-| 3 LEDGER architecture | 11:00-18:00 | 10-15 |
-| 4 Evidence and what broke | 18:00-23:30 | 16-19 |
-| 5 The future of harnesses | 23:30-28:30 | 20-24 |
-| 6 Close | 28:30-30:00 | 25 |
-
 ---
 
-## 0. Cold open
+## 0. Open
 
-### Slide 1: [terminal, no title]
-- Live: `ledger run "fix the failing test" --backend ollama --model qwen3.8:27b`
-  on a small buggy repo. Plan prints, gate asks, patch lands, suite goes green.
-  Then `ledger verify-chain` and `ledger why 2`.
-- Say: "That was a local model on one GPU, no cloud. Every step it took is in a
+### Slide 1: title, with a real run's terminal output (no live demo)
+- Say: "This is a run from last week: a local model on one GPU, no cloud. Every step it took is in a
   hash-chained log, and I can ask it why it chose step two over every other
   option and get the actual numbers it used, not a story written afterwards."
-- Fallback: record the run the night before.
 
 ### Slide 2: Title
 - Say: "I'm going to argue that the next jump in agent reliability isn't in the
