@@ -1,18 +1,21 @@
 """Compile the deck: one PNG per slide, a contact sheet, and a PDF.
 
-    python build.py            # writes into talk/deck/out/
+    python build.py            # index.html -> talk/deck/out/
+    python build.py alt.html   # alt.html   -> talk/deck/out/alt/
 """
+import sys
 from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
 HERE = Path(__file__).parent
-OUT = HERE / "out"
+DECK = sys.argv[1] if len(sys.argv) > 1 else "index.html"
+OUT = HERE / "out" if DECK == "index.html" else HERE / "out" / Path(DECK).stem
 
 
 def main():
-    OUT.mkdir(exist_ok=True)
-    url = (HERE / "index.html").resolve().as_uri()
+    OUT.mkdir(parents=True, exist_ok=True)
+    url = (HERE / DECK).resolve().as_uri()
     with sync_playwright() as p:
         browser = p.chromium.launch(channel="chrome")
         page = browser.new_page(viewport={"width": 1600, "height": 900})
