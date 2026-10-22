@@ -15,7 +15,7 @@ claims about the world and can prove what happened afterwards.
 
 ---
 
-## Timing map (25 min talk, 10 slides, about 2.5 min each; Q&A after)
+## Timing map (25 min talk, 11 slides; Q&A after)
 
 The deck shows each main slide's target start time and a running clock
 (bottom right; T resets it). Everything after the close is backup.
@@ -23,6 +23,7 @@ The deck shows each main slide's target start time and a running clock
 | # | Slide | Starts at |
 | --- | --- | --- |
 | 1 | Title + claim, real run output on screen | 0:00 |
+| 1b | About me + agenda (photo; say Google out loud) | 1:30 |
 | 2 | Long, risky work breaks agents (curve, confidence is not evidence, risk-averse questions) | 3:00 |
 | 3 | GATS: layers + stress test | 5:30 |
 | 4 | The honest limit: search doesn't scale, so plan level vs skill level | 8:00 |
