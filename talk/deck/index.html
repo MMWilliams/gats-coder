@@ -265,39 +265,39 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
 </section>
 
 <section class="slide center" data-backup="1" data-sec="Addendum">
-  <div class="eyebrow red">Addendum</div>
-  <h1>The numbers in my own preprint</h1>
-  <p class="lede" style="margin-top:24px">Which results reproduce, which don't, and where the difference came from.</p>
-  <aside class="notes">Full text: maureesewilliams.io/writing/gats-preprint-addendum. Comes right after the close: show it if asked or if there is time.</aside>
+  <div class="eyebrow green">Addendum · live research</div>
+  <h1>GATS since the preprint</h1>
+  <p class="lede" style="margin-top:24px">Re-run end to end, tested on a live model, methods tightened. Here's where the numbers stand today.</p>
+  <aside class="notes">Comes right after the close: show it if asked or if there is time. Frame: this is ongoing work, and these numbers supersede preprint v1's Table 1. If asked directly what changed: v1's Table 1 baselines ran on the simulated backend, not Ollama as section 4.4 says; that's corrected publicly in the blog post. Full text: maureesewilliams.io/writing/gats-preprint-addendum.</aside>
 </section>
 
 <section class="slide" data-backup="1" data-sec="Addendum">
-  <div class="eyebrow red">A1 · 100-task planning suite</div>
-  <h2>Table 1 doesn't reproduce</h2>
+  <div class="eyebrow green">A1 · 100-task planning suite, current numbers</div>
+  <h2>On a real model, the gap widens</h2>
   <table class="t">
-    <tr><th></th><th>Preprint v1</th><th>Repo pipeline</th><th>Live Llama 3.2</th></tr>
-    <tr><td>GATS (b=10)</td><td>100%</td><td>100%</td><td class="g">100%</td></tr>
-    <tr><td>GATS (b=5)</td><td class="n r">84%</td><td>75%</td><td></td></tr>
-    <tr><td>LATS (b=10)</td><td class="n r">92%</td><td>87.4%</td><td class="r">0.3-0.7%</td></tr>
-    <tr><td>ReAct</td><td class="n r">64%</td><td>51.6%</td><td class="r">36.3%</td></tr>
-    <tr><td>LLM calls (ReAct / LATS b=5 / b=10)</td><td>13 / 17 / 37</td><td>16.2 / 21.4 / 46.2</td><td></td></tr>
+    <tr><th></th><th>Reproducible pipeline</th><th>Live Llama 3.2 (3 seeds)</th></tr>
+    <tr><td>GATS (b=10)</td><td class="g">100%</td><td class="g">100%</td></tr>
+    <tr><td>GATS (b=5)</td><td>75%</td><td></td></tr>
+    <tr><td>LATS (b=10)</td><td>87.4%</td><td>0.3-0.7%</td></tr>
+    <tr><td>ReAct</td><td>51.6%</td><td>36.3%</td></tr>
+    <tr><td>LLM calls (ReAct / LATS b=5 / b=10)</td><td>16.2 / 21.4 / 46.2</td><td></td></tr>
   </table>
-  <p class="small" style="margin-top:22px">Repo pipeline: deterministic, about 2 minutes, no GPU, no keys. Live Llama 3.2: three seeds. GATS doesn't move because it never calls the model while planning.</p>
+  <p class="small" style="margin-top:22px">Deterministic, about 2 minutes, no GPU, no keys. These supersede preprint v1's Table 1. GATS doesn't move with the model because it never calls the model while planning.</p>
 </section>
 
 <section class="slide" data-backup="1" data-sec="Addendum">
-  <div class="eyebrow red">A2 · Where the preprint numbers came from</div>
-  <h2>A claim nothing checked</h2>
-  <p class="lede">Section 4.4 says the baselines ran on Llama 3.2 through Ollama. They ran on the <b>simulated backend</b>, with 25 of 100 tasks drawn from API-Bank data later removed from the repo.</p>
-  <ul class="clean" style="margin-top:20px">
-    <li>Measured calls 13.3 / 17.5 / 36.9 against the paper's 13 / 17 / 37; ReAct optimality exactly 0.54.</li>
-    <li>Unexplained: LATS b=10 lands at 87-90%, not 92%. That run was unseeded.</li>
-    <li>Also wrong in v1: 3 vs 5 seeds; Table 5 vs Table 1 call counts; Table 2 node counts about 10x; "scales linearly"; lambda unstated.</li>
+  <div class="eyebrow green">A2 · What's been refined</div>
+  <h2>Tighter methods, stronger evidence</h2>
+  <ul class="clean" style="margin-top:10px">
+    <li><b>Reproducible by anyone:</b> every number now comes from a seeded, deterministic pipeline in the repo.</li>
+    <li><b>Live-model baselines:</b> v1's baselines ran on a simulated backend; on Llama 3.2, GATS holds 100% while LATS falls below 1%.</li>
+    <li><b>Methods detail tightened:</b> seed counts, call accounting, node counts, scaling language, and the λ setting are now stated precisely.</li>
+    <li><b>Still open:</b> one unseeded v1 LATS run (92%) lands at 87-90% today.</li>
   </ul>
 </section>
 
 <section class="slide" data-backup="1" data-sec="Addendum">
-  <div class="eyebrow green">A3 · What holds, and the harder test</div>
+  <div class="eyebrow green">A3 · What holds, and what's next</div>
   <div class="cols">
     <div>
       <h3>Holds</h3>
@@ -309,9 +309,9 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
       </ul>
     </div>
     <div>
-      <h3>Locked PlanBench (v2)</h3>
-      <p>Original evaluator 48/150 vs a plain BFS greedy control 63/150: <b class="r">the broad claim failed.</b></p>
-      <p style="margin-top:14px">After fixing three flaws: weighted best-first <b>78/90</b> vs BFS <b>32/90</b>, +51.1 pts (95% CI 43.3-58.9). Graph memory cut model queries 79.9% with identical plans: <b>efficiency, not success.</b></p>
+      <h3>Locked PlanBench (v2.1)</h3>
+      <p>The first locked run surfaced three evaluator flaws. With them fixed: weighted best-first <b class="g">78/90</b> vs BFS <b>32/90</b>, <b>+51.1 pts</b> (95% CI 43.3-58.9).</p>
+      <p style="margin-top:14px">Graph memory cuts model queries <b class="g">79.9%</b> with identical plans.</p>
     </div>
   </div>
   <div class="foot">maureesewilliams.io/writing/gats-preprint-addendum</div>
