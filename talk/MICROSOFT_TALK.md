@@ -25,7 +25,7 @@ The deck shows each main slide's target start time and a running clock
 | 1 | Title + claim, real run output on screen | 0:00 |
 | 2 | Long, risky work breaks agents (curve, confidence is not evidence, risk-averse questions) | 3:00 |
 | 3 | GATS: layers + stress test | 5:30 |
-| 4 | Addendum: a claim nothing checked (preprint vs repo vs live Llama) | 8:00 |
+| 4 | The honest limit: search doesn't scale, so plan level vs skill level | 8:00 |
 | 5 | LEDGER: plan, skill, sensors, journal; incidents; gates | 10:00 |
 | 6 | The answer to the title: why, replay, tamper | 13:00 |
 | 7 | Evidence: graded problem solving + the reward hack | 15:00 |
@@ -33,7 +33,7 @@ The deck shows each main slide's target start time and a running clock
 | 9 | Habits for any coding agent: two laws, four tips | 20:00 |
 | 10 | Close + predictions | 23:00, done by 25:00 |
 
-Backup, in order: addendum A1-A3, then the detail slides behind each main
+After the close: the addendum (divider + A1-A3), shown if asked or time allows. Then backup: the detail slides behind each main
 slide (curve, risk, GATS, scaling limit, inversion, state, altitudes, safety,
 trust, hardbench, local results, reward hack, bench lessons, RL, self-improvement,
 predictions, two laws, tips 1-4 with full prompts, verification ladder).
@@ -251,4 +251,4 @@ PlanBench (48 vs 63 of 150 failed the broad claim; v2.1 78/90 vs 32/90).
 
 ## To decide
 - Show the install one-liner? (Landmine 5)
-- Addendum is main slide 4; A2-A3 detail stays in backup.
+- Addendum (divider + A1-A3) sits right after the close slide (reese, 10-22); main slide 4 is the honest limit.

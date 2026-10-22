@@ -42,6 +42,9 @@ ol.big{list-style:none;counter-reset:n} ol.big li{counter-increment:n;padding:12
 ol.big li::before{content:counter(n);position:absolute;left:0;top:8px;font:800 40px/1 var(--sans);color:var(--blue)}
 .foot{position:absolute;left:112px;right:112px;bottom:44px;font-size:19px;color:var(--ink-3)}
 
+.qrs{display:flex;justify-content:center;gap:56px;margin-top:30px;text-align:left}
+.qr{display:flex;align-items:center;gap:16px;font-size:22px}
+.qr-img svg{display:block;width:150px;height:150px}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start}
 .cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:32px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 32px}
@@ -152,22 +155,18 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
       <p style="margin-top:28px"><b class="g">0</b> LLM calls during planning · <b>0%</b> variance across seeds · <b class="g">100%</b> on live Llama 3.2, where LATS fell below 1%</p>
     </div>
   </div>
-  <div class="foot">One table in the preprint does not reproduce: next slide.</div>
-  <aside class="notes">5:30-8:00. "Symbolic where you can, learned where you've seen it, neural only for the genuinely new." Say "during planning" every time you say zero (50 one-time bootstrap calls). Lead into the next slide: "One table in my own preprint didn't hold up." Limit if asked: impractical past about 20 actions or depth 10, which is why LEDGER searches over a few coarse actions.</aside>
+  <aside class="notes">5:30-8:00. "Symbolic where you can, learned where you've seen it, neural only for the genuinely new." Say "during planning" every time you say zero (50 one-time bootstrap calls). Lead into the next slide: "It has a hard limit, and that limit shaped everything after it."</aside>
 </section>
 
-<section data-t="8:00" class="slide" data-sec="Addendum">
-  <div class="eyebrow red">Addendum · my own preprint</div>
-  <h2>A claim nothing checked</h2>
-  <table class="t" style="font-size:24px">
-    <tr><th>100-task suite</th><th>Preprint v1</th><th>Repo pipeline</th><th>Live Llama 3.2</th></tr>
-    <tr><td>GATS (b=10)</td><td>100%</td><td>100%</td><td class="g">100%</td></tr>
-    <tr><td>LATS (b=10)</td><td class="n r">92%</td><td>87.4%</td><td class="r">0.3-0.7%</td></tr>
-    <tr><td>ReAct</td><td class="n r">64%</td><td>51.6%</td><td class="r">36.3%</td></tr>
-  </table>
-  <p style="margin-top:26px">Section 4.4 says the baselines ran on Llama 3.2. They ran on the <b>simulated backend</b>, with 25 API-Bank tasks mixed in. The repo now reproduces in two minutes, and the correction is public.</p>
-  <div class="foot">maureesewilliams.io/writing/gats-preprint-addendum · detail in backup A2-A3</div>
-  <aside class="notes">8:00-10:00. Say it plainly, no apology tour: "This talk is about not trusting claims nothing checked. Here's one of mine." The live Llama column makes the real point stronger: the baselines collapse with a real model, GATS doesn't move, because it never asks the model while planning. Then: "That's the habit LEDGER is built on."</aside>
+<section data-t="8:00" class="slide" data-sec="GATS">
+  <div class="eyebrow amber">From paper to product · the honest limit</div>
+  <h2>Search doesn't scale. So search less.</h2>
+  <p class="lede" style="margin-bottom:34px">Over raw actions, tree search is impractical past about 20 actions or depth 10. So the planner searches a few coarse moves and pushes the open-ended work down into skills.</p>
+  <div class="cols">
+    <div class="card bl"><h3>Plan level: searched</h3><p class="mono" style="font-size:22px">RunSuite · AuthorPatch · ApplyPatch · Commit · CreatePR</p><p style="margin-top:14px">Few, coarse, contracts known. Every choice is scored and logged.</p></div>
+    <div class="card am"><h3>Skill level: the LLM inside</h3><p>Writing the diff. Its output is a proposal: preflight, <span class="mono">git apply --check</span>, then the suite decides.</p></div>
+  </div>
+  <aside class="notes">8:00-10:00. Tested at 15 actions, depth 20. The limit is the design constraint LEDGER was built around: keep the decisions few and checkable, let the model do the open-ended part where a sensor can check it. "The model never picks the next move; it fills in a step whose result we can measure."</aside>
 </section>
 
 <section data-t="10:00" class="slide" data-sec="LEDGER">
@@ -254,28 +253,22 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
 
 <section data-t="23:00" class="slide center" data-sec="Close">
   <h1>Confidence is not evidence.</h1>
-  <p class="lede" style="margin:22px 0 40px">Build the harness that asks for evidence. Where this goes:</p>
+  <p class="lede" style="margin:16px 0 22px">Build the harness that asks for evidence. Where this goes:</p>
   <ol class="big" style="max-width:1300px">
     <li style="font-size:25px;padding:6px 0 6px 56px">Evals report variance and replayability, not just success rate.</li>
     <li style="font-size:25px;padding:6px 0 6px 56px">Regulated work requires deterministic replay of agent actions.</li>
     <li style="font-size:25px;padding:6px 0 6px 56px">The LLM moves down the stack; verifiers become the moat.</li>
     <li style="font-size:25px;padding:6px 0 6px 56px">"I can't do this as specified" becomes a scored capability.</li>
   </ol>
-  <p class="small" style="margin-top:40px"><b>maureesewilliams.io</b> · arXiv:2607.08894 · github.com/MMWilliams/gats</p>
-  <aside class="notes">23:00-25:00. Read the line, pause, one sentence per prediction, then "Thank you." Harnesses are already RL environments (sensors = verifier, journal = trajectories) if someone asks where this goes next: backup.</aside>
-</section>
-
-<section class="slide center" data-sec="Backup">
-  <div class="eyebrow">Backup</div>
-  <h1>For questions</h1>
-  <p class="lede" style="margin-top:24px">Addendum A1-A3, then the detail behind each main slide.</p>
+  <div class="qrs"><div class="qr"><div class="qr-img"><svg width="165" height="165" class="segno"><g transform="scale(5)"><path fill="#fff" d="M0 0h33v33h-33z"/><path class="qrline" stroke="#111" d="M2 2.5h7m2 0h3m2 0h2m1 0h4m1 0h7m-29 1h1m5 0h1m4 0h1m3 0h1m2 0h1m1 0h1m1 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m2 0h1m4 0h1m1 0h2m1 0h2m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m4 0h1m2 0h1m3 0h1m3 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m4 0h1m2 0h5m3 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m1 0h1m1 0h4m1 0h1m2 0h2m2 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-18 1h1m2 0h2m1 0h3m-20 1h1m2 0h1m1 0h2m1 0h1m2 0h6m4 0h1m1 0h1m-21 1h2m2 0h8m1 0h2m2 0h3m2 0h1m2 0h1m-29 1h1m1 0h1m1 0h1m1 0h2m6 0h1m3 0h3m1 0h2m1 0h3m-25 1h2m2 0h1m3 0h1m1 0h1m1 0h2m1 0h1m4 0h1m2 0h2m-28 1h1m1 0h3m1 0h2m1 0h1m1 0h1m2 0h4m1 0h4m2 0h1m1 0h2m-29 1h1m4 0h1m4 0h1m1 0h1m4 0h3m1 0h1m-21 1h6m4 0h2m4 0h1m2 0h2m3 0h4m-29 1h1m2 0h1m1 0h1m1 0h1m2 0h1m1 0h2m1 0h1m1 0h6m2 0h1m1 0h1m-26 1h1m1 0h1m1 0h2m1 0h1m2 0h4m1 0h1m1 0h3m5 0h1m-27 1h1m3 0h1m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m2 0h3m1 0h1m2 0h1m-29 1h1m1 0h1m1 0h1m1 0h1m3 0h1m1 0h2m3 0h2m2 0h4m2 0h2m-27 1h4m1 0h1m3 0h3m3 0h1m1 0h1m7 0h2m-29 1h1m2 0h6m5 0h1m5 0h5m1 0h1m-19 1h2m1 0h1m1 0h1m2 0h2m1 0h2m3 0h1m1 0h3m-29 1h7m2 0h1m3 0h2m1 0h1m3 0h1m1 0h1m1 0h1m2 0h1m-28 1h1m5 0h1m1 0h4m1 0h1m1 0h2m1 0h1m1 0h1m3 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m4 0h1m2 0h1m1 0h2m2 0h5m2 0h2m-29 1h1m1 0h3m1 0h1m1 0h2m3 0h2m2 0h1m1 0h1m2 0h1m1 0h4m-28 1h1m1 0h3m1 0h1m2 0h3m1 0h2m2 0h1m6 0h3m1 0h1m-29 1h1m5 0h1m2 0h3m1 0h1m3 0h4m2 0h1m3 0h1m-28 1h7m1 0h3m2 0h1m2 0h2m2 0h1m1 0h1m2 0h1m1 0h1"/></g></svg></div><div><b>Hugging Face</b><br><span class="mono small">huggingface.co/maureesewilliams</span></div></div><div class="qr"><div class="qr-img"><svg width="165" height="165" class="segno"><g transform="scale(5)"><path fill="#fff" d="M0 0h33v33h-33z"/><path class="qrline" stroke="#111" d="M2 2.5h7m2 0h3m3 0h3m1 0h1m2 0h7m-29 1h1m5 0h1m1 0h2m2 0h1m1 0h2m1 0h1m2 0h1m1 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m1 0h4m1 0h3m4 0h1m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m5 0h2m1 0h3m1 0h2m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m2 0h1m3 0h2m1 0h2m1 0h1m2 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m3 0h2m4 0h1m2 0h1m2 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-14 1h1m1 0h1m1 0h2m-20 1h3m1 0h2m2 0h1m1 0h2m2 0h3m1 0h1m6 0h2m-28 1h1m1 0h1m1 0h2m2 0h2m2 0h1m3 0h2m1 0h1m2 0h1m1 0h3m1 0h1m-29 1h3m2 0h2m5 0h2m1 0h3m4 0h1m1 0h2m1 0h1m-28 1h4m1 0h1m1 0h3m2 0h1m2 0h1m2 0h1m1 0h1m2 0h2m3 0h1m-24 1h2m2 0h4m1 0h1m1 0h2m2 0h2m1 0h1m2 0h3m-29 1h3m1 0h1m2 0h2m1 0h4m1 0h2m1 0h2m2 0h2m1 0h2m1 0h1m-26 1h2m1 0h2m1 0h2m1 0h1m6 0h2m1 0h4m2 0h1m-29 1h2m1 0h2m2 0h2m1 0h1m4 0h2m1 0h1m2 0h2m1 0h2m2 0h1m-28 1h2m3 0h1m2 0h4m1 0h2m7 0h3m1 0h1m-26 1h2m1 0h1m1 0h1m2 0h1m2 0h2m1 0h1m1 0h1m2 0h1m3 0h1m-26 1h1m4 0h2m6 0h3m1 0h1m4 0h2m1 0h1m-24 1h2m1 0h1m1 0h2m2 0h1m4 0h2m2 0h4m1 0h2m-26 1h2m3 0h1m1 0h3m1 0h2m3 0h1m1 0h8m1 0h1m-21 1h3m1 0h1m1 0h1m1 0h3m1 0h1m3 0h2m1 0h2m-29 1h7m2 0h1m3 0h2m1 0h2m1 0h2m1 0h1m1 0h1m1 0h2m-28 1h1m5 0h1m1 0h1m3 0h1m1 0h2m4 0h1m3 0h1m-25 1h1m1 0h3m1 0h1m4 0h2m3 0h3m1 0h8m-28 1h1m1 0h3m1 0h1m1 0h4m1 0h1m1 0h1m2 0h2m4 0h1m1 0h1m1 0h1m-29 1h1m1 0h3m1 0h1m1 0h1m2 0h1m1 0h2m2 0h2m1 0h1m2 0h1m1 0h2m1 0h1m-29 1h1m5 0h1m1 0h1m1 0h1m1 0h1m2 0h1m2 0h3m3 0h2m1 0h1m-28 1h7m2 0h1m4 0h2m2 0h1m1 0h1m1 0h2m1 0h1m1 0h1"/></g></svg></div><div><b>arXiv paper</b><br><span class="mono small">arxiv.org/abs/2607.08894</span></div></div><div class="qr"><div class="qr-img"><svg width="165" height="165" class="segno"><g transform="scale(5)"><path fill="#fff" d="M0 0h33v33h-33z"/><path class="qrline" stroke="#111" d="M2 2.5h7m1 0h1m2 0h6m1 0h1m1 0h1m1 0h7m-29 1h1m5 0h1m1 0h5m1 0h2m1 0h4m1 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m1 0h1m1 0h3m3 0h1m2 0h1m2 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m5 0h1m1 0h1m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m1 0h2m1 0h2m1 0h3m2 0h1m2 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m2 0h2m2 0h1m2 0h2m1 0h2m1 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-21 1h2m1 0h1m4 0h2m1 0h1m-19 1h2m1 0h1m1 0h2m5 0h4m1 0h1m1 0h1m1 0h1m1 0h5m-29 1h4m1 0h1m1 0h2m1 0h4m3 0h1m2 0h3m2 0h2m1 0h1m-28 1h1m1 0h1m2 0h3m1 0h1m1 0h1m3 0h3m4 0h6m-28 1h2m1 0h2m3 0h1m1 0h7m1 0h1m1 0h3m3 0h1m-28 1h2m1 0h2m1 0h1m3 0h2m1 0h2m1 0h2m1 0h2m1 0h2m-23 1h3m1 0h1m3 0h2m1 0h1m1 0h3m3 0h4m3 0h2m-29 1h1m1 0h1m1 0h4m2 0h1m3 0h1m1 0h2m3 0h1m1 0h1m2 0h3m-29 1h1m2 0h1m1 0h1m1 0h1m1 0h2m1 0h4m3 0h2m2 0h1m4 0h1m-26 1h1m2 0h4m1 0h3m5 0h4m2 0h1m1 0h2m-27 1h1m5 0h2m4 0h2m1 0h1m2 0h1m1 0h1m3 0h3m-29 1h1m3 0h1m1 0h2m1 0h5m6 0h2m1 0h2m1 0h3m-28 1h1m2 0h2m2 0h6m1 0h1m1 0h2m1 0h1m1 0h3m3 0h1m-29 1h1m2 0h4m1 0h1m2 0h2m3 0h2m1 0h6m-17 1h3m1 0h2m2 0h2m1 0h2m3 0h1m3 0h1m-29 1h7m1 0h1m2 0h1m2 0h1m3 0h3m1 0h1m1 0h1m1 0h3m-29 1h1m5 0h1m5 0h1m4 0h2m1 0h1m3 0h1m-25 1h1m1 0h3m1 0h1m1 0h2m1 0h2m3 0h1m1 0h1m1 0h6m1 0h2m-29 1h1m1 0h3m1 0h1m2 0h1m1 0h2m1 0h5m1 0h2m2 0h1m1 0h1m-27 1h1m1 0h3m1 0h1m1 0h4m3 0h2m2 0h1m3 0h2m1 0h1m1 0h1m-29 1h1m5 0h1m1 0h1m2 0h1m2 0h1m1 0h6m1 0h1m3 0h1m-28 1h7m3 0h1m1 0h2m1 0h1m1 0h1m2 0h2m2 0h1m2 0h2"/></g></svg></div><div><b>Blog</b><br><span class="mono small">maureesewilliams.io</span></div></div></div>
+  <aside class="notes">23:00-25:00. Read the line, pause, one sentence per prediction, then "Thank you." Leave the QR codes up through Q&A. The addendum follows this slide. Harnesses are already RL environments (sensors = verifier, journal = trajectories) if someone asks where this goes next: backup.</aside>
 </section>
 
 <section class="slide center" data-backup="1" data-sec="Addendum">
   <div class="eyebrow red">Addendum</div>
   <h1>The numbers in my own preprint</h1>
   <p class="lede" style="margin-top:24px">Which results reproduce, which don't, and where the difference came from.</p>
-  <aside class="notes">Full text: maureesewilliams.io/writing/gats-preprint-addendum. Present in-flow after slide 8 if time allows.</aside>
+  <aside class="notes">Full text: maureesewilliams.io/writing/gats-preprint-addendum. Comes right after the close: show it if asked or if there is time.</aside>
 </section>
 
 <section class="slide" data-backup="1" data-sec="Addendum">
@@ -322,6 +315,12 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
     </div>
   </div>
   <div class="foot">maureesewilliams.io/writing/gats-preprint-addendum</div>
+</section>
+
+<section class="slide center" data-sec="Backup">
+  <div class="eyebrow">Backup</div>
+  <h1>For questions</h1>
+  <p class="lede" style="margin-top:24px">The detail behind each main slide.</p>
 </section>
 
 <section class="slide" data-backup="1" data-sec="The problem">
