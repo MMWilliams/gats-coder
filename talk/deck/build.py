@@ -18,7 +18,8 @@ def main():
     url = (HERE / DECK).resolve().as_uri()
     with sync_playwright() as p:
         browser = p.chromium.launch(channel="chrome")
-        page = browser.new_page(viewport={"width": 1600, "height": 900})
+        # reduced motion: renders each slide in its final, fully animated state
+        page = browser.new_page(viewport={"width": 1600, "height": 900}, reduced_motion="reduce")
         page.goto(url)
         count = page.locator(".slide").count()
         for i in range(count):

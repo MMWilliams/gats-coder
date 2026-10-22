@@ -58,6 +58,30 @@ ol.big li::before{content:counter(n);position:absolute;left:0;top:8px;font:800 4
 .vs ul.clean li::before{top:22px}
 .bb{display:grid;grid-template-columns:240px 1fr 60px 1fr;gap:14px 20px;align-items:center;font-size:26px}
 .bb .k{font-weight:800;color:var(--ink)} .bb .from{color:var(--ink-3)} .bb .to{color:var(--green);font-weight:600} .bb .arrow{font-size:30px}
+/* animation: JS adds .play to the active slide; everything replays on each visit */
+@keyframes rise{from{opacity:0;transform:translateY(18px)}}
+@keyframes pop{from{opacity:0;transform:scale(.82)}}
+@keyframes fade{from{opacity:0}}
+@keyframes draw{to{stroke-dashoffset:0}}
+@keyframes hot{to{stroke:var(--green);stroke-width:5}}
+@keyframes typing{from{width:0}to{width:calc(var(--n) * 1ch)}}
+@keyframes travel{from{offset-distance:0%}to{offset-distance:100%}}
+@keyframes punch{0%{opacity:0;transform:scale(.6)}70%{transform:scale(1.06)}100%{opacity:1;transform:none}}
+.slide.play .a{animation:rise .6s cubic-bezier(.2,.7,.3,1) both;animation-delay:calc(var(--i) * 85ms + 80ms)}
+.slide.play .meme .a.punch{animation-name:punch;animation-duration:.7s}
+.term .ln{display:inline-block;white-space:pre;vertical-align:bottom}
+.slide.play .term .ln{animation:fade .01s both;animation-delay:var(--d)}
+.slide.play .term .ln.cmd{overflow:hidden;animation:typing calc(var(--n) * 28ms) steps(var(--n)) both;animation-delay:var(--d)}
+svg .draw{stroke-dasharray:1;stroke-dashoffset:1}
+.slide.play svg .draw{animation:draw var(--len,.6s) ease forwards;animation-delay:var(--d,0s)}
+.slide.play svg .draw.hot{animation:draw .6s ease forwards var(--d),hot .45s ease forwards var(--h)}
+svg .nd,svg .fd{transform-box:fill-box;transform-origin:center}
+.slide.play svg .nd{animation:pop .45s cubic-bezier(.2,.7,.3,1.3) both;animation-delay:var(--d)}
+.slide.play svg .fd{animation:fade .4s both;animation-delay:var(--d)}
+.slide.play svg .dot{offset-rotate:0deg;animation:fade .2s both var(--d),travel 1.8s ease-in-out both var(--d)}
+.gs .card{padding:20px 26px}.gs .card p{font-size:22px}.gs h3{font-size:26px;margin-bottom:6px}
+@media (prefers-reduced-motion:reduce){.slide *,.slide svg *{animation:none!important}.slide .term .ln.cmd{width:auto}.slide svg .draw{stroke-dashoffset:0}.slide svg .draw.hot{stroke:var(--green);stroke-width:5}.slide svg .dot{display:none}}
+@media print{.slide *,.slide svg *{animation:none!important}.slide svg .draw{stroke-dashoffset:0}.slide svg .draw.hot{stroke:var(--green);stroke-width:5}.slide svg .draw.hot{stroke:var(--green);stroke-width:5}.slide svg .dot{display:none}}
 .cols{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:start}
 .cols3{display:grid;grid-template-columns:repeat(3,1fr);gap:32px}
 .card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:28px 32px}
@@ -194,14 +218,42 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
 
 <section data-t="10:00" class="slide" data-sec="My research">
   <div class="eyebrow">My research · GATS, arXiv:2607.08894</div>
-  <h2>Give the model structure, and ground it in reality</h2>
-  <div class="cols3">
-    <div class="card bl"><h3>A map</h3><p>A graph database of states and actions: what each action did, every time it ran. Search plans over the graph.</p></div>
-    <div class="card am"><h3>A world model</h3><p><b>L1</b> rules where they exist, <b>L2</b> statistics from its own runs, <b>L3</b> the LLM only for what's genuinely new.</p></div>
-    <div class="card g"><h3>Senses</h3><p>Deterministic sensors decide what's true. When the model's claim and reality disagree, reality wins.</p></div>
+  <h2>Give the model structure and grounding</h2>
+  <div class="cols gs" style="grid-template-columns:1.2fr 1fr;gap:44px;align-items:center">
+    <svg viewBox="0 0 820 440" style="width:100%" font-family="var(--mono)">
+      <g fill="none" stroke="#b9bac0" stroke-width="3">
+        <path class="draw hot" pathLength="1" style="--d:.9s;--h:2.2s" d="M160 205 L225 118"/>
+        <path class="draw" pathLength="1" style="--d:1.0s" d="M160 235 L225 322"/>
+        <path class="draw hot" pathLength="1" style="--d:1.3s;--h:2.5s" d="M375 100 L445 100"/>
+        <path class="draw" pathLength="1" style="--d:1.4s;stroke:var(--red)" d="M375 340 L445 340"/>
+        <path class="draw hot" pathLength="1" style="--d:1.7s;--h:2.8s" d="M595 118 L660 205"/>
+      </g>
+      <g font-size="15" fill="#8a8b90">
+        <text class="fd" style="--d:1.2s" x="200" y="172">author a</text>
+        <text class="fd" style="--d:1.3s" x="200" y="284">author b</text>
+        <text class="fd" style="--d:1.5s" x="410" y="86" text-anchor="middle">apply</text>
+        <text class="fd" style="--d:1.6s" x="410" y="326" text-anchor="middle" fill="#c72d26">apply</text>
+        <text class="fd" style="--d:1.9s" x="632" y="150">run suite</text>
+      </g>
+      <g font-size="18" text-anchor="middle">
+        <g class="nd" style="--d:.2s"><rect x="10" y="192" width="150" height="56" rx="10" fill="#fbeceb" stroke="#f0c9c6"/><text x="85" y="226" fill="#c72d26">tests fail</text></g>
+        <g class="nd" style="--d:.35s"><rect x="225" y="72" width="150" height="56" rx="10" fill="#f7f7f8" stroke="#e5e5e7"/><text x="300" y="106" fill="#141518">patch a</text></g>
+        <g class="nd" style="--d:.45s"><rect x="225" y="312" width="150" height="56" rx="10" fill="#f7f7f8" stroke="#e5e5e7"/><text x="300" y="346" fill="#141518">patch b</text></g>
+        <g class="nd" style="--d:.55s"><rect x="445" y="72" width="150" height="56" rx="10" fill="#f7f7f8" stroke="#e5e5e7"/><text x="520" y="106" fill="#141518">applied</text></g>
+        <g class="nd" style="--d:.65s"><rect x="445" y="312" width="150" height="56" rx="10" fill="#fbeceb" stroke="#f0c9c6"/><text x="520" y="346" fill="#c72d26">rejected</text></g>
+        <g class="nd" style="--d:.75s"><rect x="660" y="192" width="150" height="56" rx="10" fill="#e8f4ef" stroke="#bfe0d2"/><text x="735" y="226" fill="#0f7a5a" font-weight="700">tests pass</text></g>
+        <text class="fd" style="--d:2.0s" x="520" y="402" font-size="16" fill="#c72d26" font-weight="700">INCIDENT: claimed ≠ observed</text>
+      </g>
+      <circle class="dot" r="9" fill="#0f7a5a" style="--d:3.1s;offset-path:path('M85 220 L300 100 L520 100 L735 220')"/>
+    </svg>
+    <div class="stack">
+      <div class="card bl"><h3>A map</h3><p>A graph database of states and actions: what each action did, every time it ran.</p></div>
+      <div class="card am"><h3>A world model</h3><p><b>L1</b> rules, <b>L2</b> its own statistics, <b>L3</b> the LLM only for what's new.</p></div>
+      <div class="card g"><h3>Senses</h3><p>Sensors decide what's true. When a claim and reality disagree, reality wins.</p></div>
+    </div>
   </div>
-  <p style="margin-top:40px"><b class="g">100%</b> on a 120-task stress test (LATS 88.9%, ReAct 23.9%) · <b class="g">0</b> LLM calls during planning · <b class="g">100%</b> on live Llama 3.2, where LATS fell below 1%</p>
-  <aside class="notes">10:00-13:00. "My research is about getting more out of the same model by giving it structure and grounding." Say "during planning" with the zero (50 one-time bootstrap calls). The stress test reproduces exactly. Limit if asked: tree search is impractical past about 20 raw actions, which is why LEDGER plans over a few coarse steps.</aside>
+  <p style="margin-top:22px"><b class="g" data-count>100%</b> on a 120-task stress test (LATS 88.9%, ReAct 23.9%) · <b class="g" data-count>0</b> LLM calls during planning · <b class="g" data-count>100%</b> on live Llama 3.2, where LATS fell below 1%</p>
+  <aside class="notes">10:00-13:00. "My research is about getting more out of the same model by giving it structure and grounding." Walk the graph as it animates: the planner searches states it has seen; patch b's apply claimed success but the sensor disagreed, so that edge becomes an incident and the plan routes through patch a. Say "during planning" with the zero (50 one-time bootstrap calls). The stress test reproduces exactly.</aside>
 </section>
 
 <section data-t="13:00" class="slide" data-sec="LEDGER">
@@ -643,12 +695,48 @@ AGENTS.md change that would have prevented it, as a diff.</div>
     let g = '';
     for (const v of [0, .25, .5, .75, 1]) g += `<line x1="${L}" x2="${R}" y1="${y(v)}" y2="${y(v)}" stroke="#e5e5e7"/><text x="${L-12}" y="${y(v)+7}" text-anchor="end" font-size="20" fill="#8a8b90">${v*100}%</text>`;
     for (const n of [0, 100, 200, 300, 400, 500]) g += `<text x="${x(n)}" y="${B+36}" text-anchor="middle" font-size="20" fill="#8a8b90">${n}</text>`;
-    g += `<path d="${path(.999)}" fill="none" stroke="#0f7a5a" stroke-width="4"/><path d="${path(.99)}" fill="none" stroke="#c72d26" stroke-width="4"/>`;
+    g += `<path class="draw" pathLength="1" style="--len:1.6s;--d:.3s" d="${path(.999)}" fill="none" stroke="#0f7a5a" stroke-width="4"/><path class="draw" pathLength="1" style="--len:1.6s;--d:.6s" d="${path(.99)}" fill="none" stroke="#c72d26" stroke-width="4"/>`;
     g += `<circle cx="${x(100)}" cy="${y(Math.pow(.99,100))}" r="7" fill="#c72d26"/><text x="${x(100)+14}" y="${y(Math.pow(.99,100))-12}" font-size="22" fill="#c72d26" font-weight="700">99%/step: 37% at 100</text>`;
     g += `<text x="${x(330)}" y="${y(Math.pow(.999,330))-16}" font-size="22" fill="#0f7a5a" font-weight="700">99.9%/step</text>`;
     g += `<text x="${(L+R)/2}" y="${H-4}" text-anchor="middle" font-size="20" fill="#8a8b90">steps</text>`;
     document.querySelectorAll('svg.curve').forEach(svg => svg.innerHTML = g);
   })();
+
+  // animation setup: stagger order, typed terminal lines, count-ups
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const STAGGER = ':scope > .eyebrow, :scope > h1, :scope > h2, :scope > .lede, :scope > p, :scope > .foot, :scope > .term,' +
+    ' .cols > *, .cols3 > *, .ask > *, .vs > *, .stack > *, .bars > *, ul.clean > li, ol.big > li, .qrs > *, table.t tr, .meme > *, .bb > *';
+  slides.forEach(sl => {
+    let i = 0;
+    sl.querySelectorAll(STAGGER).forEach(el => {
+      if (el.tagName === 'svg' || el.closest('aside')) return;
+      const bb = el.parentElement.classList.contains('bb');
+      const k = [...el.parentElement.children].indexOf(el);
+      if (bb && k % 4) { el.style.setProperty('--i', i - 1); el.classList.add('a'); return; }
+      if (el.parentElement.classList.contains('meme') && k >= 2) { i += k === 2 ? 8 : 0; if (k === 3) el.classList.add('punch'); }
+      el.style.setProperty('--i', Math.min(i++, 18)); el.classList.add('a');
+    });
+    sl.querySelectorAll('.term').forEach(t => {
+      let d = 0.25 + 0.085 * (parseFloat(t.style.getPropertyValue('--i')) || 0);
+      t.innerHTML = t.innerHTML.split('\n').map(line => {
+        const tmp = document.createElement('span'); tmp.innerHTML = line;
+        const n = tmp.textContent.length, cmd = line.includes('class="p"');
+        const html = `<span class="ln${cmd ? ' cmd' : ''}" style="--n:${n};--d:${d.toFixed(2)}s">${line}</span>`;
+        d += cmd ? n * 0.028 + 0.3 : 0.12;
+        return html;
+      }).join('\n');
+    });
+  });
+  function countUp(el){
+    if (still) return;
+    if (!el.dataset.to) el.dataset.to = el.textContent;
+    const m = el.dataset.to.match(/^(\d+)(.*)$/), end = +m[1], t0 = performance.now() + 600;
+    (function step(now){
+      const k = Math.max(0, Math.min(1, (now - t0) / 1100));
+      el.textContent = Math.round(end * (1 - Math.pow(1 - k, 3))) + m[2];
+      if (k < 1) requestAnimationFrame(step);
+    })(t0);
+  }
 
   // rehearsal clock: starts at load, T resets it; targets assume a 25 min talk
   let t0 = Date.now();
@@ -662,6 +750,8 @@ AGENTS.md change that would have prevented it, as a diff.</div>
     idx = Math.max(0, Math.min(slides.length - 1, i));
     slides.forEach((s, n) => s.classList.toggle('active', n === idx));
     const s = slides[idx];
+    s.classList.remove('play'); void s.offsetWidth; s.classList.add('play');
+    s.querySelectorAll('[data-count]').forEach(countUp);
     s.querySelectorAll('.bar').forEach(b => { const f = b.querySelector('.fill'); f.style.width = '0'; requestAnimationFrame(() => requestAnimationFrame(() => f.style.width = b.dataset.v + '%')); });
     document.getElementById('bar').style.width = (100 * (idx + 1) / slides.length) + '%';
     const mainCount = slides.filter(x => x.dataset.t).length;
