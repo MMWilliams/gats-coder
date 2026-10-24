@@ -20,10 +20,8 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       subprocesses, exact-value scrub in journals/prompts/errors.
 - [ ] macOS: run install.sh + `ledger setup --key` on a Mac (Keychain via
       `security -i` is unit-untested on real hardware).
-- [ ] Site still publishes no install command, but reese chose (10-24) to show
-      the one-liners on the LLMday close slide (Oct 29). Add them to the
-      kyberos.ai/ledger page before the talk so the slide and site match;
-      update kyberos CLAUDE.md + docs/STRATEGY-2026.md.
+- [x] Install one-liners live on kyberos.ai/ledger (kyberos e752391, 10-24),
+      matching the LLMday close slide; kyberos CLAUDE.md + STRATEGY updated.
 - [ ] Side effect 10-19: the first install.ps1 test hit a lookup bug and ran
       `winget install Python.Python.3.12` (user scope). Uninstall if unwanted:
       `winget uninstall Python.Python.3.12`.
