@@ -20,9 +20,10 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       subprocesses, exact-value scrub in journals/prompts/errors.
 - [ ] macOS: run install.sh + `ledger setup --key` on a Mac (Keychain via
       `security -i` is unit-untested on real hardware).
-- [ ] Site still publishes no install command (kyberos CLAUDE.md: LEDGER sold
-      as enterprise access). Advertising the one-liners is reese's call; goes
-      to docs/STRATEGY-2026.md first.
+- [ ] Site still publishes no install command, but reese chose (10-24) to show
+      the one-liners on the LLMday close slide (Oct 29). Add them to the
+      kyberos.ai/ledger page before the talk so the slide and site match;
+      update kyberos CLAUDE.md + docs/STRATEGY-2026.md.
 - [ ] Side effect 10-19: the first install.ps1 test hit a lookup bug and ran
       `winget install Python.Python.3.12` (user scope). Uninstall if unwanted:
       `winget uninstall Python.Python.3.12`.
@@ -1017,3 +1018,12 @@ eurips-verifies\ledger_verify2026.tex`.
 - The product page leads with `pip install <url>` rather than the curl-pipe
   installer on purpose. The scripts exist, but teaching `curl | sh` as the
   default is a supply-chain footgun.
+
+## Microsoft Center talk (week of 2026-10-26)
+
+- [x] Deck built (talk/deck): 10 main slides for 25 min incl. tips (9); addendum after the close; QR codes on close;
+      rest backup; addendum blog post live 2026-10-21.
+- [x] Install one-liners on the close slide, both decks (reese, 10-24).
+- [x] Backup PDF sent to Mark 10-22 (llm-day-msft-nyc-maureese-williams.pdf). No live demo (reese, 10-22).
+- [ ] reese picks which deck to present: index.html or alt.html (`python3 talk/deck/build.py alt.html`).
+- [ ] Rehearse to time (25 min) with the speaker notes (N key).

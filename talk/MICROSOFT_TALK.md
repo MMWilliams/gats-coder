@@ -228,7 +228,8 @@ predictions, two laws, tips 1-4 with full prompts, verification ladder).
    pass counts and test-edit checks are mechanical. Say so if asked.
 4. hardbench reruns after harness fixes aren't first-contact results.
 5. kyberos.ai publishes no install command (LEDGER sold as enterprise access).
-   Showing the one-liner on stage is a positioning change; decide first.
+   Decided 10-24 (reese): show it. The close slide carries both one-liners;
+   the installers are live (install.sh/.ps1 return 200).
 6. Don't say "nobody is building this"; say "almost nobody".
 
 ## Q&A backup
@@ -251,5 +252,5 @@ b=10 gap unexplained) and the other v1 errors. A3: what holds, and locked
 PlanBench (48 vs 63 of 150 failed the broad claim; v2.1 78/90 vs 32/90).
 
 ## To decide
-- Show the install one-liner? (Landmine 5)
+- Install one-liner: shown on the close slide (reese, 10-24).
 - Addendum (divider + A1-A3) sits right after the close slide (reese, 10-22); main slide 4 is the honest limit.
