@@ -250,6 +250,7 @@ predictions, two laws, tips 1-4 with full prompts, verification ladder).
 | Project Vend | phase 1 "we would not hire Claudius"; phase 2 procedures + CEO agent largely ended losing weeks | anthropic.com/research/project-vend-1, -2 |
 | Gartner | >40% of agentic AI projects canceled by end 2027; ~130 of thousands of vendors "real"; "agent washing" | Gartner press release 2025-06-25 |
 | MIT NANDA | 95% zero return; "core barrier ... is learning" | The GenAI Divide, Jul 2025 |
+| METR dev RCT | 16 experienced devs, 246 tasks: 19% slower with AI tools, believed 20% faster | metr.org, Jul 2025 |
 | METR caveat | "Time horizon is not the length of time AIs can work independently" | metr.org/notes/2026-01-22-time-horizon-limitations |
 
 ## Landmines
