@@ -25,7 +25,7 @@ rarely the bottleneck, the system around it was. Employer names stay off the sli
 
 ---
 
-## Timing map (25 min talk, 14 slides, ~2 min buffer; Q&A after)
+## Timing map (25 min talk, 14 slides + links slide, ~2 min buffer; Q&A after)
 
 Order since 10-26: the past and its patterns, then what's missing, then what
 closing it unlocks, then GATS, then LEDGER as the evidence.
@@ -46,8 +46,9 @@ The deck shows each main slide's target start time and a running clock
 | 10 | LEDGER: pipeline, sensors/incidents/gates, and the record (why, replay, tamper) | 12:00 |
 | 11 | Evidence: graded problem solving + the reward hack | 14:30 |
 | 12 | Where harnesses go + the four Monday-morning habits | 16:30 |
-| 13 | Confidence is not evidence + predictions, QR codes, install lines | 19:30 |
+| 13 | Confidence is not evidence + four predictions | 19:30 |
 | 14 | CLOSE: We can only prompt what we can foresee (control loop; prompt vs intent) | 21:00, done by 23:00 |
+| 15 | Thank you + QR codes + install lines (up through Q&A) | 23:00 |
 
 The old problem slide (0.99^n, confidence is not evidence) is now the first
 backup slide; its numbers live on slides 6 and 7.
