@@ -69,6 +69,14 @@ table.t th:first-child,table.t td:first-child{text-align:left}
 table.t td{padding:16px 18px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
 table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{text-decoration:line-through;text-decoration-thickness:2px}
 table.t.txt th,table.t.txt td{text-align:left}
+.gaps{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.gap{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:16px 18px;display:flex;flex-direction:column}
+.gap .k{font:600 14px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);margin-bottom:10px}
+.gap .n{font:800 40px/1.05 var(--sans);letter-spacing:-.02em;color:var(--red);margin-bottom:8px}
+.gap .n.g{color:var(--green)} .gap p{font-size:17px;line-height:1.35;color:var(--ink-2);flex:1}
+.gap .c{font-size:13px;color:var(--ink-3);margin-top:8px;line-height:1.3}
+.gap.sum{background:var(--ink);border-color:var(--ink);justify-content:center} .gap.sum p{color:#fff;font-size:23px;line-height:1.35;flex:0}
+table.t.tight td{padding:8px 16px}
 .ab{display:grid;grid-template-columns:1fr 30px 1fr;align-items:center;gap:6px;margin-bottom:12px}
 .ab>span{border-radius:10px;padding:9px 14px;font-size:19px;line-height:1.3;color:var(--ink);border:1px solid}
 .ab .h{background:var(--blue-bg);border-color:#c8dbf7} .ab .m{background:var(--amber-bg);border-color:#ecd6b0}
@@ -121,10 +129,10 @@ table.t.txt th,table.t.txt td{text-align:left}
 <span class="p">$</span> ledger verify-chain episode.jsonl
 <span class="ok">+ chain OK -- every hash links, nothing has been altered</span></div>
   <p class="small" style="margin-top:10px">Real output, Oct 21 run: local qwen3.8:27b, one GPU, 1 min 58 s.</p>
-  <aside class="notes">0:00-1:30. Open with your background (out loud; no employer names on slides). Say: "Hi, I'm Maureese. I build agents at Google, and before that I spent about two years on Disney's AI team. Tonight is what that work taught me: where agents still fall short, and where I think they're going." No live demo; the terminal is a real run's output. Then: "This is a run from last week: a local model on one GPU, no cloud. It fixed a payments bug in four steps, and it made zero model calls to decide what to do. Every step is in a hash-chained log. By the end you'll see me ask it why it chose each step and get the numbers it actually used. My claim tonight: the next jump in agent reliability isn't in the model, it's in the harness around it."</aside>
+  <aside class="notes">0:00-1:15. Open with your background (out loud; no employer names on slides). Say: "Hi, I'm Maureese. I build agents at Google, and before that I spent about two years on Disney's AI team. Tonight is what that work taught me: where agents still fall short, and where I think they're going." No live demo; the terminal is a real run's output. Then: "This is a run from last week: a local model on one GPU, no cloud. It fixed a payments bug in four steps, and it made zero model calls to decide what to do. Every step is in a hash-chained log. By the end you'll see me ask it why it chose each step and get the numbers it actually used. My claim tonight: the next jump in agent reliability isn't in the model, it's in the harness around it."</aside>
 </section>
 
-<section data-t="1:30" class="slide center" data-sec="Open">
+<section data-t="1:15" class="slide center" data-sec="Open">
   <div class="cols" style="grid-template-columns:1.05fr 1fr;gap:72px;margin-top:10px">
     <div>
       <div class="eyebrow">About me</div>
@@ -146,28 +154,10 @@ table.t.txt th,table.t.txt td{text-align:left}
       <ol class="big"><li><b>The gaps I hit at scale</b><span class="small" style="display:block;line-height:1.35;margin-top:4px">why long, risky work breaks agents, and why a better model alone won't fix it</span></li><li><b>Closing them: GATS and LEDGER</b><span class="small" style="display:block;line-height:1.35;margin-top:4px">planning you can replay, and a record you can audit</span></li><li><b>Where agents go</b><span class="small" style="display:block;line-height:1.35;margin-top:4px">in companies and on their own, plus habits for any coding agent on Monday</span></li></ol>
     </div>
   </div>
-  <aside class="notes">1:30-3:00. "At Disney we built RAG and agents for guests planning trips and asking about the resorts and parks: huge scale, always up, answering from data that changed constantly. At Google I build agents that sift tables and historical data, tens of millions of data points, and compress them into real-time intelligence for decisions at corporate scale. Those are high-risk, high-leverage calls: what the agent surfaces shapes outcomes and partnerships. Three lessons from both run through this talk. One: at scale, rare failures happen every day, and a confident answer from stale or partial data is still wrong. Two: when an agent's summary drives a decision, the first question is what it actually did, what it read and what it skipped, and a transcript doesn't answer it. Three: the model was rarely the bottleneck; the system around it was." Then the three parts. Keep it moving.</aside>
+  <aside class="notes">1:15-2:30. "At Disney we built RAG and agents for guests planning trips and asking about the resorts and parks: huge scale, always up, answering from data that changed constantly. At Google I build agents that sift tables and historical data, tens of millions of data points, and compress them into real-time intelligence for decisions at corporate scale. Those are high-risk, high-leverage calls: what the agent surfaces shapes outcomes and partnerships. Three lessons from both run through this talk. One: at scale, rare failures happen every day, and a confident answer from stale or partial data is still wrong. Two: when an agent's summary drives a decision, the first question is what it actually did, what it read and what it skipped, and a transcript doesn't answer it. Three: the model was rarely the bottleneck; the system around it was." Then the three parts. Keep it moving.</aside>
 </section>
 
-<section data-t="3:00" class="slide" data-sec="The problem">
-  <div class="eyebrow">The problem</div>
-  <h2>Long, risky work breaks agents</h2>
-  <div class="cols" style="grid-template-columns:1.15fr 1fr;gap:48px">
-    <div>
-      <svg class="curve" viewBox="0 0 860 470" style="width:100%"></svg>
-      <p class="small">99% per step is 37% at 100 steps and 0.004% at 1,000.</p>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:22px">
-      <div class="card r"><h3 class="r">Confidence is not evidence</h3>
-        <div><span class="chip r">"tests pass"</span><span class="chip r">"file written"</span><span class="chip r">"safe to deploy"</span><span class="chip r">"done"</span></div>
-        <p>Most failures are the agent believing its own claim about the world.</p></div>
-      <div class="card bl"><h3>Risk-averse work asks</h3><p>What exactly did it do? Can you stop it <b>before</b> the bad step? Can you prove it afterwards?</p></div>
-    </div>
-  </div>
-  <aside class="notes">3:00-5:00. Bridge from lesson one: "At scale, rare is daily, and it gets worse when the work is long." Per-step accuracy multiplies, so the horizon eats you even when each step looks great; pause on 37%. Then the mechanism: the agent asserts world state and acts on the assertion. In payments, deploys and regulated code the question isn't "did it usually work", it's "show me what it did, and could you have stopped it".</aside>
-</section>
-
-<section data-t="5:00" class="slide" data-sec="How we got here">
+<section data-t="2:30" class="slide" data-sec="How we got here">
   <div class="eyebrow">How we got here · agent harnesses, 2020 to now</div>
   <h2>Harnesses grow, then models absorb them</h2>
   <svg class="tl" viewBox="0 0 1376 460" style="width:100%;font-family:var(--sans)">
@@ -244,10 +234,100 @@ table.t.txt th,table.t.txt td{text-align:left}
     <text x="1061.2" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2026</text>
     </svg>
   <p style="margin-top:14px;font-size:25px">Models absorb procedures: reasoning, voting, reflection, search. Today's harness trains tomorrow's model. <b>What can't be absorbed is the check:</b> a verifier inside the model is just another target.</p>
-  <aside class="notes">5:00-6:30. One idea: harnesses grow, then models absorb them. Read the lanes top to bottom. Harnesses kept adding jobs: context (prompts, retrieval, memory), reasoning (chain of thought, voting, Reflexion, tree search like LATS, which GATS beats on the next slide), tools (ReAct's loop, function calling, SWE-agent, MCP) and permission (AutoGPT asking y/n, through today's permission modes, sandboxes and hooks). Then reasoning models (o1, R1) trained the whole reasoning lane into the weights, which is why Claude Code and Codex run a plain ReAct loop with no tree search. What a model can't absorb is contact with the world: what's in context, what it can touch, what it's allowed to do, and what actually happened. The proof lane is the thinnest, and it matters more as models improve: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and Claude models mostly edited the test files, the same failure my own harness hit (15:00). The proof lane is this talk; next, why the absorbing keeps happening.</aside>
+  <aside class="notes">2:30-4:00. One idea: harnesses grow, then models absorb them. Read the lanes top to bottom. Harnesses kept adding jobs: context (prompts, retrieval, memory), reasoning (chain of thought, voting, Reflexion, tree search like LATS, which GATS beats later), tools (ReAct's loop, function calling, SWE-agent, MCP) and permission (AutoGPT asking y/n, through today's permission modes, sandboxes and hooks). Then reasoning models (o1, R1) trained the whole reasoning lane into the weights, which is why Claude Code and Codex run a plain ReAct loop with no tree search. What a model can't absorb is contact with the world: what's in context, what it can touch, what it's allowed to do, and what actually happened. The proof lane is the thinnest, and it matters more as models improve: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and Claude models mostly edited the test files, the same failure my own harness hit (15:00). The proof lane is this talk; next, why the absorbing keeps happening.</aside>
 </section>
 
-<section data-t="6:30" class="slide" data-sec="How we got here">
+<section data-t="4:00" class="slide" data-sec="How we got here">
+  <div class="eyebrow">Long horizons · METR: task length an agent finishes half the time</div>
+  <h2>Tasks get longer. Then they never end.</h2>
+  <svg class="hz" viewBox="0 0 1376 490" style="width:100%;font-family:var(--sans)">
+    <rect x="130" y="6" width="1200" height="86" rx="12" fill="#fbeceb" stroke="#c72d26" stroke-dasharray="6 6" stroke-opacity=".55"/>
+    <text x="150" y="34" font-size="19" font-weight="800" fill="#c72d26">∞  Responsibilities: no completion state</text>
+    <text x="150" y="60" font-size="16" fill="#45464a">keep prod healthy · run on-call · manage a team · maintain a codebase</text>
+    <text x="150" y="82" font-size="15" fill="#8a8b90">Not a cron job or a pipeline (triggered, stateless): one agent that owns its state, runs continuously, and is judged on invariants held, not goals reached.</text>
+    <text x="118" y="54" text-anchor="end" font-size="15" font-weight="700" fill="#c72d26">no end</text>
+    <line x1="130" y1="417.2" x2="1330" y2="417.2" stroke="#e5e5e7" stroke-width="1"/>
+    <text x="118" y="422.2" text-anchor="end" font-size="15" fill="#8a8b90">seconds</text>
+    <line x1="130" y1="342.3" x2="1330" y2="342.3" stroke="#e5e5e7" stroke-width="1"/>
+    <text x="118" y="347.3" text-anchor="end" font-size="15" fill="#8a8b90">1 min</text>
+    <line x1="130" y1="284.8" x2="1330" y2="284.8" stroke="#e5e5e7" stroke-width="1"/>
+    <text x="118" y="289.8" text-anchor="end" font-size="15" fill="#8a8b90">10 min</text>
+    <line x1="130" y1="240.0" x2="1330" y2="240.0" stroke="#e5e5e7" stroke-width="1"/>
+    <text x="118" y="245.0" text-anchor="end" font-size="15" fill="#8a8b90">1 hour</text>
+    <line x1="130" y1="188.0" x2="1330" y2="188.0" stroke="#e5e5e7" stroke-width="1"/>
+    <text x="118" y="193.0" text-anchor="end" font-size="15" fill="#8a8b90">1 workday</text>
+    <line x1="130" y1="147.7" x2="1330" y2="147.7" stroke="#e5e5e7" stroke-width="1"/>
+    <text x="118" y="152.7" text-anchor="end" font-size="15" fill="#8a8b90">1 work week</text>
+    <line x1="130" y1="112.0" x2="1330" y2="112.0" stroke="#e5e5e7" stroke-width="1"/>
+    <text x="118" y="117.0" text-anchor="end" font-size="15" fill="#8a8b90">1 work month</text>
+    <polygon points="1047.4,183.3 1196.0,112.0 1272.2,112.0 1272.2,112.0 1047.4,183.3" fill="#2b6cd4" opacity=".08"/>
+    <line x1="635.3" y1="343.7" x2="1047.4" y2="183.3" stroke="#2b6cd4" stroke-width="3" stroke-opacity=".5"/>
+    <line x1="1047.4" y1="183.3" x2="1230.6" y2="112.0" stroke="#2b6cd4" stroke-width="3" stroke-dasharray="8 7"/>
+    <circle cx="145.2" cy="415.4" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text x="157.2" y="401.4" text-anchor="start" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-2</text>
+    <text x="157.2" y="419.4" text-anchor="start" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">answer a lookup</text>
+    <circle cx="307.5" cy="390.8" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text x="317.5" y="376.8" text-anchor="start" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-3</text>
+    <circle cx="534.2" cy="355.1" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text x="522.2" y="329.1" text-anchor="end" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-3.5</text>
+    <text x="522.2" y="347.1" text-anchor="end" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">write a function</text>
+    <circle cx="660.2" cy="307.7" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text x="648.2" y="281.7" text-anchor="end" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-4</text>
+    <text x="648.2" y="299.7" text-anchor="end" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">fix a small bug</text>
+    <circle cx="742.1" cy="307.4" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <circle cx="807.6" cy="293.7" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <circle cx="820.7" cy="281.5" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <circle cx="849.8" cy="267.0" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <circle cx="863.6" cy="266.8" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <circle cx="878.8" cy="250.8" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text x="864.8" y="226.8" text-anchor="end" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">o1</text>
+    <text x="864.8" y="244.8" text-anchor="end" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">debug across files</text>
+    <circle cx="906.6" cy="239.8" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <circle cx="924.2" cy="222.7" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <circle cx="963.3" cy="209.5" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text x="949.3" y="179.5" text-anchor="end" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-5</text>
+    <text x="949.3" y="197.5" text-anchor="end" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">build a feature</text>
+    <circle cx="998.9" cy="207.0" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <circle cx="1001.0" cy="200.3" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <circle cx="1006.9" cy="195.7" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <circle cx="1026.3" cy="177.9" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text x="1042.3" y="211.9" text-anchor="start" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">Claude Opus 4.6, Mythos</text>
+    <text x="1042.3" y="229.9" text-anchor="start" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">a day's project</text>
+    <circle cx="1047.4" cy="168.5" r="7" fill="#fff" stroke="#2b6cd4" stroke-width="3"/>
+    <circle cx="1138.8" cy="147.7" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="3" stroke-dasharray="4 3"/>
+    <text x="1152.8" y="169.7" text-anchor="start" font-size="16" font-weight="700" fill="#2b6cd4" paint-order="stroke" stroke="#fff" stroke-width="5">a week's project</text>
+    <text x="1152.8" y="187.7" text-anchor="start" font-size="15" fill="#8a8b90" paint-order="stroke" stroke="#fff" stroke-width="5">trend: Dec 2026</text>
+    <circle cx="1230.6" cy="112.0" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="3" stroke-dasharray="4 3"/>
+    <text x="1216.6" y="134.0" text-anchor="end" font-size="16" font-weight="700" fill="#2b6cd4" paint-order="stroke" stroke="#fff" stroke-width="5">a month's project</text>
+    <text x="1216.6" y="152.0" text-anchor="end" font-size="15" fill="#8a8b90" paint-order="stroke" stroke="#fff" stroke-width="5">trend: Sep 2027 (CI Jun 2027 – Jan 2028)</text>
+    <line x1="1230.6" y1="102.0" x2="1230.6" y2="96" stroke="#c72d26" stroke-width="2.5" stroke-dasharray="4 4"/>
+    <text x="1240.6" y="106.0" font-size="20" font-weight="800" fill="#c72d26">?</text>
+    <rect x="132.0" y="440" width="463.4" height="24" rx="6" fill="#eeeef0"/>
+    <text x="363.7" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#45464a">prompts</text>
+    <rect x="599.4" y="440" width="248.60000000000002" height="24" rx="6" fill="#eaf1fc"/>
+    <text x="723.7" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#2b6cd4">tool loops</text>
+    <rect x="852.0" y="440" width="261.29999999999995" height="24" rx="6" fill="#f8f0e2"/>
+    <text x="982.65" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#a8690c">reasoning + harnesses</text>
+    <rect x="1117.3" y="440" width="128.60000000000014" height="24" rx="6" fill="#e8f4ef" stroke="#0f7a5a" stroke-dasharray="5 4" stroke-opacity=".6"/>
+    <text x="1181.6" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#0f7a5a">planning + checks</text>
+    <rect x="1249.9" y="440" width="78.09999999999991" height="24" rx="6" fill="#fbeceb" stroke="#c72d26" stroke-dasharray="5 4" stroke-opacity=".6"/>
+    <text x="1288.95" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#c72d26">always-on</text>
+    <text x="130.0" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2019</text>
+    <text x="256.3" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2020</text>
+    <text x="382.6" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2021</text>
+    <text x="508.9" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2022</text>
+    <text x="635.3" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2023</text>
+    <text x="761.6" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2024</text>
+    <text x="887.9" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2025</text>
+    <text x="1014.2" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2026</text>
+    <text x="1140.5" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2027</text>
+    <text x="1266.8" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2028</text>
+    </svg>
+  <p class="small" style="margin-top:6px;font-size:17px">Data: METR Time Horizon 1.1 (50% success, human time to complete). Trend: doubling every ~129 days since 2023 (95% CI 104&ndash;158), extended. Past 16 h the task suite stops being reliable.</p>
+  <aside class="notes">4:00-5:30. METR measures the length of task, in human time, that an agent finishes half the time. Since 2023 it doubles about every four months: seconds for GPT-2, four minutes for GPT-4, an hour for Claude 3.7, twelve hours for Opus 4.6. Each jump came with a harness change: tool loops took us to minutes, reasoning models plus agent harnesses to hours. Extend the line and a work week lands around the turn of the year, a work month around late 2027. That's an extrapolation, not a promise, and past 16 hours their suite stops being reliable. My prediction: what comes after a month isn't a longer task, it's a different kind of request. Tasks end. Responsibilities don't: keep prod healthy, run on-call, manage a team. There's no completion state, only invariants you keep true. That's not a cron job or a pipeline, which are triggered and stateless; it's one agent that owns its state and decides what needs doing. It needs exactly the parts models don't absorb: sensors that say what's true now, gates, and a record you can audit months later. In GATS terms a goal becomes an invariant: a responsibility is a goal that never stops being checked.</aside>
+</section>
+
+<section data-t="5:30" class="slide" data-sec="How we got here">
   <div class="eyebrow">Why it keeps happening · traces become training data</div>
   <h2>Today’s harness is tomorrow’s model</h2>
   <div class="cols" style="grid-template-columns:1fr 1fr;gap:48px">
@@ -263,10 +343,37 @@ table.t.txt th,table.t.txt td{text-align:left}
     </div>
   </div>
   <div class="card r" style="margin-top:20px;padding:18px 28px"><p><b class="r">Never absorbed: the check.</b> Sensors, gates and the record stay outside, because a verifier the model trains against becomes a target. On ImpossibleBench, stronger models game tests more.</p></div>
-  <aside class="notes">6:30-8:00. Why it keeps happening: today's harness is tomorrow's training data. Its traces are the trajectories and its checks are the rewards, so whatever procedure the harness runs gets trained into the next model. Left column already happened: "think step by step" became reasoning models, voting became self-checking, ReAct's text format became native tool calls, tree search became learned backtracking (R1's "wait"). Right column is my guess at the next round: compaction and handoff files, subagents, skills and rules, and plan search, ours included. GATS's planner is a procedure, so it may be absorbed too; say so. What can't move in is the check: once a verifier is trained on, it's a target, and ImpossibleBench is what that looks like. So build the parts that stay outside: sensors, gates, the record.</aside>
+  <aside class="notes">5:30-6:45. Why it keeps happening: today's harness is tomorrow's training data. Its traces are the trajectories and its checks are the rewards, so whatever procedure the harness runs gets trained into the next model. Left column already happened: "think step by step" became reasoning models, voting became self-checking, ReAct's text format became native tool calls, tree search became learned backtracking (R1's "wait"). Right column is my guess at the next round: compaction and handoff files, subagents, skills and rules, and plan search, ours included. GATS's planner is a procedure, so it may be absorbed too; say so. What can't move in is the check: once a verifier is trained on, it's a target, and ImpossibleBench is what that looks like. So build the parts that stay outside: sensors, gates, the record.</aside>
 </section>
 
-<section data-t="8:00" class="slide" data-sec="GATS">
+<section data-t="6:45" class="slide" data-sec="What's missing">
+  <div class="eyebrow red">What's missing · why long horizons stall</div>
+  <h2>The next 10x is trust, not talent</h2>
+  <div class="gaps">
+    <div class="gap"><div class="k">Reliability</div><div class="n">17 h &rarr; 3 h</div><p>Claude Mythos at 50% vs 80% success. The horizon you can trust is 5&ndash;10x shorter than the headline.</p><div class="c">METR Time Horizon 1.1, 2026</div></div>
+    <div class="gap"><div class="k">Trust</div><div class="n">76%</div><p>GPT-5 passed impossible tasks by gaming the tests. Stronger models cheat more.</p><div class="c">ImpossibleBench, ICLR 2026</div></div>
+    <div class="gap"><div class="k">Auditability</div><div class="n">Art. 12</div><p>High-risk AI must log events over its lifetime. A chat transcript isn't tamper-evident or replayable.</p><div class="c">EU AI Act Art. 12(1) &middot; high-risk duties from Dec 2027</div></div>
+    <div class="gap"><div class="k">Reproducibility</div><div class="n">80 / 1,000</div><p>Same prompt, temperature 0, 1,000 runs: 80 different answers.</p><div class="c">Thinking Machines Lab, 2025</div></div>
+    <div class="gap"><div class="k">Planning</div><div class="n">98% &rarr; 24%</div><p>o1-preview on Blocksworld, then on plans of 20&ndash;40 steps.</p><div class="c">Valmeekam et al., 2024</div></div>
+    <div class="gap"><div class="k">World models</div><div class="n">1 command</div><p>An agent wiped a production database in a code freeze, then said rollback was impossible. It wasn't.</p><div class="c">OECD AI incident 2025-07-19</div></div>
+    <div class="gap"><div class="k">Groundedness</div><div class="n g">25 / 30</div><p>Olympiad geometry solved when a symbolic engine checks the neural guesses.</p><div class="c">AlphaGeometry, Nature 2024</div></div>
+    <div class="gap sum"><p>None of these is fixed by a smarter step. All seven live in the system <b style="color:#fff">around</b> the model.</p></div>
+  </div>
+  <aside class="notes">6:45-9:00. Bridge from lesson one: at scale, rare is daily, and it gets worse when the work is long. So what stops that line from just continuing? Seven gaps, each with a number. Reliability: METR's horizon is at 50% success; at 80% it's five to ten times shorter (Mythos: 17 hours vs 3). And 99% per step is 37% at 100 steps. Trust: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and stronger models cheat more; METR caught o3 reward hacking in 30% of its RE-Bench runs. Auditability: the EU AI Act's Article 12 requires high-risk systems to log events over their lifetime (high-risk duties start December 2027); a chat transcript is neither tamper-evident nor replayable. Reproducibility: 1,000 runs at temperature 0 gave 80 different answers. Planning: o1-preview goes from 97.8% on Blocksworld to about 24% on 20-to-40-step plans. World models: an agent with no model of consequences deleted a production database during a code freeze, then said rollback was impossible. It wasn't. Groundedness is the one with a known fix: AlphaGeometry solved 25 of 30 olympiad geometry problems by letting a symbolic engine check the neural guesses. None of these gets fixed by a smarter step. They're properties of the system around the model, and that's where the next order of magnitude is.</aside>
+</section>
+
+<section data-t="9:00" class="slide" data-sec="What it unlocks">
+  <div class="eyebrow green">Hypothetical · and where GATS fits</div>
+  <h2>What closing the gaps would unlock</h2>
+  <table class="t txt tight" style="font-size:19px">
+    <tr><th>Gap</th><th>If it closed</th><th>The GATS piece</th></tr>
+    <tr><td><b>Reliability</b></td><td>Horizons quoted at 99%, not 50%. Checks at every step take 100 steps from 37% to 90%.</td><td class="g">verify after every action; reroute</td></tr><tr><td><b>Trust</b></td><td>Delegate without re-reviewing every step</td><td class="g">sensors set state; false claims become incidents</td></tr><tr><td><b>Auditability</b></td><td>Agents allowed into regulated work</td><td class="g">hash-chained journal, a why-trace per step</td></tr><tr><td><b>Reproducibility</b></td><td>Regression tests for agent behavior</td><td class="g">deterministic plans, bit-exact replay</td></tr><tr><td><b>Planning</b></td><td>Long chains without drift; irreversible steps chosen on purpose</td><td class="g">UCB1 search over a persistent graph</td></tr><tr><td><b>World models</b></td><td>Predict before acting; cost falls with experience</td><td class="g">L1 contracts, L2 statistics, L3 LLM, cached</td></tr><tr><td><b>Groundedness</b></td><td>Claims checkable by construction</td><td class="g">symbolic contracts + sensors</td></tr>
+  </table>
+  <p style="margin-top:16px;font-size:24px">Together: tasks become <b>responsibilities</b>, an agent you can leave running.</p>
+  <aside class="notes">9:00-10:15. Hypothetically, close each gap and here's what opens up. Reliability: with a check after every step that catches nine errors in ten, 100 steps go from 37% to 90% (0.999 to the 100th); that's arithmetic, not a benchmark. Trust: you stop re-reading every step. Auditability: regulated work opens. Reproducibility: you can regression-test an agent. Planning: long chains stop drifting, and irreversible steps get chosen on purpose. World models: the agent predicts before it acts, and gets cheaper with experience. Groundedness: claims become checkable. Together they turn tasks into responsibilities. The right-hand column is GATS; next, how it works and where it stops.</aside>
+</section>
+
+<section data-t="10:15" class="slide" data-sec="GATS">
   <div class="eyebrow">GATS · arXiv:2607.08894 · with Dymitr Nowicki</div>
   <h2>The model is the last resort, not the decider</h2>
   <div class="cols" style="grid-template-columns:1fr 1.1fr;gap:56px">
@@ -288,10 +395,10 @@ table.t.txt th,table.t.txt td{text-align:left}
       <p style="margin-top:28px"><b class="g">0</b> LLM calls during planning · <b>0%</b> variance across seeds · <b class="g">100%</b> on live Llama 3.2, where LATS fell below 1%</p>
     </div>
   </div>
-  <aside class="notes">8:00-9:30. "Symbolic where you can, learned where you've seen it, neural only for the genuinely new." Say "during planning" every time you say zero (50 one-time bootstrap calls). Lead into the next slide: "It has a hard limit, and that limit shaped everything after it."</aside>
+  <aside class="notes">10:15-11:30. Frame it as two sailors. Today's agents are brilliant sailors without a chart: they read the sea and the islands and infer where they are from experience. That's dead reckoning, and its error grows with every mile, with nothing to reset it but their own judgment. GATS is the same sailor with a chart: it plans the passage before leaving, takes a fix at every waypoint (sensors), and corrects the chart when the sea disagrees (L2), so it never hits the same rock twice. The next voyage starts from the corrected chart: a repeat run needs no new model calls to plan. The journal is the ship's log, which is where the word comes from. If asked: a model can find shortest routes and still hold an incoherent map, and detours break it (Vafa et al., NeurIPS 2024; contested by a 2026 follow-up). "Symbolic where you can, learned where you've seen it, neural only for the genuinely new." Say "during planning" every time you say zero (50 one-time bootstrap calls). Lead into the next slide: "It has a hard limit, and that limit shaped everything after it."</aside>
 </section>
 
-<section data-t="9:30" class="slide" data-sec="GATS">
+<section data-t="11:30" class="slide" data-sec="GATS">
   <div class="eyebrow amber">From paper to product · the honest limit</div>
   <h2>Search doesn't scale. So search less.</h2>
   <p class="lede" style="margin-bottom:34px">Over raw actions, tree search is impractical past about 20 actions or depth 10. So the planner searches a few coarse moves and pushes the open-ended work down into skills.</p>
@@ -299,10 +406,10 @@ table.t.txt th,table.t.txt td{text-align:left}
     <div class="card bl"><h3>Plan level: searched</h3><p class="mono" style="font-size:22px">RunSuite · AuthorPatch · ApplyPatch · Commit · CreatePR</p><p style="margin-top:14px">Few, coarse, contracts known. Every choice is scored and logged.</p></div>
     <div class="card am"><h3>Skill level: the LLM inside</h3><p>Writing the diff. Its output is a proposal: preflight, <span class="mono">git apply --check</span>, then the suite decides.</p></div>
   </div>
-  <aside class="notes">9:30-10:30. Tested at 15 actions, depth 20. The limit is the design constraint LEDGER was built around: keep the decisions few and checkable, let the model do the open-ended part where a sensor can check it. "The model never picks the next move; it fills in a step whose result we can measure."</aside>
+  <aside class="notes">11:30-12:15. Tested at 15 actions, depth 20. The limit is the design constraint LEDGER was built around: keep the decisions few and checkable, let the model do the open-ended part where a sensor can check it. "The model never picks the next move; it fills in a step whose result we can measure."</aside>
 </section>
 
-<section data-t="10:30" class="slide" data-sec="LEDGER">
+<section data-t="12:15" class="slide" data-sec="LEDGER">
   <div class="eyebrow">LEDGER · audit-first coding agent on GATS</div>
   <h2>Neural proposes, symbolic disposes</h2>
   <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;align-items:center;gap:14px;margin-bottom:34px">
@@ -316,10 +423,10 @@ table.t.txt th,table.t.txt td{text-align:left}
     <div><h3>Lies become incidents</h3><p style="font-size:23px">Claimed effects minus observed effects is an <span class="mono">INCIDENT</span>; the planner routes around the falsified edge.</p></div>
     <div><h3>Gates, not hopes</h3><p style="font-size:23px">Risk classes gate execution. A denial is an observation. Escalation is named: <span class="mono">no_path</span>, <span class="mono">infeasible</span>, <span class="mono">budget_exhausted</span>.</p></div>
   </div>
-  <aside class="notes">10:30-13:00. The typical agent lets the model decide, act, check and write the report. LEDGER splits those jobs. Plan-level actions are few and coarse (RunSuite, AuthorPatch, ApplyPatch, Commit, CreatePR), which keeps search tractable. Irreversible means an action that deletes the recoverable proposition. Runs on Claude, OpenAI or a local model with the same guarantees; keys are sealed in the OS vault and never reach the repo's subprocesses.</aside>
+  <aside class="notes">12:15-14:00. The typical agent lets the model decide, act, check and write the report. LEDGER splits those jobs. Plan-level actions are few and coarse (RunSuite, AuthorPatch, ApplyPatch, Commit, CreatePR), which keeps search tractable. Irreversible means an action that deletes the recoverable proposition. Runs on Claude, OpenAI or a local model with the same guarantees; keys are sealed in the OS vault and never reach the repo's subprocesses.</aside>
 </section>
 
-<section data-t="13:00" class="slide" data-sec="LEDGER">
+<section data-t="14:00" class="slide" data-sec="LEDGER">
   <div class="eyebrow">The ledger</div>
   <h2>The answer to the title, from the record</h2>
   <div class="term" style="font-size:20px"><span class="p">$</span> ledger why episode.jsonl 1
@@ -334,10 +441,10 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
 
 <span class="p">$</span> ledger verify-chain tampered.jsonl      <span class="dim"># one field edited in the END entry</span>
 <span class="bad">x chain BROKEN: entry 17: content hash mismatch</span></div>
-  <aside class="notes">13:00-15:00. Lesson two, answered. Answer the title question: not the model's account, the record's. All three outputs are from the 2026-10-21 rehearsal. The why-trace is the recorded UCB table, not a post-hoc explanation. Tie broken lexicographically: no RNG anywhere.</aside>
+  <aside class="notes">14:00-15:15. Lesson two, answered. Answer the title question: not the model's account, the record's. All three outputs are from the 2026-10-21 rehearsal. The why-trace is the recorded UCB table, not a post-hoc explanation. Tie broken lexicographically: no RNG anywhere.</aside>
 </section>
 
-<section data-t="15:00" class="slide" data-sec="Evidence">
+<section data-t="15:15" class="slide" data-sec="Evidence">
   <div class="eyebrow">Evidence, and what broke</div>
   <h2>Grade problem solving, not pass rate</h2>
   <div class="cols" style="grid-template-columns:1.25fr 1fr;gap:48px">
@@ -357,10 +464,10 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
       <p style="margin-top:16px"><b>Fix:</b> test integrity became a sensor. Not a better model.</p>
     </div>
   </div>
-  <aside class="notes">15:00-17:30. "The most important skill for a risk-averse agent is saying 'this can't be done as specified' instead of gaming the tests." Where the local model fails, it fails honestly: integrity 3 of 3 on every task. Then the credibility beat: my own harness certified a lie. Bench lessons if asked (backup): calibrate oracles against two implementations; write held-out tasks after the harness is frozen.</aside>
+  <aside class="notes">15:15-17:00. "The most important skill for a risk-averse agent is saying 'this can't be done as specified' instead of gaming the tests." Where the local model fails, it fails honestly: integrity 3 of 3 on every task. Then the credibility beat: my own harness certified a lie. Bench lessons if asked (backup): calibrate oracles against two implementations; write held-out tasks after the harness is frozen.</aside>
 </section>
 
-<section data-t="17:30" class="slide" data-sec="Future">
+<section data-t="17:00" class="slide" data-sec="Future">
   <div class="eyebrow">Where harnesses go</div>
   <h2>Models are parts. The harness is the product.</h2>
   <div class="cols3">
@@ -369,10 +476,10 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
     <div class="card g"><h3>Self-improvement, gated</h3><p><span class="mono">ledger improve</span> files its own bugs as failing tests and fixes them, local model only. The gate caught 2 bad changes in 5.</p></div>
   </div>
   <p class="small" style="margin-top:30px">Safe only while the verifier sits outside the thing being improved. Weights promoted only if plan variance stays at zero.</p>
-  <aside class="notes">17:30-20:00. Lesson three, looking forward: "In a company, the model is a part you'll swap every few months. What you keep is the harness: the data, the checks, the record. That's what makes an agent's output safe to decide on, and what lets it run on its own." Three surfaces to train: the skill policy (RL with verifiable rewards), planner value nets (PUCT replacing UCB1), L2 as a learned dynamics model. Honest caveat if asked: one accepted self-improvement commit was partly gamed (a wrong alias satisfied the lint check), and that loophole is the lesson.</aside>
+  <aside class="notes">17:00-18:00. Lesson three, looking forward: "In a company, the model is a part you'll swap every few months. What you keep is the harness: the data, the checks, the record. That's what makes an agent's output safe to decide on, and what lets it run on its own." Three surfaces to train: the skill policy (RL with verifiable rewards), planner value nets (PUCT replacing UCB1), L2 as a learned dynamics model. Honest caveat if asked: one accepted self-improvement commit was partly gamed (a wrong alias satisfied the lint check), and that loophole is the lesson.</aside>
 </section>
 
-<section data-t="20:00" class="slide" data-sec="Habits">
+<section data-t="18:00" class="slide" data-sec="Habits">
   <div class="eyebrow">Monday morning · for any coding agent</div>
   <h2 style="font-size:54px">Context is the budget. A check is the finish line.</h2>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:22px">
@@ -381,10 +488,10 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
     <div class="card bl"><h3>3 · Fresh-context review before "done"</h3><p style="font-size:22px"><span class="mono">/code-review</span>, a second session, or Codex <span class="mono">/review</span>. Correctness gaps only.</p></div>
     <div class="card"><h3>4 · Make repeated corrections durable</h3><p style="font-size:22px">Judgment rule → <span class="mono">AGENTS.md</span> · workflow → skill · mechanical rule → hook.</p></div>
   </div>
-  <aside class="notes">20:00-23:00. "You don't need LEDGER to use the ideas." Law 1: context degrades as it fills; 40 files in, the agent ignores the rule from turn 2. Law 2: without a pass/fail signal the agent stops when the work looks done, and you become the verifier. Example prompt for tip 1: write a failing test that fires 101 concurrent requests and expects exactly 100 x 200 and 1 x 429, fix the race, run pnpm test rateLimiter until green, end with the output. Full prompts and the verification ladder are in backup.</aside>
+  <aside class="notes">18:00-21:00. "You don't need LEDGER to use the ideas." Law 1: context degrades as it fills; 40 files in, the agent ignores the rule from turn 2. Law 2: without a pass/fail signal the agent stops when the work looks done, and you become the verifier. Example prompt for tip 1: write a failing test that fires 101 concurrent requests and expects exactly 100 x 200 and 1 x 429, fix the race, run pnpm test rateLimiter until green, end with the output. Full prompts and the verification ladder are in backup.</aside>
 </section>
 
-<section data-t="23:00" class="slide center" data-sec="Close">
+<section data-t="21:00" class="slide center" data-sec="Close">
   <h1>Confidence is not evidence.</h1>
   <p class="lede" style="margin:16px 0 22px">Build the harness that asks for evidence. Where this goes:</p>
   <ol class="big" style="max-width:1300px">
@@ -395,7 +502,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
   </ol>
   <div class="qrs"><div class="qr"><div class="qr-img"><svg width="165" height="165" class="segno"><g transform="scale(5)"><path fill="#fff" d="M0 0h33v33h-33z"/><path class="qrline" stroke="#111" d="M2 2.5h7m2 0h3m2 0h2m1 0h4m1 0h7m-29 1h1m5 0h1m4 0h1m3 0h1m2 0h1m1 0h1m1 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m2 0h1m4 0h1m1 0h2m1 0h2m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m4 0h1m2 0h1m3 0h1m3 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m4 0h1m2 0h5m3 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m1 0h1m1 0h4m1 0h1m2 0h2m2 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-18 1h1m2 0h2m1 0h3m-20 1h1m2 0h1m1 0h2m1 0h1m2 0h6m4 0h1m1 0h1m-21 1h2m2 0h8m1 0h2m2 0h3m2 0h1m2 0h1m-29 1h1m1 0h1m1 0h1m1 0h2m6 0h1m3 0h3m1 0h2m1 0h3m-25 1h2m2 0h1m3 0h1m1 0h1m1 0h2m1 0h1m4 0h1m2 0h2m-28 1h1m1 0h3m1 0h2m1 0h1m1 0h1m2 0h4m1 0h4m2 0h1m1 0h2m-29 1h1m4 0h1m4 0h1m1 0h1m4 0h3m1 0h1m-21 1h6m4 0h2m4 0h1m2 0h2m3 0h4m-29 1h1m2 0h1m1 0h1m1 0h1m2 0h1m1 0h2m1 0h1m1 0h6m2 0h1m1 0h1m-26 1h1m1 0h1m1 0h2m1 0h1m2 0h4m1 0h1m1 0h3m5 0h1m-27 1h1m3 0h1m1 0h1m1 0h1m1 0h1m2 0h1m1 0h1m1 0h1m2 0h3m1 0h1m2 0h1m-29 1h1m1 0h1m1 0h1m1 0h1m3 0h1m1 0h2m3 0h2m2 0h4m2 0h2m-27 1h4m1 0h1m3 0h3m3 0h1m1 0h1m7 0h2m-29 1h1m2 0h6m5 0h1m5 0h5m1 0h1m-19 1h2m1 0h1m1 0h1m2 0h2m1 0h2m3 0h1m1 0h3m-29 1h7m2 0h1m3 0h2m1 0h1m3 0h1m1 0h1m1 0h1m2 0h1m-28 1h1m5 0h1m1 0h4m1 0h1m1 0h2m1 0h1m1 0h1m3 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m4 0h1m2 0h1m1 0h2m2 0h5m2 0h2m-29 1h1m1 0h3m1 0h1m1 0h2m3 0h2m2 0h1m1 0h1m2 0h1m1 0h4m-28 1h1m1 0h3m1 0h1m2 0h3m1 0h2m2 0h1m6 0h3m1 0h1m-29 1h1m5 0h1m2 0h3m1 0h1m3 0h4m2 0h1m3 0h1m-28 1h7m1 0h3m2 0h1m2 0h2m2 0h1m1 0h1m2 0h1m1 0h1"/></g></svg></div><div><b>Hugging Face</b><br><span class="mono small">huggingface.co/maureesewilliams</span></div></div><div class="qr"><div class="qr-img"><svg width="165" height="165" class="segno"><g transform="scale(5)"><path fill="#fff" d="M0 0h33v33h-33z"/><path class="qrline" stroke="#111" d="M2 2.5h7m2 0h3m3 0h3m1 0h1m2 0h7m-29 1h1m5 0h1m1 0h2m2 0h1m1 0h2m1 0h1m2 0h1m1 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m1 0h4m1 0h3m4 0h1m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m5 0h2m1 0h3m1 0h2m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m2 0h1m3 0h2m1 0h2m1 0h1m2 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m3 0h2m4 0h1m2 0h1m2 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-14 1h1m1 0h1m1 0h2m-20 1h3m1 0h2m2 0h1m1 0h2m2 0h3m1 0h1m6 0h2m-28 1h1m1 0h1m1 0h2m2 0h2m2 0h1m3 0h2m1 0h1m2 0h1m1 0h3m1 0h1m-29 1h3m2 0h2m5 0h2m1 0h3m4 0h1m1 0h2m1 0h1m-28 1h4m1 0h1m1 0h3m2 0h1m2 0h1m2 0h1m1 0h1m2 0h2m3 0h1m-24 1h2m2 0h4m1 0h1m1 0h2m2 0h2m1 0h1m2 0h3m-29 1h3m1 0h1m2 0h2m1 0h4m1 0h2m1 0h2m2 0h2m1 0h2m1 0h1m-26 1h2m1 0h2m1 0h2m1 0h1m6 0h2m1 0h4m2 0h1m-29 1h2m1 0h2m2 0h2m1 0h1m4 0h2m1 0h1m2 0h2m1 0h2m2 0h1m-28 1h2m3 0h1m2 0h4m1 0h2m7 0h3m1 0h1m-26 1h2m1 0h1m1 0h1m2 0h1m2 0h2m1 0h1m1 0h1m2 0h1m3 0h1m-26 1h1m4 0h2m6 0h3m1 0h1m4 0h2m1 0h1m-24 1h2m1 0h1m1 0h2m2 0h1m4 0h2m2 0h4m1 0h2m-26 1h2m3 0h1m1 0h3m1 0h2m3 0h1m1 0h8m1 0h1m-21 1h3m1 0h1m1 0h1m1 0h3m1 0h1m3 0h2m1 0h2m-29 1h7m2 0h1m3 0h2m1 0h2m1 0h2m1 0h1m1 0h1m1 0h2m-28 1h1m5 0h1m1 0h1m3 0h1m1 0h2m4 0h1m3 0h1m-25 1h1m1 0h3m1 0h1m4 0h2m3 0h3m1 0h8m-28 1h1m1 0h3m1 0h1m1 0h4m1 0h1m1 0h1m2 0h2m4 0h1m1 0h1m1 0h1m-29 1h1m1 0h3m1 0h1m1 0h1m2 0h1m1 0h2m2 0h2m1 0h1m2 0h1m1 0h2m1 0h1m-29 1h1m5 0h1m1 0h1m1 0h1m1 0h1m2 0h1m2 0h3m3 0h2m1 0h1m-28 1h7m2 0h1m4 0h2m2 0h1m1 0h1m1 0h2m1 0h1m1 0h1"/></g></svg></div><div><b>arXiv paper</b><br><span class="mono small">arxiv.org/abs/2607.08894</span></div></div><div class="qr"><div class="qr-img"><svg width="165" height="165" class="segno"><g transform="scale(5)"><path fill="#fff" d="M0 0h33v33h-33z"/><path class="qrline" stroke="#111" d="M2 2.5h7m1 0h1m2 0h6m1 0h1m1 0h1m1 0h7m-29 1h1m5 0h1m1 0h5m1 0h2m1 0h4m1 0h1m5 0h1m-29 1h1m1 0h3m1 0h1m1 0h1m1 0h3m3 0h1m2 0h1m2 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m1 0h1m1 0h1m1 0h1m5 0h1m1 0h1m1 0h1m1 0h3m1 0h1m-29 1h1m1 0h3m1 0h1m1 0h2m1 0h2m1 0h3m2 0h1m2 0h1m1 0h3m1 0h1m-29 1h1m5 0h1m2 0h2m2 0h1m2 0h2m1 0h2m1 0h1m5 0h1m-29 1h7m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h1m1 0h7m-21 1h2m1 0h1m4 0h2m1 0h1m-19 1h2m1 0h1m1 0h2m5 0h4m1 0h1m1 0h1m1 0h1m1 0h5m-29 1h4m1 0h1m1 0h2m1 0h4m3 0h1m2 0h3m2 0h2m1 0h1m-28 1h1m1 0h1m2 0h3m1 0h1m1 0h1m3 0h3m4 0h6m-28 1h2m1 0h2m3 0h1m1 0h7m1 0h1m1 0h3m3 0h1m-28 1h2m1 0h2m1 0h1m3 0h2m1 0h2m1 0h2m1 0h2m1 0h2m-23 1h3m1 0h1m3 0h2m1 0h1m1 0h3m3 0h4m3 0h2m-29 1h1m1 0h1m1 0h4m2 0h1m3 0h1m1 0h2m3 0h1m1 0h1m2 0h3m-29 1h1m2 0h1m1 0h1m1 0h1m1 0h2m1 0h4m3 0h2m2 0h1m4 0h1m-26 1h1m2 0h4m1 0h3m5 0h4m2 0h1m1 0h2m-27 1h1m5 0h2m4 0h2m1 0h1m2 0h1m1 0h1m3 0h3m-29 1h1m3 0h1m1 0h2m1 0h5m6 0h2m1 0h2m1 0h3m-28 1h1m2 0h2m2 0h6m1 0h1m1 0h2m1 0h1m1 0h3m3 0h1m-29 1h1m2 0h4m1 0h1m2 0h2m3 0h2m1 0h6m-17 1h3m1 0h2m2 0h2m1 0h2m3 0h1m3 0h1m-29 1h7m1 0h1m2 0h1m2 0h1m3 0h3m1 0h1m1 0h1m1 0h3m-29 1h1m5 0h1m5 0h1m4 0h2m1 0h1m3 0h1m-25 1h1m1 0h3m1 0h1m1 0h2m1 0h2m3 0h1m1 0h1m1 0h6m1 0h2m-29 1h1m1 0h3m1 0h1m2 0h1m1 0h2m1 0h5m1 0h2m2 0h1m1 0h1m-27 1h1m1 0h3m1 0h1m1 0h4m3 0h2m2 0h1m3 0h2m1 0h1m1 0h1m-29 1h1m5 0h1m1 0h1m2 0h1m2 0h1m1 0h6m1 0h1m3 0h1m-28 1h7m3 0h1m1 0h2m1 0h1m1 0h1m2 0h2m2 0h1m2 0h2"/></g></svg></div><div><b>Blog</b><br><span class="mono small">maureesewilliams.io</span></div></div></div>
   <p style="margin-top:26px;text-align:center;font-size:22px;line-height:1.6"><b>Try LEDGER</b><br><span class="mono">curl -fsSL https://kyberos.ai/ledger/install.sh | sh</span><br><span class="mono">irm https://kyberos.ai/ledger/install.ps1 | iex</span> <span class="small">(Windows)</span></p>
-  <aside class="notes">23:00-25:00. Read the line, pause, one sentence per prediction, then "Thank you." Leave the QR codes and the install line up through Q&A. The addendum follows this slide. Harnesses are already RL environments (sensors = verifier, journal = trajectories) if someone asks where this goes next: backup.</aside>
+  <aside class="notes">21:00-23:00. Read the line, pause, one sentence per prediction, then "Thank you." Leave the QR codes and the install line up through Q&A. The addendum follows this slide. Harnesses are already RL environments (sensors = verifier, journal = trajectories) if someone asks where this goes next: backup.</aside>
 </section>
 
 <section class="slide center" data-backup="1" data-sec="Addendum">
@@ -455,6 +562,24 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
   <div class="eyebrow">Backup</div>
   <h1>For questions</h1>
   <p class="lede" style="margin-top:24px">The detail behind each main slide.</p>
+</section>
+
+<section class="slide" data-backup="1" data-sec="The problem">
+  <div class="eyebrow">The problem</div>
+  <h2>Long, risky work breaks agents</h2>
+  <div class="cols" style="grid-template-columns:1.15fr 1fr;gap:48px">
+    <div>
+      <svg class="curve" viewBox="0 0 860 470" style="width:100%"></svg>
+      <p class="small">99% per step is 37% at 100 steps and 0.004% at 1,000.</p>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:22px">
+      <div class="card r"><h3 class="r">Confidence is not evidence</h3>
+        <div><span class="chip r">"tests pass"</span><span class="chip r">"file written"</span><span class="chip r">"safe to deploy"</span><span class="chip r">"done"</span></div>
+        <p>Most failures are the agent believing its own claim about the world.</p></div>
+      <div class="card bl"><h3>Risk-averse work asks</h3><p>What exactly did it do? Can you stop it <b>before</b> the bad step? Can you prove it afterwards?</p></div>
+    </div>
+  </div>
+  <aside class="notes">Bridge from lesson one: "At scale, rare is daily, and it gets worse when the work is long." Per-step accuracy multiplies, so the horizon eats you even when each step looks great; pause on 37%. Then the mechanism: the agent asserts world state and acts on the assertion. In payments, deploys and regulated code the question isn't "did it usually work", it's "show me what it did, and could you have stopped it".</aside>
 </section>
 
 <section class="slide" data-backup="1" data-sec="The problem">

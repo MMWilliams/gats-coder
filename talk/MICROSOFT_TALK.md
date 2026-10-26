@@ -25,26 +25,33 @@ rarely the bottleneck, the system around it was. Employer names stay off the sli
 
 ---
 
-## Timing map (25 min talk, 13 slides; Q&A after)
+## Timing map (25 min talk, 15 slides, ~2 min buffer; Q&A after)
 
+Order since 10-26: the past and its patterns, then what's missing, then what
+closing it unlocks, then GATS, then LEDGER as the evidence.
 The deck shows each main slide's target start time and a running clock
 (bottom right; T resets it). Everything after the close is backup.
 
 | # | Slide | Starts at |
 | --- | --- | --- |
 | 1 | Title + claim, real run output on screen | 0:00 |
-| 1b | About me + three lessons + agenda (photo; employers said out loud) | 1:30 |
-| 2 | Long, risky work breaks agents (curve, confidence is not evidence, risk-averse questions) | 3:00 |
-| 2b | How we got here: swimlane timeline 2020-now (know/think/act/control/prove); models absorbed "think" | 5:00 |
-| 2c | Today's harness is tomorrow's model: absorbed examples, next-to-go guesses, the check never moves in | 6:30 |
-| 3 | GATS: layers + stress test | 8:00 |
-| 4 | The honest limit: search doesn't scale, so plan level vs skill level | 9:30 |
-| 5 | LEDGER: plan, skill, sensors, journal; incidents; gates | 10:30 |
-| 6 | The answer to the title: why, replay, tamper | 13:00 |
-| 7 | Evidence: graded problem solving + the reward hack | 15:00 |
-| 8 | Where harnesses go: product, RL environment, gated self-improvement | 17:30 |
-| 9 | Habits for any coding agent: two laws, four tips | 20:00 |
-| 10 | Close + predictions | 23:00, done by 25:00 |
+| 2 | About me + three lessons + agenda | 1:15 |
+| 3 | Harnesses grow, then models absorb them (swimlane timeline 2020-now) | 2:30 |
+| 4 | Tasks get longer, then they never end (METR horizons, projection, responsibilities) | 4:00 |
+| 5 | Today's harness is tomorrow's model (absorbed, next to go, the check stays) | 5:30 |
+| 6 | The next 10x is trust, not talent (7 gaps, one cited number each) | 6:45 |
+| 7 | What closing the gaps would unlock (hypothetical) + the GATS piece | 9:00 |
+| 8 | GATS: layers + stress test | 10:15 |
+| 9 | The honest limit: search doesn't scale | 11:30 |
+| 10 | LEDGER: plan, skill, sensors, journal; incidents; gates | 12:15 |
+| 11 | The answer to the title: why, replay, tamper | 14:00 |
+| 12 | Evidence: graded problem solving + the reward hack | 15:15 |
+| 13 | Where harnesses go | 17:00 |
+| 14 | Habits for any coding agent | 18:00 |
+| 15 | Close + predictions | 21:00, done by 23:00 |
+
+The old problem slide (0.99^n, confidence is not evidence) is now the first
+backup slide; its numbers live on slides 6 and 7.
 
 After the close: the addendum (divider + A1-A3), shown if asked or time allows. Then backup: the detail slides behind each main
 slide (curve, risk, GATS, scaling limit, inversion, state, altitudes, safety,
@@ -228,6 +235,22 @@ predictions, two laws, tips 1-4 with full prompts, verification ladder).
 | LEDGER test suite | 623 passing (v0.15.0) | repo |
 | Local squeeze | 8/10, `infeasible`, tests untouched | FINDINGS §6 |
 | Lie bench (DEF CON) | 15k injections: naked ships 100%, guarded 0, 0% FP | gats2/demos |
+| METR 50% horizon (TH1.1) | GPT-2 3 s, GPT-4 4 min, Claude 3.7 60 min, GPT-5 3.4 h, Opus 4.6 12 h, Mythos 17.4 h (>16 h unreliable) | talk/deck/data/metr_horizon_v1_1.yaml (metr.org/assets/benchmark_results_1_1.yaml) |
+| METR doubling since 2023 | 129 days (95% CI 104-158); trend: work week Dec 2026, work month Sep 2027 (CI Jun 2027-Jan 2028) | same file; horizon.py |
+| 50% vs 80% horizon | Mythos 17.4 h vs 3.1 h; ratio 5-10x across recent models | same file |
+| ImpossibleBench | GPT-5 76% on oneoff impossible-SWEbench; Claude mostly edits tests; stronger models cheat more | arXiv:2510.20270, ICLR 2026 |
+| METR reward hacking | o3: RE-Bench 30.4% (39/128), HCAST 0.7% (8/1,087) | metr.org/blog/2025-06-05-recent-reward-hacking |
+| EU AI Act Art. 12(1) | "automatic recording of events (logs) over the lifetime of the system"; Annex III duties from 2 Dec 2027 (Reg. (EU) 2026/1744, OJ 2026-07-24) | artificialintelligenceact.eu/article/12 |
+| Nondeterminism | 1,000 samples at temp 0, Qwen3-235B: 80 unique | thinkingmachines.ai/blog/defeating-nondeterminism-in-llm-inference |
+| PlanBench, o1-preview | Blocksworld 97.8% (587/600), Mystery 52.8%, 20-40-step plans 23.63% | arxiv.org/html/2409.13373v1 |
+| Replit incident | agent deleted prod DB during a code freeze, said rollback impossible; it wasn't | oecd.ai incident 2025-07-19 |
+| AlphaGeometry | 25/30 olympiad geometry, neuro-symbolic | Trinh et al., Nature 2024 |
+| tau-bench | gpt-4o retail pass^1 61.2%, pass^8 <25% (figure only) | arXiv:2406.12045 |
+| Vending-Bench | "all models have runs that derail"; failure vs full context r=0.167 | arXiv:2502.15840 |
+| Project Vend | phase 1 "we would not hire Claudius"; phase 2 procedures + CEO agent largely ended losing weeks | anthropic.com/research/project-vend-1, -2 |
+| Gartner | >40% of agentic AI projects canceled by end 2027; ~130 of thousands of vendors "real"; "agent washing" | Gartner press release 2025-06-25 |
+| MIT NANDA | 95% zero return; "core barrier ... is learning" | The GenAI Divide, Jul 2025 |
+| METR caveat | "Time horizon is not the length of time AIs can work independently" | metr.org/notes/2026-01-22-time-horizon-limitations |
 
 ## Landmines
 
