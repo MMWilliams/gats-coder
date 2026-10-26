@@ -238,6 +238,25 @@ table.t.tight td{padding:8px 16px}
 </section>
 
 <section data-t="4:00" class="slide" data-sec="How we got here">
+  <div class="eyebrow">Why it keeps happening · traces become training data</div>
+  <h2>Today’s harness is tomorrow’s model</h2>
+  <div class="cols" style="grid-template-columns:1fr 1fr;gap:48px">
+    <div>
+      <div class="eyebrow amber" style="margin-bottom:6px">Already absorbed</div>
+      <p class="small" style="margin-bottom:14px">harness trick &rarr; model capability</p>
+      <div class="ab"><span class="h">"Let's think step by step" <i>2022</i></span><span class="arr">&rarr;</span><span class="m">Thinks by default: o1, R1 <i>2024-25</i></span></div><div class="ab"><span class="h">Sample many answers, vote <i>2022</i></span><span class="arr">&rarr;</span><span class="m">Checks its own work while reasoning</span></div><div class="ab"><span class="h">ReAct's Thought / Action text format <i>2022</i></span><span class="arr">&rarr;</span><span class="m">Native tool calls, thinking between them <i>2025</i></span></div><div class="ab"><span class="h">Tree of Thoughts, LATS backtracking <i>2023</i></span><span class="arr">&rarr;</span><span class="m">Learned backtracking: R1's "wait" <i>2025</i></span></div>
+    </div>
+    <div>
+      <div class="eyebrow" style="margin-bottom:6px">Next to go?</div>
+      <p class="small" style="margin-bottom:14px">today's harness &rarr; a plausible next model</p>
+      <div class="ab"><span class="h">Context compaction, HANDOFF.md</span><span class="arr">&rarr;</span><span class="m q">Manages its own context and memory</span></div><div class="ab"><span class="h">Subagents, orchestration</span><span class="arr">&rarr;</span><span class="m q">Plans and delegates on its own</span></div><div class="ab"><span class="h">Skills, AGENTS.md rules</span><span class="arr">&rarr;</span><span class="m q">Procedures learned into the weights</span></div><div class="ab"><span class="h">Plan search, GATS included</span><span class="arr">&rarr;</span><span class="m q">Plans internally</span></div>
+    </div>
+  </div>
+  <div class="card r" style="margin-top:20px;padding:18px 28px"><p><b class="r">Never absorbed: the check.</b> Sensors, gates and the record stay outside, because a verifier the model trains against becomes a target. On ImpossibleBench, stronger models game tests more.</p></div>
+  <aside class="notes">4:00-5:15. Why it keeps happening: today's harness is tomorrow's training data. Its traces are the trajectories and its checks are the rewards, so whatever procedure the harness runs gets trained into the next model. Left column already happened: "think step by step" became reasoning models, voting became self-checking, ReAct's text format became native tool calls, tree search became learned backtracking (R1's "wait"). Right column is my guess at the next round: compaction and handoff files, subagents, skills and rules, and plan search, ours included. GATS's planner is a procedure, so it may be absorbed too; say so. What can't move in is the check: once a verifier is trained on, it's a target, and ImpossibleBench is what that looks like. So build the parts that stay outside: sensors, gates, the record.</aside>
+</section>
+
+<section data-t="5:15" class="slide" data-sec="How we got here">
   <div class="eyebrow">Long horizons · METR: task length an agent finishes half the time</div>
   <h2>Tasks get longer. Then they never end.</h2>
   <svg class="hz" viewBox="0 0 1376 490" style="width:100%;font-family:var(--sans)">
@@ -324,26 +343,7 @@ table.t.tight td{padding:8px 16px}
     <text x="1266.8" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2028</text>
     </svg>
   <p class="small" style="margin-top:6px;font-size:17px">Data: METR Time Horizon 1.1 (50% success, human time to complete). Trend: doubling every ~129 days since 2023 (95% CI 104&ndash;158), extended. Past 16 h the task suite stops being reliable.</p>
-  <aside class="notes">4:00-5:30. METR measures the length of task, in human time, that an agent finishes half the time. Since 2023 it doubles about every four months: seconds for GPT-2, four minutes for GPT-4, an hour for Claude 3.7, twelve hours for Opus 4.6. Each jump came with a harness change: tool loops took us to minutes, reasoning models plus agent harnesses to hours. Extend the line and a work week lands around the turn of the year, a work month around late 2027. That's an extrapolation, not a promise, and past 16 hours their suite stops being reliable. My prediction: what comes after a month isn't a longer task, it's a different kind of request. Tasks end. Responsibilities don't: keep prod healthy, run on-call, manage a team. There's no completion state, only invariants you keep true. That's not a cron job or a pipeline, which are triggered and stateless; it's one agent that owns its state and decides what needs doing. It needs exactly the parts models don't absorb: sensors that say what's true now, gates, and a record you can audit months later. In GATS terms a goal becomes an invariant: a responsibility is a goal that never stops being checked.</aside>
-</section>
-
-<section data-t="5:30" class="slide" data-sec="How we got here">
-  <div class="eyebrow">Why it keeps happening · traces become training data</div>
-  <h2>Today’s harness is tomorrow’s model</h2>
-  <div class="cols" style="grid-template-columns:1fr 1fr;gap:48px">
-    <div>
-      <div class="eyebrow amber" style="margin-bottom:6px">Already absorbed</div>
-      <p class="small" style="margin-bottom:14px">harness trick &rarr; model capability</p>
-      <div class="ab"><span class="h">"Let's think step by step" <i>2022</i></span><span class="arr">&rarr;</span><span class="m">Thinks by default: o1, R1 <i>2024-25</i></span></div><div class="ab"><span class="h">Sample many answers, vote <i>2022</i></span><span class="arr">&rarr;</span><span class="m">Checks its own work while reasoning</span></div><div class="ab"><span class="h">ReAct's Thought / Action text format <i>2022</i></span><span class="arr">&rarr;</span><span class="m">Native tool calls, thinking between them <i>2025</i></span></div><div class="ab"><span class="h">Tree of Thoughts, LATS backtracking <i>2023</i></span><span class="arr">&rarr;</span><span class="m">Learned backtracking: R1's "wait" <i>2025</i></span></div>
-    </div>
-    <div>
-      <div class="eyebrow" style="margin-bottom:6px">Next to go?</div>
-      <p class="small" style="margin-bottom:14px">today's harness &rarr; a plausible next model</p>
-      <div class="ab"><span class="h">Context compaction, HANDOFF.md</span><span class="arr">&rarr;</span><span class="m q">Manages its own context and memory</span></div><div class="ab"><span class="h">Subagents, orchestration</span><span class="arr">&rarr;</span><span class="m q">Plans and delegates on its own</span></div><div class="ab"><span class="h">Skills, AGENTS.md rules</span><span class="arr">&rarr;</span><span class="m q">Procedures learned into the weights</span></div><div class="ab"><span class="h">Plan search, GATS included</span><span class="arr">&rarr;</span><span class="m q">Plans internally</span></div>
-    </div>
-  </div>
-  <div class="card r" style="margin-top:20px;padding:18px 28px"><p><b class="r">Never absorbed: the check.</b> Sensors, gates and the record stay outside, because a verifier the model trains against becomes a target. On ImpossibleBench, stronger models game tests more.</p></div>
-  <aside class="notes">5:30-6:45. Why it keeps happening: today's harness is tomorrow's training data. Its traces are the trajectories and its checks are the rewards, so whatever procedure the harness runs gets trained into the next model. Left column already happened: "think step by step" became reasoning models, voting became self-checking, ReAct's text format became native tool calls, tree search became learned backtracking (R1's "wait"). Right column is my guess at the next round: compaction and handoff files, subagents, skills and rules, and plan search, ours included. GATS's planner is a procedure, so it may be absorbed too; say so. What can't move in is the check: once a verifier is trained on, it's a target, and ImpossibleBench is what that looks like. So build the parts that stay outside: sensors, gates, the record.</aside>
+  <aside class="notes">5:15-6:45. METR measures the length of task, in human time, that an agent finishes half the time. Since 2023 it doubles about every four months: seconds for GPT-2, four minutes for GPT-4, an hour for Claude 3.7, twelve hours for Opus 4.6. Each jump came with a harness change: tool loops took us to minutes, reasoning models plus agent harnesses to hours. Extend the line and a work week lands around the turn of the year, a work month around late 2027. That's an extrapolation, not a promise, and past 16 hours their suite stops being reliable. My prediction: what comes after a month isn't a longer task, it's a different kind of request. Tasks end. Responsibilities don't: keep prod healthy, run on-call, manage a team. There's no completion state, only invariants you keep true. That's not a cron job or a pipeline, which are triggered and stateless; it's one agent that owns its state and decides what needs doing. It needs exactly the parts models don't absorb: sensors that say what's true now, gates, and a record you can audit months later. In GATS terms a goal becomes an invariant: a responsibility is a goal that never stops being checked.</aside>
 </section>
 
 <section data-t="6:45" class="slide" data-sec="What's missing">

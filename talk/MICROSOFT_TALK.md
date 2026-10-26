@@ -37,8 +37,8 @@ The deck shows each main slide's target start time and a running clock
 | 1 | Title + claim, real run output on screen | 0:00 |
 | 2 | About me + three lessons + agenda | 1:15 |
 | 3 | Harnesses grow, then models absorb them (swimlane timeline 2020-now) | 2:30 |
-| 4 | Tasks get longer, then they never end (METR horizons, projection, responsibilities) | 4:00 |
-| 5 | Today's harness is tomorrow's model (absorbed, next to go, the check stays) | 5:30 |
+| 4 | Today's harness is tomorrow's model (absorbed, next to go, the check stays) | 4:00 |
+| 5 | Tasks get longer, then they never end (METR horizons, projection, responsibilities) | 5:15 |
 | 6 | The next 10x is trust, not talent (7 gaps, one cited number each) | 6:45 |
 | 7 | What closing the gaps would unlock (hypothetical) + the GATS piece | 9:00 |
 | 8 | GATS: layers + stress test | 10:15 |
