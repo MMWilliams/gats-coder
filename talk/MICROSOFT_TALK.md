@@ -41,13 +41,13 @@ The deck shows each main slide's target start time and a running clock
 | 5 | Tasks get longer, then they never end (METR horizons, projection, responsibilities) | 5:15 |
 | 6 | The next 10x is trust, not talent (7 gaps, one cited number each) | 6:45 |
 | 7 | What closing the gaps would unlock + the GATS piece | 8:45 |
-| 8 | We can only prompt what we can foresee (control loop; prompt vs intent) | 10:00 |
-| 9 | GATS: layers + stress test (sailor framing in notes) | 11:30 |
-| 10 | The honest limit: search doesn't scale | 12:45 |
-| 11 | LEDGER: pipeline, sensors/incidents/gates, and the record (why, replay, tamper) | 13:30 |
-| 12 | Evidence: graded problem solving + the reward hack | 16:00 |
-| 13 | Where harnesses go + the four Monday-morning habits | 18:00 |
-| 14 | Close + predictions | 21:00, done by 23:00 |
+| 8 | GATS: layers + stress test (sailor framing in notes) | 10:00 |
+| 9 | The honest limit: search doesn't scale | 11:15 |
+| 10 | LEDGER: pipeline, sensors/incidents/gates, and the record (why, replay, tamper) | 12:00 |
+| 11 | Evidence: graded problem solving + the reward hack | 14:30 |
+| 12 | Where harnesses go + the four Monday-morning habits | 16:30 |
+| 13 | Confidence is not evidence + predictions, QR codes, install lines | 19:30 |
+| 14 | CLOSE: We can only prompt what we can foresee (control loop; prompt vs intent) | 21:00, done by 23:00 |
 
 The old problem slide (0.99^n, confidence is not evidence) is now the first
 backup slide; its numbers live on slides 6 and 7.
