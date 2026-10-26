@@ -68,7 +68,11 @@ table.t th{font:600 18px/1 var(--mono);letter-spacing:.1em;text-transform:upperc
 table.t th:first-child,table.t td:first-child{text-align:left}
 table.t td{padding:16px 18px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
 table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{text-decoration:line-through;text-decoration-thickness:2px}
-table.t.txt th,table.t.txt td{text-align:left} table.t.txt td{padding:11px 18px}
+table.t.txt th,table.t.txt td{text-align:left}
+.ab{display:grid;grid-template-columns:1fr 30px 1fr;align-items:center;gap:6px;margin-bottom:12px}
+.ab>span{border-radius:10px;padding:9px 14px;font-size:19px;line-height:1.3;color:var(--ink);border:1px solid}
+.ab .h{background:var(--blue-bg);border-color:#c8dbf7} .ab .m{background:var(--amber-bg);border-color:#ecd6b0}
+.ab .m.q{border-style:dashed} .ab i{font-style:normal;color:var(--ink-3);font-size:16px} .ab .arr{border:0;padding:0;text-align:center;font-size:26px;color:var(--ink-3)} table.t.txt td{padding:11px 18px}
 
 .bars{display:flex;flex-direction:column;gap:22px;margin-top:10px}
 .bar{display:grid;grid-template-columns:150px 1fr 120px;align-items:center;gap:22px;font-size:28px}
@@ -240,10 +244,29 @@ table.t.txt th,table.t.txt td{text-align:left} table.t.txt td{padding:11px 18px}
     <text x="1061.2" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2026</text>
     </svg>
   <p style="margin-top:14px;font-size:25px">Models absorb procedures: reasoning, voting, reflection, search. Today's harness trains tomorrow's model. <b>What can't be absorbed is the check:</b> a verifier inside the model is just another target.</p>
-  <aside class="notes">5:00-7:00. One idea: harnesses grow, then models absorb them. Read the lanes top to bottom. Harnesses kept adding jobs: context (prompts, retrieval, memory), reasoning (chain of thought, voting, Reflexion, tree search like LATS, which GATS beats on the next slide), tools (ReAct's loop, function calling, SWE-agent, MCP) and permission (AutoGPT asking y/n, through today's permission modes, sandboxes and hooks). Then reasoning models (o1, R1) trained the whole reasoning lane into the weights, which is why Claude Code and Codex run a plain ReAct loop with no tree search. What a model can't absorb is contact with the world: what's in context, what it can touch, what it's allowed to do, and what actually happened. The proof lane is the thinnest, and it matters more as models improve: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and Claude models mostly edited the test files, the same failure my own harness hit (15:00). That's not an accident. Today's harness is tomorrow's training data: its traces are the trajectories and its checks are the rewards, so whatever procedure the harness runs gets trained into the next model. Planning is a procedure too, so GATS's search may well be absorbed; say so. What can't be absorbed is the check: once a verifier is trained on, it's a target, and ImpossibleBench is what that looks like. The proof lane is this talk.</aside>
+  <aside class="notes">5:00-6:30. One idea: harnesses grow, then models absorb them. Read the lanes top to bottom. Harnesses kept adding jobs: context (prompts, retrieval, memory), reasoning (chain of thought, voting, Reflexion, tree search like LATS, which GATS beats on the next slide), tools (ReAct's loop, function calling, SWE-agent, MCP) and permission (AutoGPT asking y/n, through today's permission modes, sandboxes and hooks). Then reasoning models (o1, R1) trained the whole reasoning lane into the weights, which is why Claude Code and Codex run a plain ReAct loop with no tree search. What a model can't absorb is contact with the world: what's in context, what it can touch, what it's allowed to do, and what actually happened. The proof lane is the thinnest, and it matters more as models improve: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and Claude models mostly edited the test files, the same failure my own harness hit (15:00). The proof lane is this talk; next, why the absorbing keeps happening.</aside>
 </section>
 
-<section data-t="7:00" class="slide" data-sec="GATS">
+<section data-t="6:30" class="slide" data-sec="How we got here">
+  <div class="eyebrow">Why it keeps happening · traces become training data</div>
+  <h2>Today’s harness is tomorrow’s model</h2>
+  <div class="cols" style="grid-template-columns:1fr 1fr;gap:48px">
+    <div>
+      <div class="eyebrow amber" style="margin-bottom:6px">Already absorbed</div>
+      <p class="small" style="margin-bottom:14px">harness trick &rarr; model capability</p>
+      <div class="ab"><span class="h">"Let's think step by step" <i>2022</i></span><span class="arr">&rarr;</span><span class="m">Thinks by default: o1, R1 <i>2024-25</i></span></div><div class="ab"><span class="h">Sample many answers, vote <i>2022</i></span><span class="arr">&rarr;</span><span class="m">Checks its own work while reasoning</span></div><div class="ab"><span class="h">ReAct's Thought / Action text format <i>2022</i></span><span class="arr">&rarr;</span><span class="m">Native tool calls, thinking between them <i>2025</i></span></div><div class="ab"><span class="h">Tree of Thoughts, LATS backtracking <i>2023</i></span><span class="arr">&rarr;</span><span class="m">Learned backtracking: R1's "wait" <i>2025</i></span></div>
+    </div>
+    <div>
+      <div class="eyebrow" style="margin-bottom:6px">Next to go?</div>
+      <p class="small" style="margin-bottom:14px">today's harness &rarr; a plausible next model</p>
+      <div class="ab"><span class="h">Context compaction, HANDOFF.md</span><span class="arr">&rarr;</span><span class="m q">Manages its own context and memory</span></div><div class="ab"><span class="h">Subagents, orchestration</span><span class="arr">&rarr;</span><span class="m q">Plans and delegates on its own</span></div><div class="ab"><span class="h">Skills, AGENTS.md rules</span><span class="arr">&rarr;</span><span class="m q">Procedures learned into the weights</span></div><div class="ab"><span class="h">Plan search, GATS included</span><span class="arr">&rarr;</span><span class="m q">Plans internally</span></div>
+    </div>
+  </div>
+  <div class="card r" style="margin-top:20px;padding:18px 28px"><p><b class="r">Never absorbed: the check.</b> Sensors, gates and the record stay outside, because a verifier the model trains against becomes a target. On ImpossibleBench, stronger models game tests more.</p></div>
+  <aside class="notes">6:30-8:00. Why it keeps happening: today's harness is tomorrow's training data. Its traces are the trajectories and its checks are the rewards, so whatever procedure the harness runs gets trained into the next model. Left column already happened: "think step by step" became reasoning models, voting became self-checking, ReAct's text format became native tool calls, tree search became learned backtracking (R1's "wait"). Right column is my guess at the next round: compaction and handoff files, subagents, skills and rules, and plan search, ours included. GATS's planner is a procedure, so it may be absorbed too; say so. What can't move in is the check: once a verifier is trained on, it's a target, and ImpossibleBench is what that looks like. So build the parts that stay outside: sensors, gates, the record.</aside>
+</section>
+
+<section data-t="8:00" class="slide" data-sec="GATS">
   <div class="eyebrow">GATS · arXiv:2607.08894 · with Dymitr Nowicki</div>
   <h2>The model is the last resort, not the decider</h2>
   <div class="cols" style="grid-template-columns:1fr 1.1fr;gap:56px">
@@ -265,10 +288,10 @@ table.t.txt th,table.t.txt td{text-align:left} table.t.txt td{padding:11px 18px}
       <p style="margin-top:28px"><b class="g">0</b> LLM calls during planning · <b>0%</b> variance across seeds · <b class="g">100%</b> on live Llama 3.2, where LATS fell below 1%</p>
     </div>
   </div>
-  <aside class="notes">7:00-9:00."Symbolic where you can, learned where you've seen it, neural only for the genuinely new." Say "during planning" every time you say zero (50 one-time bootstrap calls). Lead into the next slide: "It has a hard limit, and that limit shaped everything after it."</aside>
+  <aside class="notes">8:00-9:30. "Symbolic where you can, learned where you've seen it, neural only for the genuinely new." Say "during planning" every time you say zero (50 one-time bootstrap calls). Lead into the next slide: "It has a hard limit, and that limit shaped everything after it."</aside>
 </section>
 
-<section data-t="9:00" class="slide" data-sec="GATS">
+<section data-t="9:30" class="slide" data-sec="GATS">
   <div class="eyebrow amber">From paper to product · the honest limit</div>
   <h2>Search doesn't scale. So search less.</h2>
   <p class="lede" style="margin-bottom:34px">Over raw actions, tree search is impractical past about 20 actions or depth 10. So the planner searches a few coarse moves and pushes the open-ended work down into skills.</p>
@@ -276,7 +299,7 @@ table.t.txt th,table.t.txt td{text-align:left} table.t.txt td{padding:11px 18px}
     <div class="card bl"><h3>Plan level: searched</h3><p class="mono" style="font-size:22px">RunSuite · AuthorPatch · ApplyPatch · Commit · CreatePR</p><p style="margin-top:14px">Few, coarse, contracts known. Every choice is scored and logged.</p></div>
     <div class="card am"><h3>Skill level: the LLM inside</h3><p>Writing the diff. Its output is a proposal: preflight, <span class="mono">git apply --check</span>, then the suite decides.</p></div>
   </div>
-  <aside class="notes">9:00-10:30.Tested at 15 actions, depth 20. The limit is the design constraint LEDGER was built around: keep the decisions few and checkable, let the model do the open-ended part where a sensor can check it. "The model never picks the next move; it fills in a step whose result we can measure."</aside>
+  <aside class="notes">9:30-10:30. Tested at 15 actions, depth 20. The limit is the design constraint LEDGER was built around: keep the decisions few and checkable, let the model do the open-ended part where a sensor can check it. "The model never picks the next move; it fills in a step whose result we can measure."</aside>
 </section>
 
 <section data-t="10:30" class="slide" data-sec="LEDGER">
@@ -293,7 +316,7 @@ table.t.txt th,table.t.txt td{text-align:left} table.t.txt td{padding:11px 18px}
     <div><h3>Lies become incidents</h3><p style="font-size:23px">Claimed effects minus observed effects is an <span class="mono">INCIDENT</span>; the planner routes around the falsified edge.</p></div>
     <div><h3>Gates, not hopes</h3><p style="font-size:23px">Risk classes gate execution. A denial is an observation. Escalation is named: <span class="mono">no_path</span>, <span class="mono">infeasible</span>, <span class="mono">budget_exhausted</span>.</p></div>
   </div>
-  <aside class="notes">10:30-13:00.The typical agent lets the model decide, act, check and write the report. LEDGER splits those jobs. Plan-level actions are few and coarse (RunSuite, AuthorPatch, ApplyPatch, Commit, CreatePR), which keeps search tractable. Irreversible means an action that deletes the recoverable proposition. Runs on Claude, OpenAI or a local model with the same guarantees; keys are sealed in the OS vault and never reach the repo's subprocesses.</aside>
+  <aside class="notes">10:30-13:00. The typical agent lets the model decide, act, check and write the report. LEDGER splits those jobs. Plan-level actions are few and coarse (RunSuite, AuthorPatch, ApplyPatch, Commit, CreatePR), which keeps search tractable. Irreversible means an action that deletes the recoverable proposition. Runs on Claude, OpenAI or a local model with the same guarantees; keys are sealed in the OS vault and never reach the repo's subprocesses.</aside>
 </section>
 
 <section data-t="13:00" class="slide" data-sec="LEDGER">

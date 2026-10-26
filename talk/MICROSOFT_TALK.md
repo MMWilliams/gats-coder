@@ -25,7 +25,7 @@ rarely the bottleneck, the system around it was. Employer names stay off the sli
 
 ---
 
-## Timing map (25 min talk, 12 slides; Q&A after)
+## Timing map (25 min talk, 13 slides; Q&A after)
 
 The deck shows each main slide's target start time and a running clock
 (bottom right; T resets it). Everything after the close is backup.
@@ -35,9 +35,10 @@ The deck shows each main slide's target start time and a running clock
 | 1 | Title + claim, real run output on screen | 0:00 |
 | 1b | About me + three lessons + agenda (photo; employers said out loud) | 1:30 |
 | 2 | Long, risky work breaks agents (curve, confidence is not evidence, risk-averse questions) | 3:00 |
-| 2b | How we got here: ReAct, Reflexion, ToT/LATS, SWE-agent/CodeAct; what Claude Code and Codex kept; ImpossibleBench | 5:00 |
-| 3 | GATS: layers + stress test | 7:00 |
-| 4 | The honest limit: search doesn't scale, so plan level vs skill level | 9:00 |
+| 2b | How we got here: swimlane timeline 2020-now (know/think/act/control/prove); models absorbed "think" | 5:00 |
+| 2c | Today's harness is tomorrow's model: absorbed examples, next-to-go guesses, the check never moves in | 6:30 |
+| 3 | GATS: layers + stress test | 8:00 |
+| 4 | The honest limit: search doesn't scale, so plan level vs skill level | 9:30 |
 | 5 | LEDGER: plan, skill, sensors, journal; incidents; gates | 10:30 |
 | 6 | The answer to the title: why, replay, tamper | 13:00 |
 | 7 | Evidence: graded problem solving + the reward hack | 15:00 |

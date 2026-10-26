@@ -22,6 +22,9 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       `security -i` is unit-untested on real hardware).
 - [x] Install one-liners live on kyberos.ai/ledger (kyberos e752391, 10-24),
       matching the LLMday close slide; kyberos CLAUDE.md + STRATEGY updated.
+- [x] LEDGER license settled 10-26: stays MIT, free to install (kyberos fc0b2fc).
+- [ ] LLMday 10-29: rehearse index.html to 25 min (lineage slide 4 added
+      10-26, 6e0bfaf); resend backup PDF to Mark if the new slides should be in it.
 - [ ] Side effect 10-19: the first install.ps1 test hit a lookup bug and ran
       `winget install Python.Python.3.12` (user scope). Uninstall if unwanted:
       `winget uninstall Python.Python.3.12`.
