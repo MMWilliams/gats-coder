@@ -116,7 +116,7 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
 <span class="p">$</span> ledger verify-chain episode.jsonl
 <span class="ok">+ chain OK -- every hash links, nothing has been altered</span></div>
   <p class="small" style="margin-top:10px">Real output, Oct 21 run: local qwen3.8:27b, one GPU, 1 min 58 s.</p>
-  <aside class="notes">0:00-1:30. Intro out loud: AI Software Engineer at Google (not on the slide). No live demo; the terminal is a real run's output. Say: "This is a run from last week: a local model on one GPU, no cloud. It fixed a payments bug in four steps, and it made zero model calls to decide what to do. Every step is in a hash-chained log. By the end you'll see me ask it why it chose each step and get the numbers it actually used. My claim tonight: the next jump in agent reliability isn't in the model, it's in the harness around it."</aside>
+  <aside class="notes">0:00-1:30. Open with your background (out loud; no employer names on slides). Say: "Hi, I'm Maureese. I build agents at Google, and before that I spent about two years on Disney's AI team. Tonight is what that work taught me: where agents still fall short, and where I think they're going." No live demo; the terminal is a real run's output. Then: "This is a run from last week: a local model on one GPU, no cloud. It fixed a payments bug in four steps, and it made zero model calls to decide what to do. Every step is in a hash-chained log. By the end you'll see me ask it why it chose each step and get the numbers it actually used. My claim tonight: the next jump in agent reliability isn't in the model, it's in the harness around it."</aside>
 </section>
 
 <section data-t="1:30" class="slide center" data-sec="Open">
@@ -129,19 +129,19 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
           <h3 style="font-size:36px;margin-bottom:4px">Maureese Williams</h3>
           <p class="small" style="margin-bottom:14px">AI Software Engineer</p>
           <ul class="clean">
-            <li>Builds agents for long, high-stakes work</li>
-            <li>GATS: graph-based planning for LLM agents, arXiv:2607.08894</li>
-            <li>LEDGER: an audit-first coding agent built on it</li>
+            <li>Now: agents that turn tens of millions of data points into real-time intelligence</li>
+            <li>Before: 2 years of RAG and agents for vacation planning, at huge scale</li>
+            <li>Research: GATS (arXiv:2607.08894) and LEDGER, an audit-first agent</li>
           </ul>
         </div>
       </div>
     </div>
     <div>
-      <div class="eyebrow">Agenda</div>
-      <ol class="big"><li><b>Why long, risky work breaks agents</b><span class="small" style="display:block;line-height:1.35;margin-top:4px">and why a better model alone won't fix it</span></li><li><b>GATS and LEDGER</b><span class="small" style="display:block;line-height:1.35;margin-top:4px">planning you can replay, and a record you can audit</span></li><li><b>Where harnesses go</b><span class="small" style="display:block;line-height:1.35;margin-top:4px">plus habits you can use with any coding agent on Monday</span></li></ol>
+      <div class="eyebrow">Lessons learned</div>
+      <ol class="big"><li><b>The gaps I hit at scale</b><span class="small" style="display:block;line-height:1.35;margin-top:4px">why long, risky work breaks agents, and why a better model alone won't fix it</span></li><li><b>Closing them: GATS and LEDGER</b><span class="small" style="display:block;line-height:1.35;margin-top:4px">planning you can replay, and a record you can audit</span></li><li><b>Where agents go</b><span class="small" style="display:block;line-height:1.35;margin-top:4px">in companies and on their own, plus habits for any coding agent on Monday</span></li></ol>
     </div>
   </div>
-  <aside class="notes">1:30-3:00. Thirty seconds on you (say Google here), then the three parts. Keep it moving.</aside>
+  <aside class="notes">1:30-3:00. "At Disney we built RAG and agents for guests planning trips and asking about the resorts and parks: huge scale, always up, answering from data that changed constantly. At Google I build agents that sift tables and historical data, tens of millions of data points, and compress them into real-time intelligence for decisions at corporate scale. Those are high-risk, high-leverage calls: what the agent surfaces shapes outcomes and partnerships. Three lessons from both run through this talk. One: at scale, rare failures happen every day, and a confident answer from stale or partial data is still wrong. Two: when an agent's summary drives a decision, the first question is what it actually did, what it read and what it skipped, and a transcript doesn't answer it. Three: the model was rarely the bottleneck; the system around it was." Then the three parts. Keep it moving.</aside>
 </section>
 
 <section data-t="3:00" class="slide" data-sec="The problem">
@@ -159,7 +159,7 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
       <div class="card bl"><h3>Risk-averse work asks</h3><p>What exactly did it do? Can you stop it <b>before</b> the bad step? Can you prove it afterwards?</p></div>
     </div>
   </div>
-  <aside class="notes">3:00-5:30. Per-step accuracy multiplies, so the horizon eats you even when each step looks great; pause on 37%. Then the mechanism: the agent asserts world state and acts on the assertion. In payments, deploys and regulated code the question isn't "did it usually work", it's "show me what it did, and could you have stopped it".</aside>
+  <aside class="notes">3:00-5:30. Bridge from lesson one: "At scale, rare is daily, and it gets worse when the work is long." Per-step accuracy multiplies, so the horizon eats you even when each step looks great; pause on 37%. Then the mechanism: the agent asserts world state and acts on the assertion. In payments, deploys and regulated code the question isn't "did it usually work", it's "show me what it did, and could you have stopped it".</aside>
 </section>
 
 <section data-t="5:30" class="slide" data-sec="GATS">
@@ -230,7 +230,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
 
 <span class="p">$</span> ledger verify-chain tampered.jsonl      <span class="dim"># one field edited in the END entry</span>
 <span class="bad">x chain BROKEN: entry 17: content hash mismatch</span></div>
-  <aside class="notes">13:00-15:00. Answer the title question: not the model's account, the record's. All three outputs are from the 2026-10-21 rehearsal. The why-trace is the recorded UCB table, not a post-hoc explanation. Tie broken lexicographically: no RNG anywhere.</aside>
+  <aside class="notes">13:00-15:00. Lesson two, answered. Answer the title question: not the model's account, the record's. All three outputs are from the 2026-10-21 rehearsal. The why-trace is the recorded UCB table, not a post-hoc explanation. Tie broken lexicographically: no RNG anywhere.</aside>
 </section>
 
 <section data-t="15:00" class="slide" data-sec="Evidence">
@@ -265,7 +265,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
     <div class="card g"><h3>Self-improvement, gated</h3><p><span class="mono">ledger improve</span> files its own bugs as failing tests and fixes them, local model only. The gate caught 2 bad changes in 5.</p></div>
   </div>
   <p class="small" style="margin-top:30px">Safe only while the verifier sits outside the thing being improved. Weights promoted only if plan variance stays at zero.</p>
-  <aside class="notes">17:30-20:00. Three surfaces to train: the skill policy (RL with verifiable rewards), planner value nets (PUCT replacing UCB1), L2 as a learned dynamics model. Honest caveat if asked: one accepted self-improvement commit was partly gamed (a wrong alias satisfied the lint check), and that loophole is the lesson.</aside>
+  <aside class="notes">17:30-20:00. Lesson three, looking forward: "In a company, the model is a part you'll swap every few months. What you keep is the harness: the data, the checks, the record. That's what makes an agent's output safe to decide on, and what lets it run on its own." Three surfaces to train: the skill policy (RL with verifiable rewards), planner value nets (PUCT replacing UCB1), L2 as a learned dynamics model. Honest caveat if asked: one accepted self-improvement commit was partly gamed (a wrong alias satisfied the lint check), and that loophole is the lesson.</aside>
 </section>
 
 <section data-t="20:00" class="slide" data-sec="Habits">

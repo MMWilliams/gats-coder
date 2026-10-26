@@ -13,6 +13,16 @@ One idea the room should leave with: reliability over long horizons doesn't come
 from a smarter model, it comes from a harness that never trusts the model's
 claims about the world and can prove what happened afterwards.
 
+Frame (reese, 10-26): lessons learned from large-scale AI and agent platforms. Disney
+AI team, about 2 years: RAG and agents for guests planning vacations and asking about
+resorts and parks (huge scale, always available, data updated continually). Now at
+Google: agents that sift tables and historical data and compress tens of millions of
+data points into real-time intelligence for high-risk, high-leverage corporate
+decisions. Three lessons thread the talk: (1) at scale rare failures are daily, and a
+confident answer from stale or partial data is still wrong; (2) when an agent's output
+drives a decision, you need what it actually did, not a transcript; (3) the model was
+rarely the bottleneck, the system around it was. Employer names stay off the slides.
+
 ---
 
 ## Timing map (25 min talk, 11 slides; Q&A after)
@@ -23,7 +33,7 @@ The deck shows each main slide's target start time and a running clock
 | # | Slide | Starts at |
 | --- | --- | --- |
 | 1 | Title + claim, real run output on screen | 0:00 |
-| 1b | About me + agenda (photo; say Google out loud) | 1:30 |
+| 1b | About me + three lessons + agenda (photo; employers said out loud) | 1:30 |
 | 2 | Long, risky work breaks agents (curve, confidence is not evidence, risk-averse questions) | 3:00 |
 | 3 | GATS: layers + stress test | 5:30 |
 | 4 | The honest limit: search doesn't scale, so plan level vs skill level | 8:00 |
