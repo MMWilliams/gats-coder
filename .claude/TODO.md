@@ -27,7 +27,7 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       Nexus release 106), close slide switched; release.ps1 mirrors the wheel
       + latest.json to the blog. Verified 10-26: Windows + WSL installs, tamper
       refused on both. After the next release.ps1: deploy BOTH sites.
-- [ ] LLMday 10-29: rehearse index.html to 25 min (lineage slide 4 added
+- [ ] LLMday 10-29: rehearse index.html (14 slides, targets end 23:00) to 25 min (lineage slide 4 added
       10-26, 6e0bfaf); resend backup PDF to Mark if the new slides should be in it.
 - [ ] Side effect 10-19: the first install.ps1 test hit a lookup bug and ran
       `winget install Python.Python.3.12` (user scope). Uninstall if unwanted:
