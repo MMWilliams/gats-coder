@@ -3,13 +3,15 @@
 # Automates the four-step release chore: reads the version from
 # pyproject.toml, builds the wheel, copies it to <site>\public\ledger,
 # and rewrites latest.json (version/wheel/sha256/released) plus the
-# WHEEL constant in src\landing\ledgerRelease.js. Commit and deploy the site
-# yourself afterwards.
+# WHEEL constant in src\landing\ledgerRelease.js. The same wheel and
+# latest.json are mirrored to the personal site (maureesewilliams.io/ledger),
+# whose installers read from there. Commit and deploy both sites yourself
+# afterwards (the personal site deploys via Nexus, not Vercel).
 #
 #   .\release.ps1                 # site defaults to C:\Users\reese\kyberos
-#   .\release.ps1 -Site D:\kyberos
+#   .\release.ps1 -Site D:\kyberos -Mirror ''   # skip the mirror
 
-param([string]$Site = 'C:\Users\reese\kyberos')
+param([string]$Site = 'C:\Users\reese\kyberos', [string]$Mirror = 'C:\Users\reese\maureeseblog')
 
 $ErrorActionPreference = 'Stop'
 $repo = $PSScriptRoot
@@ -54,6 +56,17 @@ $meta.wheel = "/ledger/$($wheel.Name)"
 $meta.sha256 = $sha
 $meta.released = Get-Date -Format 'yyyy-MM-dd'
 [System.IO.File]::WriteAllText($latestPath, (($meta | ConvertTo-Json) + "`n"), $utf8NoBom)
+
+# Mirror the exact same files: wheels aren't byte-reproducible, so a second
+# build would carry a different sha256 than this latest.json.
+if ($Mirror) {
+    $mpub = Join-Path $Mirror 'public\ledger'
+    if (-not (Test-Path $mpub)) { throw "$mpub does not exist" }
+    Get-ChildItem (Join-Path $mpub 'ledger_agent-*.whl') |
+        Where-Object Name -ne $wheel.Name | Remove-Item -Confirm:$false
+    Copy-Item (Join-Path $pub $wheel.Name), $latestPath $mpub -Force
+    Write-Host "    mirrored to $mpub"
+}
 
 # The wheel URL lives in one module that both the product page and the home
 # page import; a copy per page is how a stale version survives a release.

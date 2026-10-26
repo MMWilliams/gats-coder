@@ -23,8 +23,10 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
 - [x] Install one-liners live on kyberos.ai/ledger (kyberos e752391, 10-24),
       matching the LLMday close slide; kyberos CLAUDE.md + STRATEGY updated.
 - [x] LEDGER license settled 10-26: stays MIT, free to install (kyberos fc0b2fc).
-- [ ] Host LEDGER installers on maureesewilliams.io/ledger and switch the
-      close slide's one-liners there (plan in HANDOFF.md, reese 10-26).
+- [x] LEDGER installers hosted on maureesewilliams.io/ledger (blog 37cc7a9,
+      Nexus release 106), close slide switched; release.ps1 mirrors the wheel
+      + latest.json to the blog. Verified 10-26: Windows + WSL installs, tamper
+      refused on both. After the next release.ps1: deploy BOTH sites.
 - [ ] LLMday 10-29: rehearse index.html to 25 min (lineage slide 4 added
       10-26, 6e0bfaf); resend backup PDF to Mark if the new slides should be in it.
 - [ ] Side effect 10-19: the first install.ps1 test hit a lookup bug and ran

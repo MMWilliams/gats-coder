@@ -219,7 +219,7 @@ predictions, two laws, tips 1-4 with full prompts, verification ladder).
 
 ### Slide 25: Close
 - "Confidence is not evidence. Build the harness that asks for evidence."
-- QR to the paper and kyberos.ai/ledger (see Landmine 5).
+- QR to the paper; install one-liners from maureesewilliams.io/ledger (see Landmine 5).
 
 ---
 
@@ -262,9 +262,10 @@ predictions, two laws, tips 1-4 with full prompts, verification ladder).
 3. Rubric scores are operator judgment by the same model family as the author;
    pass counts and test-edit checks are mechanical. Say so if asked.
 4. hardbench reruns after harness fixes aren't first-contact results.
-5. kyberos.ai publishes no install command (LEDGER sold as enterprise access).
-   Decided 10-24 (reese): show it. The close slide carries both one-liners;
-   the installers are live (install.sh/.ps1 return 200).
+5. Install one-liners on the close slide point at maureesewilliams.io/ledger
+   (reese, 10-26; MIT, free). Verified live 10-26: both installers install
+   0.15.1 from the site (Windows + Linux/WSL) and refuse a tampered manifest.
+   kyberos.ai/ledger still serves the same wheel (release.ps1 mirrors both).
 6. Don't say "nobody is building this"; say "almost nobody".
 
 ## Q&A backup
