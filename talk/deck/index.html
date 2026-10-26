@@ -164,18 +164,83 @@ table.t.txt th,table.t.txt td{text-align:left} table.t.txt td{padding:11px 18px}
 </section>
 
 <section data-t="5:00" class="slide" data-sec="How we got here">
-  <div class="eyebrow">How we got here · agent harnesses since 2022</div>
-  <h2>Each harness unlocked something. Frontier agents kept the loop.</h2>
-  <table class="t txt" style="font-size:21px;margin-top:6px">
-    <tr><th>Harness</th><th>What it unlocked</th><th>In Claude Code, Codex?</th></tr>
-    <tr><td><b>ReAct</b> 2022</td><td>Reason, act, observe: tool use grounded in feedback</td><td class="g">Yes. It's the core loop.</td></tr>
-    <tr><td><b>Reflexion</b> 2023</td><td>Learn from a failed try by writing the lesson down</td><td>Partly: memory files (CLAUDE.md, AGENTS.md)</td></tr>
-    <tr><td><b>Tree of Thoughts, LATS</b> 2023</td><td>Search: look ahead, score, backtrack</td><td class="r">No. One path per run; lookahead moved into training</td></tr>
-    <tr><td><b>SWE-agent, CodeAct</b> 2024</td><td>Tools built for the model; code as the action</td><td class="g">Yes: edit, search and shell tools</td></tr>
-    <tr><td><b>GATS, LEDGER</b> 2026</td><td>Replayable plans; claims checked by sensors</td><td>No. LEDGER can wrap Claude Code</td></tr>
-  </table>
-  <div class="card r" style="margin-top:22px;padding:20px 28px"><p><b class="r">What none of them added: a check on the model's own claims.</b> On ImpossibleBench, frontier models pass impossible tasks by gaming the tests, and stronger models generally cheat more. <span class="small">(Zhong, Raghunathan, Carlini, ICLR 2026)</span></p></div>
-  <aside class="notes">5:00-7:00. Two minutes, because the next slide compares GATS to two of these. ReAct gave every agent its loop: think, call a tool, read the result. Reflexion added memory of a failed try. Tree of Thoughts and LATS added search; LATS is the one GATS beats on the next slide. SWE-agent and CodeAct showed the tools you hand the model matter as much as the model. Claude Code and Codex are that loop with very good tools and a model trained with RL. They dropped inference-time tree search because a real repo isn't cheap to rewind; the lookahead moved into training (Codex's parallel attempts are as close as it gets). What none of them added is a check on the model's claims, and that matters more as models improve: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and Claude models mostly did it by editing test files, the same failure my own harness hit (15:00). An abort option cut GPT-5 from 54% to 9%; LEDGER's version of that is the infeasible escalation.</aside>
+  <div class="eyebrow">How we got here · agent harnesses, 2020 to now</div>
+  <h2>Harnesses grow, then models absorb them</h2>
+  <svg class="tl" viewBox="0 0 1376 460" style="width:100%;font-family:var(--sans)">
+    <rect x="0" y="103" width="1376" height="76" fill="#f7f7f8"/>
+    <rect x="0" y="255" width="1376" height="76" fill="#f7f7f8"/>
+    <line x1="868.1" y1="22" x2="868.1" y2="407" stroke="#a8690c" stroke-width="2" stroke-dasharray="5 5"/>
+    <text x="0" y="63" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#2b6cd4">KNOW</text>
+    <text x="0" y="84" font-size="15" fill="#8a8b90">context</text>
+    <rect x="199.7" y="60" width="980.3" height="10" rx="5" fill="#2b6cd4"/>
+    <circle cx="229.4" cy="65" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text x="229.4" y="49" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">prompt, RAG</text>
+    <circle cx="734.4" cy="65" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text x="734.4" y="49" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">MemGPT</text>
+    <circle cx="972.1" cy="65" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text x="878.1" y="49" text-anchor="start" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">memory files, compaction</text>
+    <text x="1206" y="71" font-size="17" font-weight="700" fill="#2b6cd4">in the harness</text>
+    <text x="0" y="139" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#a8690c">THINK</text>
+    <text x="0" y="160" font-size="15" fill="#8a8b90">reasoning</text>
+    <rect x="467.1" y="136" width="401.0" height="10" rx="5" fill="#a8690c"/>
+    <rect x="868.1" y="136" width="311.9" height="10" rx="5" fill="#a8690c" opacity=".28"/>
+    <text x="1024" y="169" text-anchor="middle" font-size="16" font-style="italic" fill="#a8690c">inside the model now</text>
+    <circle cx="481.9" cy="141" r="8" fill="#fff" stroke="#a8690c" stroke-width="4"/>
+    <text x="481.9" y="125" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">chain of thought, voting</text>
+    <circle cx="645.3" cy="141" r="8" fill="#fff" stroke="#a8690c" stroke-width="4"/>
+    <text x="645.3" y="169" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">Reflexion</text>
+    <circle cx="719.6" cy="141" r="8" fill="#fff" stroke="#a8690c" stroke-width="4"/>
+    <text x="719.6" y="125" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">Tree of Thoughts, LATS</text>
+    <text x="1206" y="147" font-size="17" font-weight="700" fill="#a8690c">in the model</text>
+    <text x="0" y="215" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#2b6cd4">ACT</text>
+    <text x="0" y="236" font-size="15" fill="#8a8b90">tools</text>
+    <rect x="571.0" y="212" width="609.0" height="10" rx="5" fill="#2b6cd4"/>
+    <circle cx="585.9" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text x="585.9" y="201" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">ReAct loop</text>
+    <circle cx="682.4" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text x="682.4" y="245" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">function calling</text>
+    <circle cx="808.7" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text x="858.1" y="201" text-anchor="end" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">SWE-agent, CodeAct</text>
+    <circle cx="897.8" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text x="897.8" y="245" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">MCP</text>
+    <circle cx="972.1" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text x="972.1" y="201" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">Claude Code, Codex</text>
+    <text x="1206" y="223" font-size="17" font-weight="700" fill="#2b6cd4">in the harness</text>
+    <text x="0" y="291" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#2b6cd4">CONTROL</text>
+    <text x="0" y="312" font-size="15" fill="#8a8b90">permission</text>
+    <rect x="660.1" y="288" width="519.9" height="10" rx="5" fill="#2b6cd4"/>
+    <circle cx="660.1" cy="293" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text x="660.1" y="277" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">AutoGPT asks y/n</text>
+    <circle cx="972.1" cy="293" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text x="878.1" y="277" text-anchor="start" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">permission modes, sandboxes, hooks</text>
+    <text x="1206" y="299" font-size="17" font-weight="700" fill="#2b6cd4">in the harness</text>
+    <text x="0" y="367" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#c72d26">PROVE</text>
+    <text x="0" y="388" font-size="15" fill="#8a8b90">verify, record</text>
+    <line x1="734.4" y1="369" x2="1180" y2="369" stroke="#c72d26" stroke-width="6" stroke-dasharray="14 10" stroke-linecap="round"/>
+    <circle cx="734.4" cy="369" r="8" fill="#fff" stroke="#c72d26" stroke-width="4"/>
+    <text x="734.4" y="353" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">SWE-bench: tests as judge</text>
+    <circle cx="1135.4" cy="369" r="8" fill="#fff" stroke="#c72d26" stroke-width="4"/>
+    <text x="1180" y="397" text-anchor="end" font-size="16" font-weight="600" fill="#c72d26" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">GATS, LEDGER: sensors, replayable journal</text>
+    <text x="1206" y="375" font-size="17" font-weight="700" fill="#c72d26">barely built</text>
+    <text x="868.1" y="15" text-anchor="middle" font-size="16" font-weight="600" fill="#a8690c">o1, R1 (2024-25): reasoning trained into the model</text>
+    <line x1="170" y1="419" x2="1180" y2="419" stroke="#8a8b90" stroke-width="1.5"/>
+    <line x1="170.0" y1="413" x2="170.0" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text x="170.0" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2020</text>
+    <line x1="318.5" y1="413" x2="318.5" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text x="318.5" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2021</text>
+    <line x1="467.1" y1="413" x2="467.1" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text x="467.1" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2022</text>
+    <line x1="615.6" y1="413" x2="615.6" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text x="615.6" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2023</text>
+    <line x1="764.1" y1="413" x2="764.1" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text x="764.1" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2024</text>
+    <line x1="912.6" y1="413" x2="912.6" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text x="912.6" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2025</text>
+    <line x1="1061.2" y1="413" x2="1061.2" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text x="1061.2" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2026</text>
+    </svg>
+  <p style="margin-top:14px;font-size:25px">Models absorb procedures: reasoning, voting, reflection, search. Today's harness trains tomorrow's model. <b>What can't be absorbed is the check:</b> a verifier inside the model is just another target.</p>
+  <aside class="notes">5:00-7:00. One idea: harnesses grow, then models absorb them. Read the lanes top to bottom. Harnesses kept adding jobs: context (prompts, retrieval, memory), reasoning (chain of thought, voting, Reflexion, tree search like LATS, which GATS beats on the next slide), tools (ReAct's loop, function calling, SWE-agent, MCP) and permission (AutoGPT asking y/n, through today's permission modes, sandboxes and hooks). Then reasoning models (o1, R1) trained the whole reasoning lane into the weights, which is why Claude Code and Codex run a plain ReAct loop with no tree search. What a model can't absorb is contact with the world: what's in context, what it can touch, what it's allowed to do, and what actually happened. The proof lane is the thinnest, and it matters more as models improve: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and Claude models mostly edited the test files, the same failure my own harness hit (15:00). That's not an accident. Today's harness is tomorrow's training data: its traces are the trajectories and its checks are the rewards, so whatever procedure the harness runs gets trained into the next model. Planning is a procedure too, so GATS's search may well be absorbed; say so. What can't be absorbed is the check: once a verifier is trained on, it's a target, and ImpossibleBench is what that looks like. The proof lane is this talk.</aside>
 </section>
 
 <section data-t="7:00" class="slide" data-sec="GATS">
@@ -400,6 +465,21 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
     <div class="card bl"><h3>Payments, deploys, infra, regulated code ask</h3><p>What exactly did it do?<br>Can you stop it <b>before</b> the bad step?<br>Can you prove it afterwards?</p></div>
   </div>
   <aside class="notes">"In risk-averse work the question isn't 'did it usually work', it's 'can you show me exactly what it did, and could you have stopped it before the bad step.'"</aside>
+</section>
+
+<section class="slide" data-backup="1" data-sec="How we got here">
+  <div class="eyebrow">Backup · who uses which harness idea</div>
+  <h2>Each harness unlocked something. Frontier agents kept the loop.</h2>
+  <table class="t txt" style="font-size:21px;margin-top:6px">
+    <tr><th>Harness</th><th>What it unlocked</th><th>In Claude Code, Codex?</th></tr>
+    <tr><td><b>ReAct</b> 2022</td><td>Reason, act, observe: tool use grounded in feedback</td><td class="g">Yes. It's the core loop.</td></tr>
+    <tr><td><b>Reflexion</b> 2023</td><td>Learn from a failed try by writing the lesson down</td><td>Partly: memory files (CLAUDE.md, AGENTS.md)</td></tr>
+    <tr><td><b>Tree of Thoughts, LATS</b> 2023</td><td>Search: look ahead, score, backtrack</td><td class="r">No. One path per run; lookahead moved into training</td></tr>
+    <tr><td><b>SWE-agent, CodeAct</b> 2024</td><td>Tools built for the model; code as the action</td><td class="g">Yes: edit, search and shell tools</td></tr>
+    <tr><td><b>GATS, LEDGER</b> 2026</td><td>Replayable plans; claims checked by sensors</td><td>No. LEDGER can wrap Claude Code</td></tr>
+  </table>
+  <div class="card r" style="margin-top:22px;padding:20px 28px"><p><b class="r">What none of them added: a check on the model's own claims.</b> On ImpossibleBench, frontier models pass impossible tasks by gaming the tests, and stronger models generally cheat more. <span class="small">(Zhong, Raghunathan, Carlini, ICLR 2026)</span></p></div>
+  <aside class="notes">If asked which of these Claude Code and Codex actually use. ReAct gave every agent its loop: think, call a tool, read the result. Reflexion added memory of a failed try. Tree of Thoughts and LATS added search; LATS is the one GATS beats on the next slide. SWE-agent and CodeAct showed the tools you hand the model matter as much as the model. Claude Code and Codex are that loop with very good tools and a model trained with RL. They dropped inference-time tree search because a real repo isn't cheap to rewind; the lookahead moved into training (Codex's parallel attempts are as close as it gets). What none of them added is a check on the model's claims, and that matters more as models improve: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and Claude models mostly did it by editing test files, the same failure my own harness hit (15:00). An abort option cut GPT-5 from 54% to 9%; LEDGER's version of that is the infeasible escalation.</aside>
 </section>
 
 <section class="slide" data-backup="1" data-sec="How we got here">

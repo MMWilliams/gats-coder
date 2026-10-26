@@ -258,6 +258,14 @@ predictions, two laws, tips 1-4 with full prompts, verification ladder).
   ImpossibleBench, arXiv:2510.20270, ICLR 2026); they already have gates;
   "model as last resort" is the bet, not a fact. Only cite ImpossibleBench's
   76% with "on one impossible SWE-bench variant" (GPT-5, oneoff).
+- Has anyone shipped GATS ideas? Pieces, not the core. Stagehand replays
+  cached browser actions with no model call and falls back to the model when
+  a step breaks (closest match: L1/L3 with cache). MCP tool annotations mark
+  destructive vs read-only tools (risk classes, hints only). Temporal and
+  LangGraph replay recorded model outputs (replay, no hash chain, no "why").
+  Nobody popular plans without the model, learns transition statistics across
+  runs, or journals lies as incidents. The pieces show up where actions
+  repeat, which is the scaling-limit slide's point.
 - Determinism with a stochastic LLM? Plans are deterministic; skill outputs are
   journaled as blobs, so replay is bit-exact.
 
