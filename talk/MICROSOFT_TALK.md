@@ -25,7 +25,7 @@ rarely the bottleneck, the system around it was. Employer names stay off the sli
 
 ---
 
-## Timing map (25 min talk, 11 slides; Q&A after)
+## Timing map (25 min talk, 12 slides; Q&A after)
 
 The deck shows each main slide's target start time and a running clock
 (bottom right; T resets it). Everything after the close is backup.
@@ -35,9 +35,10 @@ The deck shows each main slide's target start time and a running clock
 | 1 | Title + claim, real run output on screen | 0:00 |
 | 1b | About me + three lessons + agenda (photo; employers said out loud) | 1:30 |
 | 2 | Long, risky work breaks agents (curve, confidence is not evidence, risk-averse questions) | 3:00 |
-| 3 | GATS: layers + stress test | 5:30 |
-| 4 | The honest limit: search doesn't scale, so plan level vs skill level | 8:00 |
-| 5 | LEDGER: plan, skill, sensors, journal; incidents; gates | 10:00 |
+| 2b | How we got here: ReAct, Reflexion, ToT/LATS, SWE-agent/CodeAct; what Claude Code and Codex kept; ImpossibleBench | 5:00 |
+| 3 | GATS: layers + stress test | 7:00 |
+| 4 | The honest limit: search doesn't scale, so plan level vs skill level | 9:00 |
+| 5 | LEDGER: plan, skill, sensors, journal; incidents; gates | 10:30 |
 | 6 | The answer to the title: why, replay, tamper | 13:00 |
 | 7 | Evidence: graded problem solving + the reward hack | 15:00 |
 | 8 | Where harnesses go: product, RL environment, gated self-improvement | 17:30 |
@@ -252,6 +253,11 @@ predictions, two laws, tips 1-4 with full prompts, verification ladder).
   text causing an unverified action. Intent attacks (a valid but malicious
   goal) need authorization, a separate layer.
 - Why not just a better model? Same harness, local 27B model, same guarantees.
+- Does this apply to Claude Code and Codex? Backup slide "Do these principles
+  hold": the problem and the record hold (stronger models game tests more, per
+  ImpossibleBench, arXiv:2510.20270, ICLR 2026); they already have gates;
+  "model as last resort" is the bet, not a fact. Only cite ImpossibleBench's
+  76% with "on one impossible SWE-bench variant" (GPT-5, oneoff).
 - Determinism with a stochastic LLM? Plans are deterministic; skill outputs are
   journaled as blobs, so replay is bit-exact.
 

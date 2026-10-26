@@ -68,6 +68,7 @@ table.t th{font:600 18px/1 var(--mono);letter-spacing:.1em;text-transform:upperc
 table.t th:first-child,table.t td:first-child{text-align:left}
 table.t td{padding:16px 18px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums;color:var(--ink)}
 table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{text-decoration:line-through;text-decoration-thickness:2px}
+table.t.txt th,table.t.txt td{text-align:left} table.t.txt td{padding:11px 18px}
 
 .bars{display:flex;flex-direction:column;gap:22px;margin-top:10px}
 .bar{display:grid;grid-template-columns:150px 1fr 120px;align-items:center;gap:22px;font-size:28px}
@@ -159,10 +160,25 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
       <div class="card bl"><h3>Risk-averse work asks</h3><p>What exactly did it do? Can you stop it <b>before</b> the bad step? Can you prove it afterwards?</p></div>
     </div>
   </div>
-  <aside class="notes">3:00-5:30. Bridge from lesson one: "At scale, rare is daily, and it gets worse when the work is long." Per-step accuracy multiplies, so the horizon eats you even when each step looks great; pause on 37%. Then the mechanism: the agent asserts world state and acts on the assertion. In payments, deploys and regulated code the question isn't "did it usually work", it's "show me what it did, and could you have stopped it".</aside>
+  <aside class="notes">3:00-5:00. Bridge from lesson one: "At scale, rare is daily, and it gets worse when the work is long." Per-step accuracy multiplies, so the horizon eats you even when each step looks great; pause on 37%. Then the mechanism: the agent asserts world state and acts on the assertion. In payments, deploys and regulated code the question isn't "did it usually work", it's "show me what it did, and could you have stopped it".</aside>
 </section>
 
-<section data-t="5:30" class="slide" data-sec="GATS">
+<section data-t="5:00" class="slide" data-sec="How we got here">
+  <div class="eyebrow">How we got here · agent harnesses since 2022</div>
+  <h2>Each harness unlocked something. Frontier agents kept the loop.</h2>
+  <table class="t txt" style="font-size:21px;margin-top:6px">
+    <tr><th>Harness</th><th>What it unlocked</th><th>In Claude Code, Codex?</th></tr>
+    <tr><td><b>ReAct</b> 2022</td><td>Reason, act, observe: tool use grounded in feedback</td><td class="g">Yes. It's the core loop.</td></tr>
+    <tr><td><b>Reflexion</b> 2023</td><td>Learn from a failed try by writing the lesson down</td><td>Partly: memory files (CLAUDE.md, AGENTS.md)</td></tr>
+    <tr><td><b>Tree of Thoughts, LATS</b> 2023</td><td>Search: look ahead, score, backtrack</td><td class="r">No. One path per run; lookahead moved into training</td></tr>
+    <tr><td><b>SWE-agent, CodeAct</b> 2024</td><td>Tools built for the model; code as the action</td><td class="g">Yes: edit, search and shell tools</td></tr>
+    <tr><td><b>GATS, LEDGER</b> 2026</td><td>Replayable plans; claims checked by sensors</td><td>No. LEDGER can wrap Claude Code</td></tr>
+  </table>
+  <div class="card r" style="margin-top:22px;padding:20px 28px"><p><b class="r">What none of them added: a check on the model's own claims.</b> On ImpossibleBench, frontier models pass impossible tasks by gaming the tests, and stronger models generally cheat more. <span class="small">(Zhong, Raghunathan, Carlini, ICLR 2026)</span></p></div>
+  <aside class="notes">5:00-7:00. Two minutes, because the next slide compares GATS to two of these. ReAct gave every agent its loop: think, call a tool, read the result. Reflexion added memory of a failed try. Tree of Thoughts and LATS added search; LATS is the one GATS beats on the next slide. SWE-agent and CodeAct showed the tools you hand the model matter as much as the model. Claude Code and Codex are that loop with very good tools and a model trained with RL. They dropped inference-time tree search because a real repo isn't cheap to rewind; the lookahead moved into training (Codex's parallel attempts are as close as it gets). What none of them added is a check on the model's claims, and that matters more as models improve: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and Claude models mostly did it by editing test files, the same failure my own harness hit (15:00). An abort option cut GPT-5 from 54% to 9%; LEDGER's version of that is the infeasible escalation.</aside>
+</section>
+
+<section data-t="7:00" class="slide" data-sec="GATS">
   <div class="eyebrow">GATS · arXiv:2607.08894 · with Dymitr Nowicki</div>
   <h2>The model is the last resort, not the decider</h2>
   <div class="cols" style="grid-template-columns:1fr 1.1fr;gap:56px">
@@ -184,10 +200,10 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
       <p style="margin-top:28px"><b class="g">0</b> LLM calls during planning · <b>0%</b> variance across seeds · <b class="g">100%</b> on live Llama 3.2, where LATS fell below 1%</p>
     </div>
   </div>
-  <aside class="notes">5:30-8:00. "Symbolic where you can, learned where you've seen it, neural only for the genuinely new." Say "during planning" every time you say zero (50 one-time bootstrap calls). Lead into the next slide: "It has a hard limit, and that limit shaped everything after it."</aside>
+  <aside class="notes">7:00-9:00."Symbolic where you can, learned where you've seen it, neural only for the genuinely new." Say "during planning" every time you say zero (50 one-time bootstrap calls). Lead into the next slide: "It has a hard limit, and that limit shaped everything after it."</aside>
 </section>
 
-<section data-t="8:00" class="slide" data-sec="GATS">
+<section data-t="9:00" class="slide" data-sec="GATS">
   <div class="eyebrow amber">From paper to product · the honest limit</div>
   <h2>Search doesn't scale. So search less.</h2>
   <p class="lede" style="margin-bottom:34px">Over raw actions, tree search is impractical past about 20 actions or depth 10. So the planner searches a few coarse moves and pushes the open-ended work down into skills.</p>
@@ -195,10 +211,10 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
     <div class="card bl"><h3>Plan level: searched</h3><p class="mono" style="font-size:22px">RunSuite · AuthorPatch · ApplyPatch · Commit · CreatePR</p><p style="margin-top:14px">Few, coarse, contracts known. Every choice is scored and logged.</p></div>
     <div class="card am"><h3>Skill level: the LLM inside</h3><p>Writing the diff. Its output is a proposal: preflight, <span class="mono">git apply --check</span>, then the suite decides.</p></div>
   </div>
-  <aside class="notes">8:00-10:00. Tested at 15 actions, depth 20. The limit is the design constraint LEDGER was built around: keep the decisions few and checkable, let the model do the open-ended part where a sensor can check it. "The model never picks the next move; it fills in a step whose result we can measure."</aside>
+  <aside class="notes">9:00-10:30.Tested at 15 actions, depth 20. The limit is the design constraint LEDGER was built around: keep the decisions few and checkable, let the model do the open-ended part where a sensor can check it. "The model never picks the next move; it fills in a step whose result we can measure."</aside>
 </section>
 
-<section data-t="10:00" class="slide" data-sec="LEDGER">
+<section data-t="10:30" class="slide" data-sec="LEDGER">
   <div class="eyebrow">LEDGER · audit-first coding agent on GATS</div>
   <h2>Neural proposes, symbolic disposes</h2>
   <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;align-items:center;gap:14px;margin-bottom:34px">
@@ -212,7 +228,7 @@ table.t td.r{color:var(--red)} table.t td.g{color:var(--green)} table.t td.n{tex
     <div><h3>Lies become incidents</h3><p style="font-size:23px">Claimed effects minus observed effects is an <span class="mono">INCIDENT</span>; the planner routes around the falsified edge.</p></div>
     <div><h3>Gates, not hopes</h3><p style="font-size:23px">Risk classes gate execution. A denial is an observation. Escalation is named: <span class="mono">no_path</span>, <span class="mono">infeasible</span>, <span class="mono">budget_exhausted</span>.</p></div>
   </div>
-  <aside class="notes">10:00-13:00. The typical agent lets the model decide, act, check and write the report. LEDGER splits those jobs. Plan-level actions are few and coarse (RunSuite, AuthorPatch, ApplyPatch, Commit, CreatePR), which keeps search tractable. Irreversible means an action that deletes the recoverable proposition. Runs on Claude, OpenAI or a local model with the same guarantees; keys are sealed in the OS vault and never reach the repo's subprocesses.</aside>
+  <aside class="notes">10:30-13:00.The typical agent lets the model decide, act, check and write the report. LEDGER splits those jobs. Plan-level actions are few and coarse (RunSuite, AuthorPatch, ApplyPatch, Commit, CreatePR), which keeps search tractable. Irreversible means an action that deletes the recoverable proposition. Runs on Claude, OpenAI or a local model with the same guarantees; keys are sealed in the OS vault and never reach the repo's subprocesses.</aside>
 </section>
 
 <section data-t="13:00" class="slide" data-sec="LEDGER">
@@ -384,6 +400,21 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
     <div class="card bl"><h3>Payments, deploys, infra, regulated code ask</h3><p>What exactly did it do?<br>Can you stop it <b>before</b> the bad step?<br>Can you prove it afterwards?</p></div>
   </div>
   <aside class="notes">"In risk-averse work the question isn't 'did it usually work', it's 'can you show me exactly what it did, and could you have stopped it before the bad step.'"</aside>
+</section>
+
+<section class="slide" data-backup="1" data-sec="How we got here">
+  <div class="eyebrow">Backup · frontier coding agents</div>
+  <h2>Do these principles hold for Claude Code and Codex?</h2>
+  <table class="t txt" style="font-size:21px">
+    <tr><th>Principle</th><th>Claude Code, Codex today</th><th>Verdict</th></tr>
+    <tr><td>Long horizons compound errors</td><td>Better per-step accuracy delays the curve; it doesn't remove it</td><td class="g">Holds</td></tr>
+    <tr><td>Confidence is not evidence</td><td>The final report is the model's own. On ImpossibleBench, stronger models game tests more</td><td class="g">Holds, more so</td></tr>
+    <tr><td>Gate before the bad step</td><td>Permission modes, deny rules, blocking hooks; Codex OS sandbox and approval policy</td><td class="g">They have it</td></tr>
+    <tr><td>State comes from sensors</td><td>State is whatever the transcript says. A Stop hook running the suite gets close</td><td class="r">Gap</td></tr>
+    <tr><td>A record you can replay</td><td>JSONL transcripts and local checkpoints: not hash-chained, and a path the model picked can't be replayed</td><td class="r">Gap</td></tr>
+    <tr><td>Model as last resort</td><td>The opposite: the model is the loop, and it works at today's horizons</td><td>The bet, not a fact</td></tr>
+  </table>
+  <aside class="notes">If asked "does this apply to Claude Code and Codex": yes for the problem and the record, and they already have gates. Where I disagree with them is who picks the next step; that's a bet about long horizons, not a proven fact. Practical answer: add the checks yourself (Monday-morning slide), or run them as the patch writer inside a harness that checks them.</aside>
 </section>
 
 <section class="slide" data-backup="1" data-sec="GATS">
