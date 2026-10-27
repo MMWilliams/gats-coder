@@ -279,9 +279,11 @@ predictions, two laws, tips 1-4 with full prompts, verification ladder).
   text causing an unverified action. Intent attacks (a valid but malicious
   goal) need authorization, a separate layer.
 - Why not just a better model? Same harness, local 27B model, same guarantees.
-- Does this apply to Claude Code and Codex? Backup slide "Do these principles
-  hold": the problem and the record hold (stronger models game tests more, per
-  ImpossibleBench, arXiv:2510.20270, ICLR 2026); they already have gates;
+- Does this apply to Claude Code, Codex and Antigravity? Backup slide "Do these
+  principles hold": the problem and the record hold (stronger models game tests more, per
+  ImpossibleBench, arXiv:2510.20270, ICLR 2026); they already have gates; Antigravity's Artifacts (plan, task list,
+  walkthrough with screenshots and browser recordings) are the closest to a
+  record, but the agent writes them and nothing checks them;
   "model as last resort" is the bet, not a fact. Only cite ImpossibleBench's
   76% with "on one impossible SWE-bench variant" (GPT-5, oneoff).
 - Has anyone shipped GATS ideas? Pieces, not the core. Stagehand replays

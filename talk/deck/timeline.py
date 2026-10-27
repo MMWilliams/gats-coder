@@ -25,7 +25,7 @@ LANES = [
      [(2022.1, "chain of thought, voting", True), (2023.2, "Reflexion", False), (2023.7, "Tree of Thoughts, LATS", True)]),
     ("ACT", "tools", BLUE, "in the harness", 2022.7, False,
      [(2022.8, "ReAct loop", True), (2023.45, "function calling", False), (2024.3, "SWE-agent, CodeAct", True),
-      (2024.9, "MCP", False), (2025.4, "Claude Code, Codex", True)]),
+      (2024.9, "MCP", False), (2025.6, "Claude Code, Codex, Antigravity", True)]),
     ("CONTROL", "permission", BLUE, "in the harness", 2023.3, False,
      [(2023.3, "AutoGPT asks y/n", True), (2025.4, "permission modes, sandboxes, hooks", True)]),
     ("PROVE", "verify, record", RED, "barely built", 2023.8, True,

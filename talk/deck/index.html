@@ -197,8 +197,8 @@ table.t.tight td{padding:8px 16px}
     <text x="858.1" y="201" text-anchor="end" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">SWE-agent, CodeAct</text>
     <circle cx="897.8" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
     <text x="897.8" y="245" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">MCP</text>
-    <circle cx="972.1" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
-    <text x="972.1" y="201" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">Claude Code, Codex</text>
+    <circle cx="1001.8" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text x="878.1" y="201" text-anchor="start" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">Claude Code, Codex, Antigravity</text>
     <text x="1206" y="223" font-size="17" font-weight="700" fill="#2b6cd4">in the harness</text>
     <text x="0" y="291" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#2b6cd4">CONTROL</text>
     <text x="0" y="312" font-size="15" fill="#8a8b90">permission</text>
@@ -234,7 +234,7 @@ table.t.tight td{padding:8px 16px}
     <text x="1061.2" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2026</text>
     </svg>
   <p style="margin-top:14px;font-size:25px">Models absorb procedures: reasoning, voting, reflection, search. Today's harness trains tomorrow's model. <b>What can't be absorbed is the check:</b> a verifier inside the model is just another target.</p>
-  <aside class="notes">2:30-4:00. One idea: harnesses grow, then models absorb them. Read the lanes top to bottom. Harnesses kept adding jobs: context (prompts, retrieval, memory), reasoning (chain of thought, voting, Reflexion, tree search like LATS, which GATS beats later), tools (ReAct's loop, function calling, SWE-agent, MCP) and permission (AutoGPT asking y/n, through today's permission modes, sandboxes and hooks). Then reasoning models (o1, R1) trained the whole reasoning lane into the weights, which is why Claude Code and Codex run a plain ReAct loop with no tree search. What a model can't absorb is contact with the world: what's in context, what it can touch, what it's allowed to do, and what actually happened. The proof lane is the thinnest, and it matters more as models improve: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and Claude models mostly edited the test files, the same failure my own harness hit (15:00). The proof lane is this talk; next, why the absorbing keeps happening.</aside>
+  <aside class="notes">2:30-4:00. One idea: harnesses grow, then models absorb them. Read the lanes top to bottom. Harnesses kept adding jobs: context (prompts, retrieval, memory), reasoning (chain of thought, voting, Reflexion, tree search like LATS, which GATS beats later), tools (ReAct's loop, function calling, SWE-agent, MCP) and permission (AutoGPT asking y/n, through today's permission modes, sandboxes and hooks). Then reasoning models (o1, R1) trained the whole reasoning lane into the weights, which is why Claude Code, Codex and Google's Antigravity run a plain ReAct loop with no tree search (Antigravity writes a plan first, but it's still one path). What a model can't absorb is contact with the world: what's in context, what it can touch, what it's allowed to do, and what actually happened. The proof lane is the thinnest, and it matters more as models improve: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and Claude models mostly edited the test files, the same failure my own harness hit (15:00). The proof lane is this talk; next, why the absorbing keeps happening.</aside>
 </section>
 
 <section data-t="4:00" class="slide" data-sec="How we got here">
@@ -646,30 +646,30 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
   <div class="eyebrow">Backup · who uses which harness idea</div>
   <h2>Each harness unlocked something. Frontier agents kept the loop.</h2>
   <table class="t txt" style="font-size:21px;margin-top:6px">
-    <tr><th>Harness</th><th>What it unlocked</th><th>In Claude Code, Codex?</th></tr>
+    <tr><th>Harness</th><th>What it unlocked</th><th>In Claude Code, Codex, Antigravity?</th></tr>
     <tr><td><b>ReAct</b> 2022</td><td>Reason, act, observe: tool use grounded in feedback</td><td class="g">Yes. It's the core loop.</td></tr>
-    <tr><td><b>Reflexion</b> 2023</td><td>Learn from a failed try by writing the lesson down</td><td>Partly: memory files (CLAUDE.md, AGENTS.md)</td></tr>
+    <tr><td><b>Reflexion</b> 2023</td><td>Learn from a failed try by writing the lesson down</td><td>Partly: memory and rules files (CLAUDE.md, AGENTS.md)</td></tr>
     <tr><td><b>Tree of Thoughts, LATS</b> 2023</td><td>Search: look ahead, score, backtrack</td><td class="r">No. One path per run; lookahead moved into training</td></tr>
     <tr><td><b>SWE-agent, CodeAct</b> 2024</td><td>Tools built for the model; code as the action</td><td class="g">Yes: edit, search and shell tools</td></tr>
     <tr><td><b>GATS, LEDGER</b> 2026</td><td>Replayable plans; claims checked by sensors</td><td>No. LEDGER can wrap Claude Code</td></tr>
   </table>
   <div class="card r" style="margin-top:22px;padding:20px 28px"><p><b class="r">What none of them added: a check on the model's own claims.</b> On ImpossibleBench, frontier models pass impossible tasks by gaming the tests, and stronger models generally cheat more. <span class="small">(Zhong, Raghunathan, Carlini, ICLR 2026)</span></p></div>
-  <aside class="notes">If asked which of these Claude Code and Codex actually use. ReAct gave every agent its loop: think, call a tool, read the result. Reflexion added memory of a failed try. Tree of Thoughts and LATS added search; LATS is the one GATS beats on the next slide. SWE-agent and CodeAct showed the tools you hand the model matter as much as the model. Claude Code and Codex are that loop with very good tools and a model trained with RL. They dropped inference-time tree search because a real repo isn't cheap to rewind; the lookahead moved into training (Codex's parallel attempts are as close as it gets). What none of them added is a check on the model's claims, and that matters more as models improve: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and Claude models mostly did it by editing test files, the same failure my own harness hit (15:00). An abort option cut GPT-5 from 54% to 9%; LEDGER's version of that is the infeasible escalation.</aside>
+  <aside class="notes">If asked which of these Claude Code, Codex and Antigravity actually use. ReAct gave every agent its loop: think, call a tool, read the result. Reflexion added memory of a failed try. Tree of Thoughts and LATS added search; LATS is the one GATS beats on the next slide. SWE-agent and CodeAct showed the tools you hand the model matter as much as the model. Claude Code, Codex and Antigravity are that loop with very good tools and a model trained with RL; Antigravity adds a planning mode that writes an implementation plan you can comment on before it acts. They dropped inference-time tree search because a real repo isn't cheap to rewind; the lookahead moved into training (Codex's parallel attempts are as close as it gets). What none of them added is a check on the model's claims, and that matters more as models improve: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and Claude models mostly did it by editing test files, the same failure my own harness hit (15:00). An abort option cut GPT-5 from 54% to 9%; LEDGER's version of that is the infeasible escalation.</aside>
 </section>
 
 <section class="slide" data-backup="1" data-sec="How we got here">
   <div class="eyebrow">Backup · frontier coding agents</div>
-  <h2>Do these principles hold for Claude Code and Codex?</h2>
+  <h2>Do these principles hold for Claude Code, Codex, Antigravity?</h2>
   <table class="t txt" style="font-size:21px">
-    <tr><th>Principle</th><th>Claude Code, Codex today</th><th>Verdict</th></tr>
+    <tr><th>Principle</th><th>Frontier coding agents today</th><th>Verdict</th></tr>
     <tr><td>Long horizons compound errors</td><td>Better per-step accuracy delays the curve; it doesn't remove it</td><td class="g">Holds</td></tr>
     <tr><td>Confidence is not evidence</td><td>The final report is the model's own. On ImpossibleBench, stronger models game tests more</td><td class="g">Holds, more so</td></tr>
-    <tr><td>Gate before the bad step</td><td>Permission modes, deny rules, blocking hooks; Codex OS sandbox and approval policy</td><td class="g">They have it</td></tr>
+    <tr><td>Gate before the bad step</td><td>Permission modes, deny rules, hooks; Codex sandbox and approvals; Antigravity terminal auto-run settings and plan review</td><td class="g">They have it</td></tr>
     <tr><td>State comes from sensors</td><td>State is whatever the transcript says. A Stop hook running the suite gets close</td><td class="r">Gap</td></tr>
-    <tr><td>A record you can replay</td><td>JSONL transcripts and local checkpoints: not hash-chained, and a path the model picked can't be replayed</td><td class="r">Gap</td></tr>
+    <tr><td>A record you can replay</td><td>Transcripts, checkpoints, Antigravity's Artifacts (plans, walkthroughs, screenshots, browser recordings): the agent writes them, nothing checks them, and none replay</td><td class="r">Gap</td></tr>
     <tr><td>Model as last resort</td><td>The opposite: the model is the loop, and it works at today's horizons</td><td>The bet, not a fact</td></tr>
   </table>
-  <aside class="notes">If asked "does this apply to Claude Code and Codex": yes for the problem and the record, and they already have gates. Where I disagree with them is who picks the next step; that's a bet about long horizons, not a proven fact. Practical answer: add the checks yourself (Monday-morning slide), or run them as the patch writer inside a harness that checks them.</aside>
+  <aside class="notes">If asked "does this apply to Claude Code, Codex and Antigravity": yes for the problem and the record, and they already have gates. Antigravity comes closest on the record: its Artifacts are a reviewable plan before it acts and a walkthrough with screenshots and browser recordings after. The gap is that the agent writes them and nothing outside the model checks them, which is the whole point of this talk. Where I disagree with them is who picks the next step; that's a bet about long horizons, not a proven fact. Practical answer: add the checks yourself (Monday-morning slide), or run them as the patch writer inside a harness that checks them.</aside>
 </section>
 
 <section class="slide" data-backup="1" data-sec="GATS">
