@@ -8,6 +8,8 @@ from pathlib import Path
 
 from playwright.sync_api import sync_playwright
 
+import script
+
 HERE = Path(__file__).parent
 DECK = sys.argv[1] if len(sys.argv) > 1 else "index.html"
 OUT = HERE / "out" if DECK == "index.html" else HERE / "out" / Path(DECK).stem
@@ -41,6 +43,8 @@ def main():
         sheet.screenshot(path=str(OUT / "contact-sheet.png"), full_page=True)
         browser.close()
     print(f"{count} slides -> {OUT}")
+    if DECK == "index.html":
+        script.export()
 
 
 if __name__ == "__main__":
