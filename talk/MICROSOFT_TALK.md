@@ -15,10 +15,9 @@ claims about the world and can prove what happened afterwards.
 
 Frame (reese, 10-26): lessons learned from large-scale AI and agent platforms. Disney
 AI team, about 2 years: RAG and agents for guests planning vacations and asking about
-resorts and parks (huge scale, always available, data updated continually). Now at
-Google: agents that sift tables and historical data and compress tens of millions of
-data points into real-time intelligence for high-risk, high-leverage corporate
-decisions. Three lessons thread the talk: (1) at scale rare failures are daily, and a
+resorts and parks (high traffic, always available, data updated continually). Now at
+Google: agents that read tables and historical data and summarize tens of millions of
+records for business decisions. Three lessons thread the talk: (1) at scale rare failures are daily, and a
 confident answer from stale or partial data is still wrong; (2) when an agent's output
 drives a decision, you need what it actually did, not a transcript; (3) the model was
 rarely the bottleneck, the system around it was. Employer names stay off the slides.
@@ -38,13 +37,13 @@ The deck shows each main slide's target start time and a running clock
 | 2 | About me + three lessons + agenda | 1:15 |
 | 3 | Harnesses grow, then models absorb them (swimlane timeline 2020-now) | 2:30 |
 | 4 | Today's harness is tomorrow's model (absorbed, next to go, the check stays) | 4:00 |
-| 5 | Tasks get longer, then they never end (METR horizons, projection, responsibilities) | 5:15 |
-| 6 | The next 10x is trust, not talent (7 gaps, one cited number each) | 6:45 |
-| 7 | What closing the gaps would unlock + the GATS piece | 8:45 |
+| 5 | Task length doubles about every 4 months (METR horizons, projection, responsibilities) | 5:15 |
+| 6 | Seven gaps that limit long-horizon agents (7 gaps, one cited number each) | 6:45 |
+| 7 | If the gaps closed + the GATS piece | 8:45 |
 | 8 | GATS: layers + stress test (sailor framing in notes) | 10:00 |
-| 9 | The honest limit: search doesn't scale | 11:15 |
-| 10 | LEDGER: pipeline, sensors/incidents/gates, and the record (why, replay, tamper) | 12:00 |
-| 11 | Evidence: graded problem solving + the reward hack | 14:30 |
+| 9 | The limit: keep the search space small | 11:15 |
+| 10 | LEDGER, a zero-trust experiment: pipeline, sensors/incidents/gates, and the record (why, replay, tamper) | 12:00 |
+| 11 | What zero trust bought: LEDGER vs most coding agents + crc before/after | 14:30 |
 | 12 | Where harnesses go + the four Monday-morning habits | 16:30 |
 | 13 | Confidence is not evidence + four predictions | 19:30 |
 | 14 | CLOSE: We can only prompt what we can foresee (control loop; prompt vs intent) | 21:00, done by 23:00 |
@@ -124,7 +123,8 @@ predictions, two laws, tips 1-4 with full prompts, verification ladder).
 - Visual: two stacks. Typical agent: LLM in the loop choosing every action.
   LEDGER: GATS picks every action; the LLM only lives inside skills (writing a
   patch), and its output is checked by sensors before it counts.
-- Say: "Neural proposes, symbolic disposes."
+- Say: "LEDGER is an experiment: give the model zero trust and measure what
+  that buys. It can't pick actions, set state, or report success."
 
 ### Slide 11: State is what sensors say, not what the model says
 - Repo as a proposition set: `tests.pass:unit`, `repo.clean`, `patch.applied`,
@@ -172,7 +172,7 @@ predictions, two laws, tips 1-4 with full prompts, verification ladder).
 
 ### Slide 18: The harness certified a lie (crc, run 2)
 - Journal said `success`. The author had edited the suite; the hidden suite
-  failed. The harness checked the bar, not whether the bar had moved.
+  failed. The harness checked that the tests passed, not whether they'd changed.
 - Say: "My own harness got reward-hacked. The fix wasn't a better model, it was
   making test integrity a sensor."
 - This slide is the credibility slide. Don't cut it.
@@ -212,7 +212,7 @@ predictions, two laws, tips 1-4 with full prompts, verification ladder).
 1. Agent evals report variance and replayability, not just success rate.
 2. Regulated industries require deterministic replay of agent actions.
 3. The LLM moves down the stack: skill author and last-resort predictor.
-4. Harnesses ship verifiers as the moat; models are interchangeable parts.
+4. Models become interchangeable; verification is where products differ.
 5. "I can't do this as specified" becomes a scored capability.
 
 ## 6. Close
@@ -305,4 +305,4 @@ PlanBench (48 vs 63 of 150 failed the broad claim; v2.1 78/90 vs 32/90).
 
 ## To decide
 - Install one-liner: shown on the close slide (reese, 10-24).
-- Addendum (divider + A1-A3) sits right after the close slide (reese, 10-22); main slide 4 is the honest limit.
+- Addendum (divider + A1-A3) sits right after the close slide (reese, 10-22); main slide 4 is the limit.

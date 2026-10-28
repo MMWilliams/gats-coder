@@ -142,9 +142,9 @@ table.t.tight td{padding:8px 16px}
           <h3 style="font-size:36px;margin-bottom:4px">Maureese Williams</h3>
           <p class="small" style="margin-bottom:14px">AI Software Engineer</p>
           <ul class="clean">
-            <li>Now: agents that turn tens of millions of data points into real-time intelligence</li>
-            <li>Before: 2 years of RAG and agents for vacation planning, at huge scale</li>
-            <li>Research: GATS (arXiv:2607.08894) and LEDGER, an audit-first agent</li>
+            <li>Now: agents that summarize tens of millions of records for business decisions</li>
+            <li>Before: 2 years of RAG and agents for vacation planning, in production</li>
+            <li>Research: GATS (arXiv:2607.08894) and LEDGER, a zero-trust coding agent</li>
           </ul>
         </div>
       </div>
@@ -154,7 +154,7 @@ table.t.tight td{padding:8px 16px}
       <ol class="big"><li><b>The gaps I hit at scale</b><span class="small" style="display:block;line-height:1.35;margin-top:4px">why long, risky work breaks agents, and why a better model alone won't fix it</span></li><li><b>Closing them: GATS and LEDGER</b><span class="small" style="display:block;line-height:1.35;margin-top:4px">planning you can replay, and a record you can audit</span></li><li><b>Where agents go</b><span class="small" style="display:block;line-height:1.35;margin-top:4px">in companies and on their own, plus habits for any coding agent on Monday</span></li></ol>
     </div>
   </div>
-  <aside class="notes">1:15-2:30. "At Disney we built RAG and agents for guests planning trips and asking about the resorts and parks: huge scale, always up, answering from data that changed constantly. At Google I build agents that sift tables and historical data, tens of millions of data points, and compress them into real-time intelligence for decisions at corporate scale. Those are high-risk, high-leverage calls: what the agent surfaces shapes outcomes and partnerships. Three lessons from both run through this talk. One: at scale, rare failures happen every day, and a confident answer from stale or partial data is still wrong. Two: when an agent's summary drives a decision, the first question is what it actually did, what it read and what it skipped, and a transcript doesn't answer it. Three: the model was rarely the bottleneck; the system around it was." Then the three parts. Keep it moving.</aside>
+  <aside class="notes">1:15-2:30. "At Disney we built RAG and agents for guests planning trips and asking about the resorts and parks: high traffic, always up, answering from data that changed constantly. At Google I build agents that read tables and historical data, tens of millions of records, and summarize them for business decisions. When a summary drives a decision, a wrong number is expensive. Three lessons from both run through this talk. One: at scale, rare failures happen every day, and a confident answer from stale or partial data is still wrong. Two: when an agent's summary drives a decision, the first question is what it actually did, what it read and what it skipped, and a transcript doesn't answer it. Three: the model was rarely the bottleneck; the system around it was." Then the three parts. Keep it moving.</aside>
 </section>
 
 <section data-t="2:30" class="slide" data-sec="How we got here">
@@ -233,7 +233,7 @@ table.t.tight td{padding:8px 16px}
     <line x1="1061.2" y1="413" x2="1061.2" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
     <text x="1061.2" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2026</text>
     </svg>
-  <p style="margin-top:14px;font-size:25px">Models absorb procedures: reasoning, voting, reflection, search. Today's harness trains tomorrow's model. <b>What can't be absorbed is the check:</b> a verifier inside the model is just another target.</p>
+  <p style="margin-top:14px;font-size:25px">Models absorb procedures: reasoning, voting, reflection, search. <b>They can't absorb the check:</b> a verifier the model is trained against becomes a target.</p>
   <aside class="notes">2:30-4:00. One idea: harnesses grow, then models absorb them. Read the lanes top to bottom. Harnesses kept adding jobs: context (prompts, retrieval, memory), reasoning (chain of thought, voting, Reflexion, tree search like LATS, which GATS beats later), tools (ReAct's loop, function calling, SWE-agent, MCP) and permission (AutoGPT asking y/n, through today's permission modes, sandboxes and hooks). Then reasoning models (o1, R1) trained the whole reasoning lane into the weights, which is why Claude Code, Codex and Google's Antigravity run a plain ReAct loop with no tree search (Antigravity writes a plan first, but it's still one path). What a model can't absorb is contact with the world: what's in context, what it can touch, what it's allowed to do, and what actually happened. The proof lane is the thinnest, and it matters more as models improve: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and Claude models mostly edited the test files, the same failure my own harness hit (15:00). The proof lane is this talk; next, why the absorbing keeps happening.</aside>
 </section>
 
@@ -258,7 +258,7 @@ table.t.tight td{padding:8px 16px}
 
 <section data-t="5:15" class="slide" data-sec="How we got here">
   <div class="eyebrow">Long horizons · METR: task length an agent finishes half the time</div>
-  <h2>Tasks get longer. Then they never end.</h2>
+  <h2>Task length doubles about every 4 months</h2>
   <svg class="hz" viewBox="0 0 1376 490" style="width:100%;font-family:var(--sans)">
     <rect x="130" y="6" width="1200" height="86" rx="12" fill="#fbeceb" stroke="#c72d26" stroke-dasharray="6 6" stroke-opacity=".55"/>
     <text x="150" y="34" font-size="19" font-weight="800" fill="#c72d26">∞  Responsibilities: no completion state</text>
@@ -348,34 +348,34 @@ table.t.tight td{padding:8px 16px}
 
 <section data-t="6:45" class="slide" data-sec="What's missing">
   <div class="eyebrow red">What's missing · why long horizons stall</div>
-  <h2>The next 10x is trust, not talent</h2>
+  <h2>Seven gaps that limit long-horizon agents</h2>
   <div class="gaps">
     <div class="gap"><div class="k">Reliability</div><div class="n">17 h &rarr; 3 h</div><p>Claude Mythos at 50% vs 80% success. The horizon you can trust is 5&ndash;10x shorter than the headline.</p><div class="c">METR Time Horizon 1.1, 2026</div></div>
-    <div class="gap"><div class="k">Trust</div><div class="n">76%</div><p>GPT-5 passed impossible tasks by gaming the tests. Stronger models cheat more.</p><div class="c">ImpossibleBench, ICLR 2026</div></div>
+    <div class="gap"><div class="k">Trust</div><div class="n">76%</div><p>GPT-5 passed impossible tasks by gaming the tests (one SWE-bench variant). Stronger models did it more often.</p><div class="c">ImpossibleBench, ICLR 2026</div></div>
     <div class="gap"><div class="k">Auditability</div><div class="n">Art. 12</div><p>High-risk AI must log events over its lifetime. A chat transcript isn't tamper-evident or replayable.</p><div class="c">EU AI Act Art. 12(1) &middot; high-risk duties from Dec 2027</div></div>
     <div class="gap"><div class="k">Reproducibility</div><div class="n">80 / 1,000</div><p>Same prompt, temperature 0, 1,000 runs: 80 different answers.</p><div class="c">Thinking Machines Lab, 2025</div></div>
     <div class="gap"><div class="k">Planning</div><div class="n">98% &rarr; 24%</div><p>o1-preview on Blocksworld, then on plans of 20&ndash;40 steps.</p><div class="c">Valmeekam et al., 2024</div></div>
-    <div class="gap"><div class="k">World models</div><div class="n">1 command</div><p>An agent wiped a production database in a code freeze, then said rollback was impossible. It wasn't.</p><div class="c">OECD AI incident 2025-07-19</div></div>
+    <div class="gap"><div class="k">World models</div><div class="n">1 command</div><p>An agent wiped a production database in a code freeze, then reported rollback was impossible. Rollback worked.</p><div class="c">OECD AI incident 2025-07-19</div></div>
     <div class="gap"><div class="k">Groundedness</div><div class="n g">25 / 30</div><p>Olympiad geometry solved when a symbolic engine checks the neural guesses.</p><div class="c">AlphaGeometry, Nature 2024</div></div>
-    <div class="gap sum"><p>None of these is fixed by a smarter step. All seven live in the system <b style="color:#fff">around</b> the model.</p></div>
+    <div class="gap sum"><p>A better model shrinks these but doesn't remove them. They're properties of the system <b style="color:#fff">around</b> the model.</p></div>
   </div>
-  <aside class="notes">6:45-8:45. Bridge from lesson one: at scale, rare is daily, and it gets worse when the work is long. So what stops that line from just continuing? Seven gaps, each with a number. Reliability: METR's horizon is at 50% success; at 80% it's five to ten times shorter (Mythos: 17 hours vs 3). And 99% per step is 37% at 100 steps. Trust: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and stronger models cheat more; METR caught o3 reward hacking in 30% of its RE-Bench runs. Auditability: the EU AI Act's Article 12 requires high-risk systems to log events over their lifetime (high-risk duties start December 2027); a chat transcript is neither tamper-evident nor replayable. Reproducibility: 1,000 runs at temperature 0 gave 80 different answers. Planning: o1-preview goes from 97.8% on Blocksworld to about 24% on 20-to-40-step plans. World models: an agent with no model of consequences deleted a production database during a code freeze, then said rollback was impossible. It wasn't. Groundedness is the one with a known fix: AlphaGeometry solved 25 of 30 olympiad geometry problems by letting a symbolic engine check the neural guesses. None of these gets fixed by a smarter step. They're properties of the system around the model, and that's where the next order of magnitude is.</aside>
+  <aside class="notes">6:45-8:45. Bridge from lesson one: at scale, rare is daily, and it gets worse when the work is long. So what stops that line from just continuing? Seven gaps, each with a number. Reliability: METR's horizon is at 50% success; at 80% it's five to ten times shorter (Mythos: 17 hours vs 3). And 99% per step is 37% at 100 steps. Trust: on ImpossibleBench, GPT-5 gamed the tests on 76% of one impossible SWE-bench variant, and stronger models did it more often; METR caught o3 reward hacking in 30% of its RE-Bench runs. Auditability: the EU AI Act's Article 12 requires high-risk systems to log events over their lifetime (high-risk duties start December 2027); a chat transcript is neither tamper-evident nor replayable. Reproducibility: 1,000 runs at temperature 0 gave 80 different answers. Planning: o1-preview goes from 97.8% on Blocksworld to about 24% on 20-to-40-step plans. World models: an agent with no model of consequences deleted a production database during a code freeze, then reported rollback was impossible. Rollback worked. Groundedness is the one with a known fix: AlphaGeometry solved 25 of 30 olympiad geometry problems by letting a symbolic engine check the neural guesses. A better model shrinks these but doesn't remove them. They're properties of the system around the model, and I think that's where the next order of magnitude is.</aside>
 </section>
 
-<section data-t="8:45" class="slide" data-sec="What it unlocks">
+<section data-t="8:45" class="slide" data-sec="If the gaps closed">
   <div class="eyebrow green">Hypothetical · and where GATS fits</div>
-  <h2>What closing the gaps would unlock</h2>
+  <h2>If the gaps closed</h2>
   <table class="t txt tight" style="font-size:19px">
     <tr><th>Gap</th><th>If it closed</th><th>The GATS piece</th></tr>
     <tr><td><b>Reliability</b></td><td>Horizons quoted at 99%, not 50%. Checks at every step take 100 steps from 37% to 90%.</td><td class="g">verify after every action; reroute</td></tr><tr><td><b>Trust</b></td><td>Delegate without re-reviewing every step</td><td class="g">sensors set state; false claims become incidents</td></tr><tr><td><b>Auditability</b></td><td>Agents allowed into regulated work</td><td class="g">hash-chained journal, a why-trace per step</td></tr><tr><td><b>Reproducibility</b></td><td>Regression tests for agent behavior</td><td class="g">deterministic plans, bit-exact replay</td></tr><tr><td><b>Planning</b></td><td>Long chains without drift; irreversible steps chosen on purpose</td><td class="g">UCB1 search over a persistent graph</td></tr><tr><td><b>World models</b></td><td>Predict before acting; cost falls with experience</td><td class="g">L1 contracts, L2 statistics, L3 LLM, cached</td></tr><tr><td><b>Groundedness</b></td><td>Claims checkable by construction</td><td class="g">symbolic contracts + sensors</td></tr>
   </table>
-  <p style="margin-top:16px;font-size:24px">Together: tasks become <b>responsibilities</b>, an agent you can leave running.</p>
-  <aside class="notes">8:45-10:00. Hypothetically, close each gap and here's what opens up. Reliability: with a check after every step that catches nine errors in ten, 100 steps go from 37% to 90% (0.999 to the 100th); that's arithmetic, not a benchmark. Trust: you stop re-reading every step. Auditability: regulated work opens. Reproducibility: you can regression-test an agent. Planning: long chains stop drifting, and irreversible steps get chosen on purpose. World models: the agent predicts before it acts, and gets cheaper with experience. Groundedness: claims become checkable. Together they turn tasks into responsibilities, and I'll come back to what that means at the very end. The right-hand column is GATS; next, how it works and where it stops.</aside>
+  <p style="margin-top:16px;font-size:24px">Together: an agent you can leave running on a <b>responsibility</b>, not just a task.</p>
+  <aside class="notes">8:45-10:00. Suppose each gap closed. Here's what changes. Reliability: with a check after every step that catches nine errors in ten, 100 steps go from 37% to 90% (0.999 to the 100th); that's arithmetic, not a benchmark. Trust: you stop re-reading every step. Auditability: regulated work opens. Reproducibility: you can regression-test an agent. Planning: long chains stop drifting, and irreversible steps get chosen on purpose. World models: the agent predicts before it acts, and gets cheaper with experience. Groundedness: claims become checkable. Together they turn tasks into responsibilities, and I'll come back to what that means at the very end. The right-hand column is GATS; next, how it works and where it stops.</aside>
 </section>
 
 <section data-t="10:00" class="slide" data-sec="GATS">
   <div class="eyebrow">GATS · arXiv:2607.08894 · with Dymitr Nowicki</div>
-  <h2>The model is the last resort, not the decider</h2>
+  <h2>The LLM is the last resort</h2>
   <div class="cols" style="grid-template-columns:1fr 1.1fr;gap:56px">
     <div>
       <p style="margin-bottom:22px"><b>UCB1 tree search</b> over a <b>persistent state-transition graph</b> picks every action. Each transition goes to the cheapest layer that can answer it:</p>
@@ -395,12 +395,12 @@ table.t.tight td{padding:8px 16px}
       <p style="margin-top:28px"><b class="g">0</b> LLM calls during planning · <b>0%</b> variance across seeds · <b class="g">100%</b> on live Llama 3.2, where LATS fell below 1%</p>
     </div>
   </div>
-  <aside class="notes">10:00-11:15. Frame it as two sailors. Today's agents are brilliant sailors without a chart: they read the sea and the islands and infer where they are from experience. That's dead reckoning, and its error grows with every mile, with nothing to reset it but their own judgment. GATS is the same sailor with a chart: it plans the passage before leaving, takes a fix at every waypoint (sensors), and corrects the chart when the sea disagrees (L2), so it never hits the same rock twice. The next voyage starts from the corrected chart: a repeat run needs no new model calls to plan. The journal is the ship's log, which is where the word comes from. If asked: a model can find shortest routes and still hold an incoherent map, and detours break it (Vafa et al., NeurIPS 2024; contested by a 2026 follow-up). "Symbolic where you can, learned where you've seen it, neural only for the genuinely new." Say "during planning" every time you say zero (50 one-time bootstrap calls). Lead into the next slide: "It has a hard limit, and that limit shaped everything after it."</aside>
+  <aside class="notes">10:00-11:15. Frame it as two sailors. Today's agents are skilled sailors without a chart: they read the sea and the islands and infer where they are from experience. That's dead reckoning, and its error grows with every mile, with nothing to reset it but their own judgment. GATS is the same sailor with a chart: it plans the passage before leaving, takes a fix at every waypoint (sensors), and corrects the chart when the sea disagrees (L2), so it never hits the same rock twice. The next voyage starts from the corrected chart: a repeat run needs no new model calls to plan. The journal is the ship's log. If asked: a model can find shortest routes and still hold an incoherent map, and detours break it (Vafa et al., NeurIPS 2024; contested by a 2026 follow-up). "Symbolic when the contract is known, statistics when it has seen the transition, the LLM only for new ones." Say "during planning" every time you say zero (50 one-time bootstrap calls). Lead into the next slide: "It has a hard limit, and that limit shaped everything after it."</aside>
 </section>
 
 <section data-t="11:15" class="slide" data-sec="GATS">
-  <div class="eyebrow amber">From paper to product · the honest limit</div>
-  <h2>Search doesn't scale. So search less.</h2>
+  <div class="eyebrow amber">From paper to product · the limit</div>
+  <h2>Keep the search space small</h2>
   <p class="lede" style="margin-bottom:34px">Over raw actions, tree search is impractical past about 20 actions or depth 10. So the planner searches a few coarse moves and pushes the open-ended work down into skills.</p>
   <div class="cols">
     <div class="card bl"><h3>Plan level: searched</h3><p class="mono" style="font-size:22px">RunSuite · AuthorPatch · ApplyPatch · Commit · CreatePR</p><p style="margin-top:14px">Few, coarse, contracts known. Every choice is scored and logged.</p></div>
@@ -410,18 +410,18 @@ table.t.tight td{padding:8px 16px}
 </section>
 
 <section data-t="12:00" class="slide" data-sec="LEDGER">
-  <div class="eyebrow">LEDGER · audit-first coding agent on GATS</div>
-  <h2>Neural proposes, symbolic disposes</h2>
+  <div class="eyebrow">LEDGER · an experiment on GATS</div>
+  <h2>Give the model zero trust</h2>
   <div style="display:grid;grid-template-columns:1fr auto 1fr auto 1fr auto 1fr;align-items:center;gap:12px;margin-bottom:16px">
     <div class="card bl" style="padding:12px 18px"><h3 style="font-size:21px;margin-bottom:4px">GATS plans</h3><p class="small" style="font-size:16px">every action, 0 model calls</p></div><div class="arrow">→</div>
-    <div class="card am" style="padding:12px 18px"><h3 style="font-size:21px;margin-bottom:4px">Skill</h3><p class="small" style="font-size:16px">the LLM writes a patch</p></div><div class="arrow">→</div>
+    <div class="card am" style="padding:12px 18px"><h3 style="font-size:21px;margin-bottom:4px">Skill</h3><p class="small" style="font-size:16px">the LLM writes a patch, nothing else</p></div><div class="arrow">→</div>
     <div class="card g" style="padding:12px 18px"><h3 style="font-size:21px;margin-bottom:4px">Sensors</h3><p class="small" style="font-size:16px">decide what is true</p></div><div class="arrow">→</div>
     <div class="card" style="padding:12px 18px"><h3 style="font-size:21px;margin-bottom:4px">Journal</h3><p class="small" style="font-size:16px">hash-chained, replayable</p></div>
   </div>
   <div class="cols3" style="gap:28px;margin-bottom:16px">
-    <div><h3 style="font-size:21px;margin-bottom:4px">State is what sensors say</h3><p style="font-size:18px;line-height:1.35"><span class="mono">tests.pass:unit</span>, <span class="mono">repo.clean</span>, <span class="mono">recoverable</span>. The model never sets them.</p></div>
-    <div><h3 style="font-size:21px;margin-bottom:4px">Lies become incidents</h3><p style="font-size:18px;line-height:1.35">Claimed effects minus observed effects is an <span class="mono">INCIDENT</span>; the planner routes around the falsified edge.</p></div>
-    <div><h3 style="font-size:21px;margin-bottom:4px">Gates, not hopes</h3><p style="font-size:18px;line-height:1.35">Risk classes gate execution. A denial is an observation. Escalation is named: <span class="mono">no_path</span>, <span class="mono">infeasible</span>, <span class="mono">budget_exhausted</span>.</p></div>
+    <div><h3 style="font-size:21px;margin-bottom:4px">It can't set state</h3><p style="font-size:18px;line-height:1.35">Sensors do: <span class="mono">tests.pass:unit</span>, <span class="mono">repo.clean</span>, <span class="mono">recoverable</span>.</p></div>
+    <div><h3 style="font-size:21px;margin-bottom:4px">It can't claim success</h3><p style="font-size:18px;line-height:1.35">Claimed effects minus observed effects is an <span class="mono">INCIDENT</span>; the planner routes around the falsified edge.</p></div>
+    <div><h3 style="font-size:21px;margin-bottom:4px">It can't pick or run actions</h3><p style="font-size:18px;line-height:1.35">GATS picks; risk classes gate execution. Escalation is named: <span class="mono">no_path</span>, <span class="mono">infeasible</span>, <span class="mono">budget_exhausted</span>.</p></div>
   </div>
   <div class="term" style="font-size:17px;padding:20px 28px;line-height:1.45"><span class="p">$</span> ledger why episode.jsonl 1
 step 1 @ 87b650f27839: chose AuthorPatch:a
@@ -433,35 +433,33 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
 <span class="ok">+ replay OK -- 4 steps reproduced bit-exact</span>
 <span class="p">$</span> ledger verify-chain tampered.jsonl      <span class="dim"># one field edited in the END entry</span>
 <span class="bad">x chain BROKEN: entry 17: content hash mismatch</span></div>
-  <aside class="notes">12:00-14:30. The typical agent lets the model decide, act, check and write the report. LEDGER splits those jobs. Plan-level actions are few and coarse (RunSuite, AuthorPatch, ApplyPatch, Commit, CreatePR), which keeps search tractable. Irreversible means an action that deletes the recoverable proposition. Runs on Claude, OpenAI or a local model with the same guarantees; keys are sealed in the OS vault and never reach the repo's subprocesses. Then the answer to the title, from the record: Lesson two, answered. Answer the title question: not the model's account, the record's. All three outputs are from the 2026-10-21 rehearsal. The why-trace is the recorded UCB table, not a post-hoc explanation. Tie broken lexicographically: no RNG anywhere.</aside>
+  <aside class="notes">12:00-14:30. LEDGER is an experiment: how reliable can an agent get if the model gets zero trust? Most agents let the model decide, act, check its own work and write the report. LEDGER takes all of that away except one job, writing the patch. The model can't pick actions: GATS picks from five coarse plan actions (RunSuite, AuthorPatch, ApplyPatch, Commit, CreatePR). It can't set state: sensors do. It can't report success: a claim that doesn't match the sensors becomes an incident. The cost is flexibility; it does far less than Claude Code. The question is how much reliability that buys, and the next slide is the evidence. Irreversible means an action that deletes the recoverable proposition. Runs on Claude, OpenAI or a local model with the same guarantees; keys are sealed in the OS vault and never reach the repo's subprocesses. This answers the title question: what the agent did is in the record, not in the model's account of it. All three outputs are from the 2026-10-21 rehearsal. The why-trace is the recorded UCB table, not an explanation written afterward. Ties break lexicographically: no RNG anywhere.</aside>
 </section>
 
 <section data-t="14:30" class="slide" data-sec="Evidence">
-  <div class="eyebrow">Evidence, and what broke</div>
-  <h2>Grade problem solving, not pass rate</h2>
-  <div class="cols" style="grid-template-columns:1.25fr 1fr;gap:48px">
+  <div class="eyebrow">Evidence · LEDGER vs most coding agents</div>
+  <h2>What zero trust bought</h2>
+  <div class="cols" style="grid-template-columns:1.6fr 1fr;gap:36px">
     <div>
-      <p class="small" style="margin-bottom:8px">Hard and impossible tasks, LEDGER alone on local qwen3.8:27b. Rubric: recognition, integrity, delivery, efficiency.</p>
-      <table class="t" style="font-size:23px">
-        <tr><th>Task</th><th>Outcome</th><th>Score</th></tr>
-        <tr><td>squeeze (pigeonhole)</td><td>proof, <span class="mono">infeasible</span></td><td class="g">8/10</td></tr>
-        <tr><td>crc (contradictory tests)</td><td><span class="mono">infeasible</span>, values right</td><td class="g">10/10*</td></tr>
-        <tr><td>primes, rk45</td><td>no patch, no gaming</td><td class="r">4/10</td></tr>
+      <table class="t txt tight" style="font-size:19px">
+        <tr><th></th><th>Most coding agents</th><th>LEDGER</th></tr>
+        <tr><td><b>Impossible task</b></td><td>games the tests: GPT-5 on 76% of one impossible SWE-bench variant</td><td class="g">says <span class="mono">infeasible</span> with the reason, 2 of 2</td></tr><tr><td><b>Test files</b></td><td>editable; Claude models mostly game by editing them</td><td class="g">edits refused; integrity 3/3 on all 4 hard tasks</td></tr><tr><td><b>Weak model (live Llama 3.2)</b></td><td>ReAct 36%, LATS under 1%</td><td class="g">GATS planner 100%</td></tr><tr><td><b>Model calls to pick actions</b></td><td>one per step</td><td class="g">0 during planning</td></tr><tr><td><b>Same run twice</b></td><td>80 distinct answers in 1,000 runs at temperature 0</td><td class="g">bit-exact replay, 0% variance</td></tr><tr><td><b>The record</b></td><td>a transcript the model wrote</td><td class="g">hash chain; one edited field is caught</td></tr>
       </table>
-      <p class="small" style="margin-top:12px">* Not first contact. Scores are operator judgment; pass counts and test-edit checks are mechanical.</p>
+      <p class="small" style="margin-top:10px;font-size:15px">Not a head-to-head: left column is published results on other tasks (ImpossibleBench, ICLR 2026; Thinking Machines Lab, 2025). LEDGER: hardbench on local qwen3.8:27b; GATS addendum suite. Cost: 5 plan actions; both from-scratch tasks failed locally (4/10).</p>
     </div>
-    <div class="card r">
-      <h3 class="r">My harness got reward-hacked</h3>
-      <p>The journal said <b class="g">success</b>. The author had edited the tests; the hidden suite failed. It checked the bar, not whether the bar moved.</p>
-      <p style="margin-top:16px"><b>Fix:</b> test integrity became a sensor. Not a better model.</p>
+    <div class="card r" style="padding:22px 26px">
+      <h3 class="r" style="font-size:24px">Same task, before and after the constraint</h3>
+      <p style="font-size:19px;line-height:1.4"><b>Before:</b> the Claude author rewrote the test file in 4 of 4 attempts. The journal said <b class="g">success</b>; the hidden suite failed.</p>
+      <p style="font-size:19px;line-height:1.4;margin-top:12px"><b>After:</b> test edits refused, and the author can answer <span class="mono">INFEASIBLE</span>. The local 27B model escalated with the right reason, tests untouched: 10/10.</p>
+      <p style="font-size:19px;line-height:1.4;margin-top:12px"><b>Fix:</b> a sensor, not a better model.</p>
     </div>
   </div>
-  <aside class="notes">14:30-16:30. "The most important skill for a risk-averse agent is saying 'this can't be done as specified' instead of gaming the tests." Where the local model fails, it fails honestly: integrity 3 of 3 on every task. Then the credibility beat: my own harness certified a lie. Bench lessons if asked (backup): calibrate oracles against two implementations; write held-out tasks after the harness is frozen.</aside>
+  <aside class="notes">14:30-16:30. What did zero trust buy? Left is what published benchmarks show for typical agents, right is LEDGER. It's not a head-to-head: different tasks, and say so. The gains: on impossible tasks it says 'can't be done' with the reason instead of gaming the tests, and integrity is 3 of 3 on every hard task even on a local 27B model. The planner holds 100% on a weak live model where LATS falls under 1%. Zero model calls to plan. Same run, same result, bit-exact. A record that catches one edited field. The card on the right is the same task before and after the constraint: before, the Claude author rewrote the test file in 4 of 4 attempts and my journal certified success while the hidden suite failed. The fix was a sensor, not a better model: test edits refused, plus a sanctioned way to answer INFEASIBLE. After it, the local model escalated with the right reason and left the tests alone. The cost: it's narrow, five plan actions, and both from-scratch tasks failed on the local model because the thinking model returned empty replies (4/10). "The most important skill for a risk-averse agent is saying 'this can't be done as specified' instead of gaming the tests." If asked: ImpossibleBench is arXiv:2510.20270 (ICLR 2026); 80 of 1,000 is Thinking Machines Lab, 2025; the Llama 3.2 numbers are the addendum suite. Bench lessons (backup): calibrate oracles against two implementations; write held-out tasks after the harness is frozen.</aside>
 </section>
 
 <section data-t="16:30" class="slide" data-sec="Future">
   <div class="eyebrow">Where harnesses go · and what to do Monday</div>
-  <h2>Models are parts. The harness is the product.</h2>
+  <h2>The model is a part you swap</h2>
   <div class="cols3" style="gap:20px;margin-bottom:24px">
     <div class="card" style="padding:18px 22px"><h3 style="font-size:22px;margin-bottom:6px">Swap the model</h3><p style="font-size:18px;line-height:1.4">Claude for a local 27B model: state, verification and replay don't move. Guarantees live in the harness.</p></div>
     <div class="card bl" style="padding:18px 22px"><h3 style="font-size:22px;margin-bottom:6px">It's the RL environment</h3><p style="font-size:18px;line-height:1.4">Sensors are the verifier, worktrees the rollouts, the journal the trajectories. Per-action postconditions solve credit assignment.</p></div>
@@ -474,16 +472,16 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
     <div class="card bl" style="padding:16px 18px"><h3 style="font-size:19px;line-height:1.25;margin-bottom:8px">3 · Fresh-context review before "done"</h3><p style="font-size:16px;line-height:1.4"><span class="mono">/code-review</span>, a second session, or Codex <span class="mono">/review</span>. Correctness gaps only.</p></div>
     <div class="card" style="padding:16px 18px"><h3 style="font-size:19px;line-height:1.25;margin-bottom:8px">4 · Make repeated corrections durable</h3><p style="font-size:16px;line-height:1.4">Judgment rule → <span class="mono">AGENTS.md</span> · workflow → skill · mechanical rule → hook.</p></div>
   </div>
-  <aside class="notes">16:30-19:30. Lesson three, looking forward: "In a company, the model is a part you'll swap every few months. What you keep is the harness: the data, the checks, the record. That's what makes an agent's output safe to decide on, and what lets it run on its own." Three surfaces to train: the skill policy (RL with verifiable rewards), planner value nets (PUCT replacing UCB1), L2 as a learned dynamics model. Honest caveat if asked: one accepted self-improvement commit was partly gamed (a wrong alias satisfied the lint check), and that loophole is the lesson. Safe only while the verifier sits outside the thing being improved. Then Monday morning: "You don't need LEDGER to use the ideas." Law 1: context degrades as it fills; 40 files in, the agent ignores the rule from turn 2. Law 2: without a pass/fail signal the agent stops when the work looks done, and you become the verifier. Example prompt for tip 1: write a failing test that fires 101 concurrent requests and expects exactly 100 x 200 and 1 x 429, fix the race, run pnpm test rateLimiter until green, end with the output. Full prompts and the verification ladder are in backup.</aside>
+  <aside class="notes">16:30-19:30. Lesson three, looking forward: "In a company, the model is a part you'll swap every few months. What you keep is the harness: the data, the checks, the record. That's what makes an agent's output safe to decide on, and what lets it run on its own." Three surfaces to train: the skill policy (RL with verifiable rewards), planner value nets (PUCT replacing UCB1), L2 as a learned dynamics model. Caveat if asked: one accepted self-improvement commit was partly gamed (a wrong alias satisfied the lint check), and that loophole is the lesson. Safe only while the verifier sits outside the thing being improved. Then Monday morning: "You don't need LEDGER to use the ideas." Law 1: context degrades as it fills; 40 files in, the agent ignores the rule from turn 2. Law 2: without a pass/fail signal the agent stops when the work looks done, and you become the verifier. Example prompt for tip 1: write a failing test that fires 101 concurrent requests and expects exactly 100 x 200 and 1 x 429, fix the race, run pnpm test rateLimiter until green, end with the output. Full prompts and the verification ladder are in backup.</aside>
 </section>
 
 <section data-t="19:30" class="slide center" data-sec="Predictions">
   <h1>Confidence is not evidence.</h1>
-  <p class="lede" style="margin:16px 0 22px">Build the harness that asks for evidence. Where this goes:</p>
+  <p class="lede" style="margin:16px 0 22px">Check claims outside the model. Where this goes:</p>
   <ol class="big" style="max-width:1300px">
     <li style="font-size:25px;padding:6px 0 6px 56px">Evals report variance and replayability, not just success rate.</li>
     <li style="font-size:25px;padding:6px 0 6px 56px">Regulated work requires deterministic replay of agent actions.</li>
-    <li style="font-size:25px;padding:6px 0 6px 56px">The LLM moves down the stack; verifiers become the moat.</li>
+    <li style="font-size:25px;padding:6px 0 6px 56px">The LLM moves down the stack; verification is where products differ.</li>
     <li style="font-size:25px;padding:6px 0 6px 56px">"I can't do this as specified" becomes a scored capability.</li>
   </ol>
   <aside class="notes">19:30-21:00. Read the line, pause, one sentence per prediction, then the closing slide. Harnesses are already RL environments (sensors = verifier, journal = trajectories) if someone asks where this goes next: backup.</aside>
@@ -522,7 +520,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
     </table>
   </div>
   <div class="card bl" style="margin-top:18px;padding:16px 28px"><p style="font-size:26px"><b>Prompts scale with our foresight.</b> Plans scale with the agent&rsquo;s, and the record lets us check it.</p></div>
-  <aside class="notes">21:00-23:00. Last slide: the thought to leave them with. We can only prompt what we can foresee. Try writing thirty scenarios into a prompt: you'll cover the five you thought of, and the agent fills the rest with guesses, then grades itself. As tasks become responsibilities there is no final outcome to specify, only states to keep. So we stop giving steps and finish lines and give intent: the purpose, the invariants to keep true, limits on authority, a budget, and when to come back. Militaries made the same move long ago with commander's intent. The loop on the left is what the agent runs, and it never ends: sense what's true, compare it to the defined state, simulate futures and pick a path, act, with irreversible steps gated and everything journaled. It comes back only on exceptions: an invariant at risk, a limit hit, or 'this can't be done as specified'. Working with it looks like managing: you review the plan and the exceptions, not every step, and you change the intent, not the instructions. The bottleneck moves from our foresight to the quality of its plans and checks. That's why planning and verification are the next unlock. Round trips are already the hidden cost: in METR's 2025 study, experienced developers were 19% slower with AI tools while believing they were 20% faster. The shift I'd leave you with: stop writing better prompts; start writing intent an agent can check itself against, and build the record that lets you check it too. Thank you, then the links slide for Q&amp;A.</aside>
+  <aside class="notes">21:00-23:00. Last slide: the thought to leave them with. We can only prompt what we can foresee. Try writing thirty scenarios into a prompt: you'll cover the five you thought of, and the agent fills the rest with guesses, then grades itself. As tasks become responsibilities there is no final outcome to specify, only states to keep. So we stop giving steps and finish lines and give intent: the purpose, the invariants to keep true, limits on authority, a budget, and when to come back. Militaries made the same move long ago with commander's intent. The loop on the left is what the agent runs, and it never ends: sense what's true, compare it to the defined state, simulate futures and pick a path, act, with irreversible steps gated and everything journaled. It comes back only on exceptions: an invariant at risk, a limit hit, or 'this can't be done as specified'. Working with it looks like managing: you review the plan and the exceptions, not every step, and you change the intent, not the instructions. The bottleneck moves from our foresight to the quality of its plans and checks. That's why planning and verification come next. Round trips are already the hidden cost: in METR's 2025 study, experienced developers were 19% slower with AI tools while believing they were 20% faster. The shift I'd leave you with: stop writing better prompts; start writing intent an agent can check itself against, and build the record that lets you check it too. Thank you, then the links slide for Q&amp;A.</aside>
 </section>
 
 <section data-t="23:00" class="slide center" data-sec="Links">
@@ -555,7 +553,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
 
 <section class="slide" data-backup="1" data-sec="Addendum">
   <div class="eyebrow green">A2 · What's been refined</div>
-  <h2>Tighter methods, stronger evidence</h2>
+  <h2>What changed since the preprint</h2>
   <ul class="clean" style="margin-top:10px">
     <li><b>Reproducible by anyone:</b> every number now comes from a seeded, deterministic pipeline in the repo.</li>
     <li><b>Live-model baselines:</b> v1's baselines ran on a simulated backend; on Llama 3.2, GATS holds 100% while LATS falls below 1%.</li>
@@ -644,9 +642,9 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
 
 <section class="slide" data-backup="1" data-sec="How we got here">
   <div class="eyebrow">Backup · who uses which harness idea</div>
-  <h2>Each harness unlocked something. Frontier agents kept the loop.</h2>
+  <h2>Each harness added something. Frontier agents kept the loop.</h2>
   <table class="t txt" style="font-size:21px;margin-top:6px">
-    <tr><th>Harness</th><th>What it unlocked</th><th>In Claude Code, Codex, Antigravity?</th></tr>
+    <tr><th>Harness</th><th>What it added</th><th>In Claude Code, Codex, Antigravity?</th></tr>
     <tr><td><b>ReAct</b> 2022</td><td>Reason, act, observe: tool use grounded in feedback</td><td class="g">Yes. It's the core loop.</td></tr>
     <tr><td><b>Reflexion</b> 2023</td><td>Learn from a failed try by writing the lesson down</td><td>Partly: memory and rules files (CLAUDE.md, AGENTS.md)</td></tr>
     <tr><td><b>Tree of Thoughts, LATS</b> 2023</td><td>Search: look ahead, score, backtrack</td><td class="r">No. One path per run; lookahead moved into training</td></tr>
@@ -674,7 +672,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
 
 <section class="slide" data-backup="1" data-sec="GATS">
   <div class="eyebrow">GATS · arXiv:2607.08894 · with Dymitr Nowicki</div>
-  <h2>The model is the last resort, not the decider</h2>
+  <h2>The LLM is the last resort</h2>
   <div class="cols" style="grid-template-columns:1fr 1.1fr">
     <div>
       <p><b>UCB1 tree search</b> over a <b>persistent state-transition graph</b> picks every action. Nothing in that loop calls a model.</p>
@@ -687,7 +685,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
       <p class="small" style="margin-top:8px">Projected open-domain split: 60% / 30% / 10%.</p>
     </div>
   </div>
-  <aside class="notes">"Symbolic where you can, learned where you've seen it, neural only for the genuinely new. Episode one pays; episode two is free."</aside>
+  <aside class="notes">"Symbolic when the contract is known, statistics when it has seen the transition, the LLM only for new ones. The first episode makes LLM calls; a repeat makes none."</aside>
 </section>
 
 <section class="slide" data-backup="1" data-sec="GATS">
@@ -704,11 +702,11 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
     <div><div class="big-num g" style="font-size:72px">100%</div><p class="small">GATS on live Llama 3.2: plan quality doesn't depend on the model</p></div>
   </div>
   <div class="foot">Preprint Table 1 (100 / 92 / 64) does not reproduce. See the addendum at the end and maureesewilliams.io/writing/gats-preprint-addendum.</div>
-  <aside class="notes">Say "during planning" every time you say zero. Table 6 reproduces exactly. Budget ablation is Table 2 of the preprint. If there's time, go straight to the addendum slides here; the honesty beat fits the talk's thesis.</aside>
+  <aside class="notes">Say "during planning" every time you say zero. Table 6 reproduces exactly. Budget ablation is Table 2 of the preprint. If there's time, go straight to the addendum slides here; the corrections fit the talk's thesis.</aside>
 </section>
 
 <section class="slide" data-backup="1" data-sec="GATS">
-  <div class="eyebrow amber">The honest limit</div>
+  <div class="eyebrow amber">The limit</div>
   <h2>Search over raw actions doesn't scale</h2>
   <p class="lede">Tested at |A| = 15, depth 20. Impractical past about 20 actions or depth 10.</p>
   <p class="lede" style="margin-top:30px">So LEDGER searches over a <b>few coarse plan-level actions</b> and pushes the open-ended part down into skills.</p>
@@ -716,8 +714,8 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
 </section>
 
 <section class="slide" data-backup="1" data-sec="LEDGER">
-  <div class="eyebrow">The inversion</div>
-  <h2>Neural proposes, symbolic disposes</h2>
+  <div class="eyebrow">Zero trust</div>
+  <h2>The model proposes, sensors decide</h2>
   <div class="cols">
     <div class="card r">
       <h3 class="r">Typical agent</h3>
@@ -738,7 +736,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
   <h2>State is what sensors say</h2>
   <p class="lede" style="margin-bottom:30px">The repo is a set of propositions. Deterministic sensors produce them, never the model.</p>
   <div><span class="chip g">tests.pass:unit</span><span class="chip g">repo.clean</span><span class="chip g">patch.applied:a</span><span class="chip g">recoverable</span><span class="chip">budget.llm:ok</span></div>
-  <div class="card r" style="margin-top:36px"><p><b class="r">Lie detection:</b> claimed effects minus observed effects = an <span class="mono">INCIDENT</span> in the journal, and the planner routes around the falsified edge.</p></div>
+  <div class="card r" style="margin-top:36px"><p><b class="r">False-claim detection:</b> claimed effects minus observed effects = an <span class="mono">INCIDENT</span> in the journal, and the planner routes around the falsified edge.</p></div>
   <aside class="notes">Verify after execute. A falsified edge resets its statistics; L2 learns the action is stochastic.</aside>
 </section>
 
@@ -790,7 +788,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
 
 <section class="slide" data-backup="1" data-sec="Evidence">
   <div class="eyebrow">LEDGER alone, local qwen3.8:27b</div>
-  <h2>A local model, honest about its limits</h2>
+  <h2>A local model that reports its limits</h2>
   <table class="t">
     <tr><th>Task</th><th>Outcome</th><th>Score</th></tr>
     <tr><td>squeeze (pigeonhole)</td><td>correct proof, escalated <span class="mono">infeasible</span>, tests untouched</td><td class="g">8/10</td></tr>
@@ -799,19 +797,19 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
     <tr><td>rk45 (from scratch)</td><td>no patch: same failure</td><td class="r">4/10</td></tr>
   </table>
   <p class="small" style="margin-top:22px">* Not first contact: the test-edit guard and INFEASIBLE verdict were built after earlier crc runs. Rubric scores are operator judgment; pass counts and test-edit checks are mechanical.</p>
-  <aside class="notes">Where it fails, it fails without gaming: integrity 3 on all four. The primes/rk45 failure is a thinking model spending its whole budget reasoning and returning empty content; LEDGER now reports that honestly (a fix LEDGER wrote itself, see slide 24).</aside>
+  <aside class="notes">Where it fails, it fails without gaming: integrity 3 on all four. The primes/rk45 failure is a thinking model spending its whole budget reasoning and returning empty content; LEDGER now reports that as an error (a fix LEDGER wrote itself, see slide 24).</aside>
 </section>
 
 <section class="slide" data-backup="1" data-sec="Evidence">
   <div class="eyebrow red">My own harness got reward-hacked</div>
   <h2>The journal said <span class="g">success</span>.<br>The hidden suite said otherwise.</h2>
-  <p class="lede">crc, run 2: the author edited the test suite, the edited suite passed, and the harness certified the result. It checked the bar, not whether the bar had moved.</p>
-  <div class="card g" style="margin-top:34px"><p><b>Fix:</b> test integrity became a sensor. Not a better model.</p></div>
+  <p class="lede">crc, run 2: the author edited the test suite, the edited suite passed, and the harness certified the result. It checked that the tests passed, not whether they'd changed.</p>
+  <div class="card g" style="margin-top:34px"><p><b>Fix:</b> a test-integrity sensor, not a better model.</p></div>
   <aside class="notes">Credibility slide. Don't cut it.</aside>
 </section>
 
 <section class="slide" data-backup="1" data-sec="Evidence">
-  <div class="eyebrow amber">The bench almost lied too</div>
+  <div class="eyebrow amber">The benchmark had bugs too</div>
   <h2>Audit the evaluator</h2>
   <ul class="clean">
     <li>Reruns after a harness fix score a harness tuned on that failure.</li>
@@ -823,7 +821,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
 
 <section class="slide" data-backup="1" data-sec="Future">
   <div class="eyebrow">Thesis</div>
-  <h2>Models are parts.<br>The harness is the product.</h2>
+  <h2>The model is a part you swap.<br>The guarantees stay in the harness.</h2>
   <p class="lede">Swap Claude for a local 27B model and the guarantees don't move: state, verification, replay, the last mile.</p>
 </section>
 
@@ -844,7 +842,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
     <div><h3>"I can't do this as specified"</h3><p>Benchmarks that only count passes reward test gaming. Ship impossible tasks in every suite; grade recognition and integrity.</p></div>
     <div><h3>Self-improvement, gated</h3><p><span class="mono">ledger improve</span>: LEDGER files its own bugs as failing tests and fixes them on a branch, local model only. Its gate caught 2 bad changes in 5; a human merges.</p><p class="small" style="margin-top:12px">Safe only when the verifier sits outside the thing being improved.</p></div>
   </div>
-  <aside class="notes">The thinking-reply fix (a 10-line change raising an honest error instead of returning empty text) was authored by qwen3.8:27b alone on its second of four tries. One accepted commit in an earlier run was partly gamed: a wrong alias satisfied the lint check. That loophole is the lesson.</aside>
+  <aside class="notes">The thinking-reply fix (a 10-line change raising an explicit error instead of returning empty text) was authored by qwen3.8:27b alone on its second of four tries. One accepted commit in an earlier run was partly gamed: a wrong alias satisfied the lint check. That loophole is the lesson.</aside>
 </section>
 
 <section class="slide" data-backup="1" data-sec="Future">
@@ -853,7 +851,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
     <li>Agent evals report variance and replayability, not just success rate.</li>
     <li>Regulated industries require deterministic replay of agent actions.</li>
     <li>The LLM moves down the stack: skill author and last-resort predictor.</li>
-    <li>Verifiers become the moat; models become interchangeable.</li>
+    <li>Models become interchangeable; verification is where products differ.</li>
     <li>"I can't do this as specified" becomes a scored capability.</li>
   </ol>
 </section>

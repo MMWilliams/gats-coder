@@ -27,7 +27,12 @@ Repo: `C:\Users\reese\gats-coder` · Site: `C:\Users\reese\kyberos`
       Nexus release 106), close slide switched; release.ps1 mirrors the wheel
       + latest.json to the blog. Verified 10-26: Windows + WSL installs, tamper
       refused on both. After the next release.ps1: deploy BOTH sites.
-- [ ] LLMday 10-29: rehearse index.html (14 slides, targets end 23:00) to 25 min (lineage slide 4 added
+- [ ] Harness laws essay/paper (brainstorm 10-28): absorption, residue, verification
+      multiplier (horizon x 1/(1-r) for independent checks), amortization; OS/x87 analogy.
+- [ ] Responsibilities research (brainstorm 10-28): goals that hold over time (LTL, linear
+      temporal logic: "always X", "X within 30 min"), scheduled sensing, budgets per time
+      window, commitment tracking, versioned charters, precedents from escalations.
+- [ ] LLMday 10-29: rehearse index.html (15 slides incl. links, targets end 23:00; Antigravity added 10-26) to 25 min (lineage slide 4 added
       10-26, 6e0bfaf); resend backup PDF to Mark if the new slides should be in it.
 - [ ] Side effect 10-19: the first install.ps1 test hit a lookup bug and ran
       `winget install Python.Python.3.12` (user scope). Uninstall if unwanted:
