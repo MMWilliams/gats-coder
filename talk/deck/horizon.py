@@ -78,6 +78,7 @@ month_fast, month_slow = cross(10020, 365.25 / ci_lo), cross(10020, 365.25 / ci_
 
 o = [f'<svg class="hz" viewBox="0 0 {W} {H}" style="width:100%;font-family:var(--sans)">']
 # responsibilities band: a change of kind, drawn above the axis rather than on it
+o.append('<g class="frag">')
 o.append(f'<rect x="{X0}" y="6" width="{X1 - X0}" height="86" rx="12" fill="#fbeceb" stroke="{RED}" '
          f'stroke-dasharray="6 6" stroke-opacity=".55"/>')
 o.append(f'<text x="{X0 + 20}" y="34" font-size="19" font-weight="800" fill="{RED}">∞  Responsibilities: no completion state</text>')
@@ -86,6 +87,7 @@ o.append(f'<text x="{X0 + 20}" y="60" font-size="16" fill="{INK2}">keep prod hea
 o.append(f'<text x="{X0 + 20}" y="82" font-size="15" fill="{INK3}">Not a cron job or a pipeline (triggered, stateless): '
          f'one agent that owns its state, runs continuously, and is judged on invariants held, not goals reached.</text>')
 o.append(f'<text x="{X0 - 12}" y="54" text-anchor="end" font-size="15" font-weight="700" fill="{RED}">no end</text>')
+o.append('</g>')
 for m, lab in GRID:
     o.append(f'<line x1="{X0}" y1="{ym(m)}" x2="{X1}" y2="{ym(m)}" stroke="{LINE}" stroke-width="1"/>')
     o.append(f'<text x="{X0 - 12}" y="{ym(m) + 5}" text-anchor="end" font-size="15" fill="{INK3}">{lab}</text>')

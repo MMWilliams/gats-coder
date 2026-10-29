@@ -25,7 +25,7 @@ def main():
         page.goto(url)
         count = page.locator(".slide").count()
         for i in range(count):
-            page.goto(f"{url}#{i + 1}")
+            page.goto(f"{url}?all#{i + 1}")  # every step shown
             page.reload()
             page.wait_for_timeout(1400)  # let bars and fades settle
             page.screenshot(path=str(OUT / f"slide-{i + 1:02d}.png"))
