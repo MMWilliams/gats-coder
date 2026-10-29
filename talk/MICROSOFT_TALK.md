@@ -34,9 +34,9 @@ The deck shows each main slide's target start time and a running clock
 | # | Slide | Starts at |
 | --- | --- | --- |
 | 1 | Title + claim, real run output on screen | 0:00 |
-| 2 | About me + three lessons + agenda | 0:45 |
-| 3 | Harnesses grow, then models absorb them (swimlane timeline 2020-now) | 1:45 |
-| 4 | Today's harness is tomorrow's model (absorbed, next to go, the check stays) | 3:45 |
+| 2 | About me + three lessons + agenda | 0:35 |
+| 3 | Harnesses grow, then models absorb them (opens with hands: before reasoning, CoT, retrieval; harness + scale + RL coupling) | 1:35 |
+| 4 | Today's harness is tomorrow's model (absorbed, next to go, the check stays) | 3:50 |
 | 5 | Task length doubles about every 4 months (METR horizons, projection, responsibilities) | 5:30 |
 | 6 | Seven gaps that limit long-horizon agents (7 gaps, one cited number each) | 7:45 |
 | 7 | If the gaps closed + the GATS piece | 10:00 |
