@@ -11,7 +11,7 @@ Concepts: production RAG (retrieval-augmented generation: fetch documents, put t
 Message: at scale, rare failures are daily; the first question about any agent output is what it actually did; the model was rarely the bottleneck.
 
 ## 3. Who remembers AI before...
-Concepts: three fixes, each from outside the model. Retrieval puts the source in the context (answers you can check). Chain of thought asks for intermediate steps (work you can follow). Reasoning models came from RL (reinforcement learning) against a checker: right answer, tests pass (work you can hand off).
+Concepts: three fixes, each from outside the model. Retrieval puts the source in the context (answers you can check). Chain of thought asks for intermediate steps (work you can follow). Reasoning models came from RL (reinforcement learning) against a checker: right answer, tests pass (work you can hand off). Last question: who used LLMs before ChatGPT (BERT, GPT-2, T5, GPT-3), all built on the transformer from Google's 2017 paper Attention Is All You Need (Vaswani et al.).
 Message: each jump in usability and trust started outside the model.
 
 ## 4. Harnesses grow, then models absorb them
@@ -88,9 +88,9 @@ Message: "tests pass" from an agent is a claim; the test output is evidence.
 Concepts: a prompt encodes steps and a finish line, so it covers only the scenarios its author simulated. Intent encodes purpose, conditions to keep true, limits, budget and escalation rules. The control loop runs forever: sense (what's true), compare (vs target state), plan (simulate, pick), act (irreversible steps gated), everything journaled, exceptions only back to the human. METR's 2025 RCT (randomized controlled trial): 16 experienced developers were 19% slower with AI tools while believing they were 20% faster, so round trips are a hidden cost.
 Message: prompts scale with our foresight; plans scale with the agent's. Write intent the agent can check itself against, and keep the record that lets you check it.
 
-## 16. Clear the context. Keep the state.
-Concepts: audience questions (lost the plan mid-session? context rot or bloat? what's a handoff file?). Context rot: answer quality drops as the window fills. Context bloat: stale tool output and dead ends fill it; bloat causes rot. A handoff file (HANDOFF.md) is written after every task: goal, files changed, decisions and why, dead ends, exact next step, test command and result. Then the context is cleared and the next session resumes from the file, so state survives crashes and days and dead ends aren't retried.
-Message: the context window is working memory; the handoff file is the record. It's LEDGER's journal at human scale.
+## 16. Quick show of hands
+Concepts: fun audience questions, one per press: has your agent forgotten the plan halfway through? Context rot (answers get worse as the context window fills) or context bloat (old output piles up)? Usually both. What's a handoff file? A short note after every task (what we're doing, what changed, what failed, what's next) so a fresh session can pick up.
+Message: write it down, clear the context, start fresh.
 
 ## 17. Thank you
 Concepts: LEDGER installs (MIT, free) from maureesewilliams.io/ledger; QR codes to the paper, the repo and the blog.
