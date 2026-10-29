@@ -37,18 +37,19 @@ The deck shows each main slide's target start time and a running clock
 | 2 | About me + three lessons + agenda | 0:35 |
 | 3 | Who remembers AI before... (show of hands: reasoning, CoT, retrieval; fixes from outside the model unlocked usability and trust) | 1:35 |
 | 4 | Harnesses grow, then models absorb them (swimlane timeline 2020-now; harness + scale + RL coupling) | 2:55 |
-| 5 | Today's harness is tomorrow's model (absorbed, next to go, the check stays) | 4:40 |
-| 6 | Task length doubles about every 4 months (METR horizons, projection, responsibilities) | 6:20 |
-| 7 | Seven gaps that limit long-horizon agents (7 gaps, one cited number each) | 8:20 |
-| 8 | If the gaps closed + the GATS piece | 10:20 |
-| 9 | GATS: layers + stress test (sailor framing in notes) | 11:45 |
-| 10 | The limit: keep the search space small | 13:40 |
-| 11 | LEDGER, a zero-trust experiment: pipeline, sensors/incidents/gates, and the record (why, replay, tamper) | 14:30 |
-| 12 | What zero trust bought: LEDGER vs most coding agents + crc before/after | 16:25 |
-| 13 | Where harnesses go + the four Monday-morning habits | 18:20 |
-| 14 | Confidence is not evidence + four predictions | 20:30 |
-| 15 | CLOSE: We can only prompt what we can foresee (control loop; prompt vs intent) | 21:30, done by 23:40 |
-| 16 | Thank you + QR codes + install lines (up through Q&A) | 23:40 |
+| 5 | Today's harness is tomorrow's model (absorbed, next to go, the check stays) | 4:25 |
+| 6 | Task length doubles about every 4 months (METR horizons, projection, responsibilities) | 6:05 |
+| 7 | Seven gaps that limit long-horizon agents (7 gaps, one cited number each) | 8:05 |
+| 8 | If the gaps closed + the GATS piece | 10:05 |
+| 9 | GATS: layers + stress test (sailor framing in notes) | 11:30 |
+| 10 | The limit: keep the search space small | 13:25 |
+| 11 | LEDGER, a zero-trust experiment: pipeline, sensors/incidents/gates, and the record (why, replay, tamper) | 14:15 |
+| 12 | What zero trust bought: LEDGER vs most coding agents + crc before/after | 16:10 |
+| 13 | Where harnesses go + the four Monday-morning habits | 18:05 |
+| 14 | Confidence is not evidence + four predictions | 20:15 |
+| 15 | CLOSE: We can only prompt what we can foresee (control loop; prompt vs intent) | 21:15, done by 23:15 |
+| 16 | Clear the context. Keep the state. (hands: lost the plan? rot or bloat? what's a handoff file? HANDOFF.md) | 23:15, done by 24:25 |
+| 17 | Thank you + QR codes + install lines (up through Q&A) | 24:25 |
 
 The old problem slide (0.99^n, confidence is not evidence) is now the first
 backup slide; its numbers live on slides 6 and 7.

@@ -1,6 +1,6 @@
 # Technical TL;DR per slide
 
-Deck: talk/deck/index.html (16 main slides). Concepts first, then the one message the slide carries.
+Deck: talk/deck/index.html (17 main slides). Concepts first, then the one message the slide carries.
 
 ## 1. What did your agent actually do?
 Concepts: the terminal is a real LEDGER run. A local 27B model fixed a failing test in 4 steps with 0 LLM planning calls (the planner, not the model, picked each step). `verify-chain` checks a hash chain (each log entry stores the hash of the one before, so any edit breaks every later link).
@@ -88,6 +88,10 @@ Message: "tests pass" from an agent is a claim; the test output is evidence.
 Concepts: a prompt encodes steps and a finish line, so it covers only the scenarios its author simulated. Intent encodes purpose, conditions to keep true, limits, budget and escalation rules. The control loop runs forever: sense (what's true), compare (vs target state), plan (simulate, pick), act (irreversible steps gated), everything journaled, exceptions only back to the human. METR's 2025 RCT (randomized controlled trial): 16 experienced developers were 19% slower with AI tools while believing they were 20% faster, so round trips are a hidden cost.
 Message: prompts scale with our foresight; plans scale with the agent's. Write intent the agent can check itself against, and keep the record that lets you check it.
 
-## 16. Thank you
+## 16. Clear the context. Keep the state.
+Concepts: audience questions (lost the plan mid-session? context rot or bloat? what's a handoff file?). Context rot: answer quality drops as the window fills. Context bloat: stale tool output and dead ends fill it; bloat causes rot. A handoff file (HANDOFF.md) is written after every task: goal, files changed, decisions and why, dead ends, exact next step, test command and result. Then the context is cleared and the next session resumes from the file, so state survives crashes and days and dead ends aren't retried.
+Message: the context window is working memory; the handoff file is the record. It's LEDGER's journal at human scale.
+
+## 17. Thank you
 Concepts: LEDGER installs (MIT, free) from maureesewilliams.io/ledger; QR codes to the paper, the repo and the blog.
 Message: try it, break it, and tell me where it fails.
