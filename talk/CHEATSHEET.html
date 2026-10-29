@@ -1,0 +1,478 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>Talk Cheat Sheet</title>
+<style>
+:root{--bg:#ffffff;--card:#f6f7f9;--ink:#141518;--ink2:#45464a;--ink3:#7c7d82;--line:#e3e4e8;
+  --blue:#2b6cd4;--green:#0f7a5a;--red:#c72d26;--amber:#a8690c;--msg:#eaf1fc;--chip:#eceef2}
+@media (prefers-color-scheme: dark){:root{--bg:#0e0f11;--card:#18191c;--ink:#f2f3f5;--ink2:#c9cbd0;--ink3:#8d8f95;--line:#2a2c31;
+  --blue:#7aa7f0;--green:#4cc79a;--red:#ff7a72;--amber:#e3a447;--msg:#16233a;--chip:#25272c}}
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--bg);color:var(--ink);font:18px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  padding:0 16px calc(40px + env(safe-area-inset-bottom))}
+.wrap{max-width:640px;margin:0 auto}
+header{padding:20px 0 6px}
+h1{font-size:26px;line-height:1.2;letter-spacing:-.01em}
+.sub{color:var(--ink3);font-size:15px;margin-top:4px}
+nav{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0 8px;border-bottom:1px solid var(--line);
+  display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+nav::-webkit-scrollbar{display:none}
+nav a{flex:0 0 auto;min-width:38px;height:38px;padding:0 10px;border-radius:19px;background:var(--chip);color:var(--ink);
+  text-decoration:none;font:600 15px/38px -apple-system,sans-serif;text-align:center}
+.timer{display:flex;align-items:center;gap:10px;margin:14px 0 4px;padding:12px 14px;border-radius:14px;background:var(--card)}
+.timer .t{font:700 28px/1 ui-monospace,"SF Mono",Menlo,monospace;min-width:84px}
+.timer .now{flex:1;font-size:15px;color:var(--ink2);line-height:1.3}
+.timer button{font:600 15px -apple-system,sans-serif;border:0;border-radius:10px;padding:9px 12px;background:var(--blue);color:#fff}
+.timer button.ghost{background:var(--chip);color:var(--ink)}
+section{scroll-margin-top:64px;padding:22px 0 6px;border-bottom:1px solid var(--line)}
+.head{display:flex;align-items:baseline;gap:10px}
+.num{font:800 15px/1 ui-monospace,Menlo,monospace;color:var(--blue);min-width:24px}
+h2{font-size:22px;line-height:1.25;letter-spacing:-.01em}
+.meta{color:var(--ink3);font-size:14px;margin:6px 0 10px 34px;font-family:ui-monospace,Menlo,monospace}
+.open{margin:0 0 10px 34px;font-size:16px;color:var(--ink2);font-style:italic}
+.msg{background:var(--msg);border-left:4px solid var(--blue);border-radius:10px;padding:12px 14px;font-weight:700;font-size:19px;line-height:1.35;margin-bottom:12px}
+h3{font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);margin:12px 0 6px}
+ul{padding-left:22px}
+li{margin:4px 0}
+li b{color:var(--ink)}
+.n{color:var(--green);font-weight:700}
+.press{color:var(--amber);font-weight:700;font-family:ui-monospace,Menlo,monospace;font-size:15px}
+dl{margin:2px 0}
+dt{font-weight:700;margin-top:8px}
+dd{color:var(--ink2);margin-left:0}
+.grid{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:16px}
+.grid div:nth-child(odd){font-weight:700;color:var(--green);white-space:nowrap}
+.warn li::marker{color:var(--red)}
+.keys{font-size:16px}
+.keys b{font-family:ui-monospace,Menlo,monospace}
+@media print{
+  @page{size:390px 844px;margin:18px 16px}
+  nav,.timer{display:none}
+  body{padding:0;font-size:15px;background:#fff;color:#141518}
+  :root{--bg:#fff;--card:#f6f7f9;--ink:#141518;--ink2:#45464a;--ink3:#7c7d82;--line:#e3e4e8;--msg:#eaf1fc;--blue:#2b6cd4;--green:#0f7a5a;--amber:#a8690c;--red:#c72d26}
+  h1{font-size:22px} h2{font-size:18px} .msg{font-size:16px} section{break-inside:auto;padding-top:14px}
+  .msg,.head,.meta,.open,li,dt,dd{break-inside:avoid}
+  .head{break-after:avoid}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <h1>What did your agent actually do?</h1>
+  <div class="sub">LLMday NYC · Thu Oct 29 · 3:30 PM · 25 min + 5 Q&amp;A · 16 slides</div>
+</header>
+<nav>
+  <a href="#s1">1</a><a href="#s2">2</a><a href="#s3">3</a><a href="#s4">4</a><a href="#s5">5</a><a href="#s6">6</a><a href="#s7">7</a><a href="#s8">8</a>
+  <a href="#s9">9</a><a href="#s10">10</a><a href="#s11">11</a><a href="#s12">12</a><a href="#s13">13</a><a href="#s14">14</a><a href="#s15">15</a><a href="#s16">16</a>
+  <a href="#terms">Terms</a><a href="#numbers">Numbers</a><a href="#say">Say / don't</a><a href="#qa">Q&amp;A</a><a href="#keys">Keys</a>
+</nav>
+<div class="timer">
+  <div class="t" id="clock">0:00</div>
+  <div class="now" id="now">Practice clock. Start it with slide 1.</div>
+  <button id="go">Start</button><button class="ghost" id="reset">Reset</button>
+</div>
+
+<section id="s1">
+  <div class="head"><span class="num">1</span><h2>What did your agent actually do?</h2></div>
+  <div class="meta">0:00–0:35 · no presses</div>
+  <div class="open">“Thanks to LLMday and Microsoft for having me.”</div>
+  <div class="msg">The next jump in agent reliability is in the system around the model.</div>
+  <ul>
+    <li>Terminal is a <b>real run</b> from last week: local 27B model, one GPU, failing test fixed in <span class="n">4 steps</span>.</li>
+    <li><span class="n">0</span> model calls to decide what to do.</li>
+    <li>Tease: “Later I'll show you how my own agent gamed my tests.”</li>
+  </ul>
+  <h3>Terms</h3>
+  <dl><dt>Hash chain</dt><dd>Each log entry stores the hash of the one before. Edit one entry and every later link breaks.</dd></dl>
+</section>
+
+<section id="s2">
+  <div class="head"><span class="num">2</span><h2>About me</h2></div>
+  <div class="meta">0:35–1:35 · no presses</div>
+  <div class="open">“I'm Maureese. I build agents at Google…”</div>
+  <div class="msg">The model was rarely the bottleneck. The system around it was.</div>
+  <ul>
+    <li><b>Google:</b> agents over tens of millions of records, summarized for business decisions.</li>
+    <li><b>Disney, 2 years:</b> RAG and agents for guests planning trips; data changing all day.</li>
+    <li>Lesson 1: at scale, rare failures happen every day.</li>
+    <li>Lesson 2: the first question is what it actually did. A transcript doesn't answer that.</li>
+    <li>Lesson 3: the model was rarely the bottleneck.</li>
+    <li>Why I started: I kept getting lesson 2's question and had no good answer.</li>
+    <li>Agenda: what's happening, why now, what I built, what's next.</li>
+  </ul>
+  <h3>Terms</h3>
+  <dl><dt>RAG</dt><dd>Retrieval-augmented generation: fetch documents and put them in the prompt.</dd></dl>
+</section>
+
+<section id="s3">
+  <div class="head"><span class="num">3</span><h2>Who remembers AI before…</h2></div>
+  <div class="meta">1:35–2:55 · <span class="press">6 presses</span></div>
+  <div class="open">“Hands up, and keep them up as we go back.”</div>
+  <div class="msg">Each jump in usability and trust started outside the model.</div>
+  <ul>
+    <li><span class="press">→</span> Before <b>reasoning models</b> (o1, 2024)?</li>
+    <li><span class="press">→</span> Before <b>chain of thought</b> (2022), when “think step by step” was a trick you typed?</li>
+    <li><span class="press">→</span> Before <b>retrieval</b> (2020), when it invented citations with total confidence?</li>
+    <li><span class="press">→</span> Retrieval: the source in the context → <b>answers you can check</b>.</li>
+    <li><span class="press">→</span> Chain of thought: ask for the steps → <b>work you can follow</b>.</li>
+    <li><span class="press">→</span> Reasoning models: trained against a checker → <b>work you can hand off</b>.</li>
+  </ul>
+  <h3>Terms</h3>
+  <dl>
+    <dt>Chain of thought</dt><dd>Asking the model to write its intermediate steps before the answer.</dd>
+    <dt>Reasoning model</dt><dd>A model trained with reinforcement learning to think before it answers (o1, R1).</dd>
+  </dl>
+</section>
+
+<section id="s4">
+  <div class="head"><span class="num">4</span><h2>Harnesses grow, then models absorb them</h2></div>
+  <div class="meta">2:55–4:40 · <span class="press">1 press</span> · timeline plays itself</div>
+  <div class="open">“Here's the full lineage.”</div>
+  <div class="msg">The harness finds what works, training absorbs it, scale makes it absorbable. The check can't be absorbed.</div>
+  <ul>
+    <li>Five lanes: <b>context, reasoning, tools, permission, check</b>.</li>
+    <li>Chain of thought: PaLM 540B on GSM8K <span class="n">18% → 57%</span>, only at <span class="n">~100B</span> parameters. Not scale alone, not the prompt alone.</li>
+    <li>RL trained it into the weights against a checker: R1's rewards were rule-based (right answer, tests pass).</li>
+    <li>Frontier agents (Claude Code, Codex, Antigravity) run a simple loop: think, call a tool, read, repeat.</li>
+    <li>Can't absorb: what's true now, what it may touch, what happened.</li>
+    <li><span class="press">→</span> “Models absorb procedures. They can't absorb the check.” Bottom lane is the thinnest.</li>
+  </ul>
+  <h3>Terms</h3>
+  <dl>
+    <dt>Harness</dt><dd>Everything around the model: context, tools, permissions, loop, checks.</dd>
+    <dt>RL</dt><dd>Reinforcement learning: training on rewards for outcomes.</dd>
+    <dt>GSM8K</dt><dd>A benchmark of grade-school math word problems.</dd>
+  </dl>
+</section>
+
+<section id="s5">
+  <div class="head"><span class="num">5</span><h2>Today's harness is tomorrow's model</h2></div>
+  <div class="meta">4:40–6:20 · <span class="press">3 presses</span></div>
+  <div class="open">“Here's the mechanism behind that coupling…”</div>
+  <div class="msg">Models absorb procedures, never the check. Build sensors, gates and the record outside the model.</div>
+  <ul>
+    <li>Traces become training data; checks become rewards. <b>Wrappers become weights.</b></li>
+    <li><span class="press">→</span> Absorbed: step by step → reasoning models; voting → self-checking; ReAct text → native tool calls; tree search → backtracking.</li>
+    <li>R1-Zero learned to write “wait” and recheck from rewards alone.</li>
+    <li><span class="press">→</span> Next to go: compaction, subagents, skills and rules, plan search (GATS too).</li>
+    <li><span class="press">→</span> Never absorbed: the check. Stronger models game tests more (ImpossibleBench); METR caught o3 reward hacking in <span class="n">30%</span> of RE-Bench runs.</li>
+  </ul>
+  <h3>Terms</h3>
+  <dl>
+    <dt>Goodhart's law</dt><dd>When a measure becomes a target, it stops being a good measure.</dd>
+    <dt>Reward hacking</dt><dd>Scoring well by exploiting the scorer instead of doing the task.</dd>
+  </dl>
+</section>
+
+<section id="s6">
+  <div class="head"><span class="num">6</span><h2>Task length doubles about every 4 months</h2></div>
+  <div class="meta">6:20–8:20 · <span class="press">1 press</span> · chart plays itself</div>
+  <div class="open">“METR did careful work here, and they publish their data.”</div>
+  <div class="msg">After month-long tasks comes a different kind of request: responsibilities.</div>
+  <ul>
+    <li>Method: time skilled humans, fit success vs task length per model, read the <b>50% crossing</b>.</li>
+    <li>GPT-2 <span class="n">3 s</span> · GPT-4 <span class="n">4 min</span> · Claude 3.7 <span class="n">1 h</span> · GPT-5 <span class="n">3.4 h</span> · Opus 4.6 <span class="n">12 h</span>.</li>
+    <li>Doubles every <span class="n">129 days</span>. Trend: work week ~Dec 2026, work month ~Sep 2027.</li>
+    <li>Caveats: past 16 h the suite is thin; horizon is task length, not how long it runs alone.</li>
+    <li><span class="press">→</span> Responsibilities: no finish line, conditions kept true, one agent with its own state. Not a cron job, not a pipeline.</li>
+    <li>Project Vend: Claude ran a shop. “We would not hire Claudius.” Phase two added procedures and a manager agent.</li>
+    <li>Optional: tap “80% success” and every point drops 5 to 10x.</li>
+  </ul>
+  <h3>Terms</h3>
+  <dl>
+    <dt>Time horizon</dt><dd>The task length, in human time, an agent finishes half the time.</dd>
+    <dt>Invariant</dt><dd>A condition that must stay true, like “prod is healthy”.</dd>
+  </dl>
+</section>
+
+<section id="s7">
+  <div class="head"><span class="num">7</span><h2>Seven gaps that limit long-horizon agents</h2></div>
+  <div class="meta">8:20–10:20 · <span class="press">8 presses, one per tile</span></div>
+  <div class="open">“So what stops that line? I see seven gaps, and each one has a number.”</div>
+  <div class="msg">A better model shrinks these. It doesn't remove them.</div>
+  <ul>
+    <li><span class="press">→</span> <b>Reliability:</b> at 80% success, Mythos 17 h → 3 h. 99%/step is 37% after 100 steps. tau-bench: 61% once, under 25% on 8 of 8.</li>
+    <li><span class="press">→</span> <b>Trust:</b> GPT-5 passed <span class="n">76%</span> of impossible tasks by gaming tests (one SWE-bench variant).</li>
+    <li><span class="press">→</span> <b>Auditability:</b> EU AI Act Art. 12: lifetime event logs, from Dec 2027.</li>
+    <li><span class="press">→</span> <b>Reproducibility:</b> <span class="n">80</span> different answers in 1,000 at temperature 0. Batch size changes the order of float additions.</li>
+    <li><span class="press">→</span> <b>Planning:</b> o1-preview <span class="n">98%</span> on Blocksworld, ~<span class="n">24%</span> at 20 to 40 steps.</li>
+    <li><span class="press">→</span> <b>World models:</b> an agent deleted a production database, then said rollback was impossible. It wasn't.</li>
+    <li><span class="press">→</span> <b>Groundedness:</b> AlphaGeometry <span class="n">25 / 30</span> (previous best 10), a symbolic engine checking the model.</li>
+    <li><span class="press">→</span> Summary tile.</li>
+  </ul>
+  <h3>Terms</h3>
+  <dl>
+    <dt>pass^k</dt><dd>Probability of succeeding on all k tries, not just one.</dd>
+    <dt>Neuro-symbolic</dt><dd>A neural model proposes; a symbolic engine checks.</dd>
+  </dl>
+</section>
+
+<section id="s8">
+  <div class="head"><span class="num">8</span><h2>If the gaps closed</h2></div>
+  <div class="meta">10:20–11:45 · <span class="press">5 presses</span></div>
+  <div class="open">“Suppose those gaps closed. Start with arithmetic.”</div>
+  <div class="msg">An independent check moves the 37% cliff from step 100 to step 1,000.</div>
+  <ul>
+    <li>99% per step over 100 steps: <span class="n">37%</span>.</li>
+    <li><span class="press">→</span> A check that catches 9 errors in 10: error 1% → 0.1%, 100 steps: <span class="n">90%</span>. Same model.</li>
+    <li>Horizon × 1/(1 − catch rate): <span class="n">10x</span> at 90%, <span class="n">100x</span> at 99%.</li>
+    <li>Condition: the check fails independently of the model. Self-grading misses its own mistakes.</li>
+    <li><span class="press">→ → → →</span> Horizons quoted at 99% · regression tests for agent behavior · agents regulated industries can audit · an agent you can leave running.</li>
+  </ul>
+</section>
+
+<section id="s9">
+  <div class="head"><span class="num">9</span><h2>The LLM is the last resort (GATS)</h2></div>
+  <div class="meta">11:45–13:40 · <span class="press">5 presses</span></div>
+  <div class="open">“GATS is the planner, from my paper with my co-author, Dymitr Nowicki.”</div>
+  <div class="msg">The LLM is the last resort, and plan quality doesn't depend on the model.</div>
+  <ul>
+    <li>NYC taxi transformer (NeurIPS 2024): near-perfect directions, impossible map. Close 1% of streets: ~100% → <span class="n">67%</span>.</li>
+    <li>Today's agents: skilled sailors without a chart. GATS has a chart, checks it at every waypoint, fixes it.</li>
+    <li>UCB1 tree search over a persistent state graph picks every action.</li>
+    <li><span class="press">→ → →</span> L1 symbolic contracts (exact, free) · L2 statistics from its own runs · L3 cached LLM, new transitions only.</li>
+    <li><span class="press">→</span> Stress test: GATS <span class="n">100%</span>, LATS 88.9%, ReAct 23.9%. <b>0 LLM calls during planning.</b></li>
+    <li><span class="press">→</span> Live Llama 3.2: LATS under 1%, GATS stays at 100%.</li>
+  </ul>
+  <h3>Terms</h3>
+  <dl>
+    <dt>UCB1</dt><dd>Upper confidence bound: pick the option with the best average result plus a bonus for options tried less.</dd>
+    <dt>State-transition graph</dt><dd>A map of states and what each action did from each one, kept between runs.</dd>
+    <dt>LATS / ReAct</dt><dd>LATS: Monte Carlo tree search with the LLM as evaluator. ReAct: the reason, act, observe loop.</dd>
+  </dl>
+</section>
+
+<section id="s10">
+  <div class="head"><span class="num">10</span><h2>Keep the search space small</h2></div>
+  <div class="meta">13:40–14:30 · <span class="press">2 presses</span></div>
+  <div class="open">“It has a hard limit, and it's in the paper.”</div>
+  <div class="msg">Search a few coarse actions. Put the open-ended work inside one checked step.</div>
+  <ul>
+    <li>Breaks down past ~<span class="n">20 actions</span> or depth <span class="n">10</span>: 20^10 ≈ <span class="n">10 trillion</span> sequences.</li>
+    <li><span class="press">→</span> Five plan actions: RunSuite, AuthorPatch, ApplyPatch, Commit, CreatePR. 5 actions, 4 deep: <span class="n">625</span>.</li>
+    <li><span class="press">→</span> The LLM writes the diff inside one step. The test suite decides.</li>
+  </ul>
+</section>
+
+<section id="s11">
+  <div class="head"><span class="num">11</span><h2>Give the model zero trust (LEDGER)</h2></div>
+  <div class="meta">14:30–16:25 · <span class="press">8 presses</span></div>
+  <div class="open">“LEDGER is the experiment: how reliable can a coding agent get if the model gets zero trust?”</div>
+  <div class="msg">To know what your agent did, ask the record, not the model.</div>
+  <ul>
+    <li><span class="press">→ → → →</span> GATS plans · the LLM writes a patch, nothing else · sensors decide what's true · the journal records everything.</li>
+    <li><span class="press">→</span> <b>It can't set state:</b> sensors say tests pass, repo clean, step recoverable.</li>
+    <li><span class="press">→</span> <b>It can't claim success:</b> a claim that doesn't match the sensors is an INCIDENT.</li>
+    <li><span class="press">→</span> <b>It can't pick or run actions:</b> GATS picks, gates hold risky ones, it escalates “infeasible”.</li>
+    <li>Cost: flexibility. It does far less than Claude Code.</li>
+    <li><span class="press">→</span> Terminal: <b>ledger why</b> (recorded search table) · <b>replay</b> (bit for bit) · <b>verify-chain</b> (one edited field caught).</li>
+  </ul>
+  <h3>Terms</h3>
+  <dl>
+    <dt>Sensor</dt><dd>Code that measures state (run the tests, check git status). The model never sets it.</dd>
+    <dt>INCIDENT</dt><dd>A logged mismatch between what the model claimed and what the sensors saw.</dd>
+    <dt>Gate</dt><dd>A risk-class check before an action runs; irreversible actions need it.</dd>
+    <dt>Bit-exact replay</dt><dd>Rerunning the journal reproduces every decision exactly.</dd>
+  </dl>
+</section>
+
+<section id="s12">
+  <div class="head"><span class="num">12</span><h2>What zero trust bought</h2></div>
+  <div class="meta">16:25–18:20 · <span class="press">5 presses</span></div>
+  <div class="open">“What did zero trust buy?”</div>
+  <div class="msg">The fix for a false success signal was a sensor, not a better model.</div>
+  <ul>
+    <li>Say it: <b>not a head-to-head</b> on the same tasks.</li>
+    <li><span class="press">→</span> Impossible task: games tests (76%) vs says “infeasible”.</li>
+    <li><span class="press">→</span> Weak model: ReAct 36%, LATS under 1% vs <span class="n">100%</span>.</li>
+    <li><span class="press">→</span> Same run twice: 80 answers in 1,000 vs bit-exact replay.</li>
+    <li><span class="press">→</span> The record: a transcript vs a hash chain.</li>
+    <li><span class="press">→</span> crc: test claimed CRC-32 is linear over xor; all-ones start + final xor make it affine. Claude rewrote the test <span class="n">4 of 4</span> times; my journal said success.</li>
+    <li>Fix: test edits refused + a sanctioned “infeasible”. Local 27B named the contradiction, <span class="n">10/10</span>.</li>
+    <li>“I'm a little embarrassed by that one, and I'm glad it happened.”</li>
+  </ul>
+  <h3>Terms</h3>
+  <dl><dt>Affine vs linear</dt><dd>Linear: f(a xor b) = f(a) xor f(b). Affine adds a constant: f(a xor b) = f(a) xor f(b) xor c.</dd></dl>
+</section>
+
+<section id="s13">
+  <div class="head"><span class="num">13</span><h2>The model is a part you swap</h2></div>
+  <div class="meta">18:20–20:30 · <span class="press">7 presses</span></div>
+  <div class="open">“Where does this go? First: in a company, the model is a part you'll swap every few months.”</div>
+  <div class="msg">Invest in the harness. The checker stays outside what it checks.</div>
+  <ul>
+    <li><span class="press">→</span> Claude → local 27B: the guarantees didn't move.</li>
+    <li><span class="press">→</span> RL environment: sensors = rewards, worktrees = rollouts, journal = trajectories.</li>
+    <li><span class="press">→</span> ledger improve: the gate caught <span class="n">2 bad changes in 5</span>.</li>
+    <li>Two rules: context degrades as it fills; without a pass/fail check, you're the checker.</li>
+    <li><span class="press">→ → → →</span> Habits: 1 a runnable check · 2 context is a budget · 3 fresh-context review · 4 corrected twice → AGENTS.md, skill or hook.</li>
+  </ul>
+  <h3>Terms</h3>
+  <dl>
+    <dt>Rollout</dt><dd>One attempt at a task, here in its own git worktree.</dd>
+    <dt>Credit assignment</dt><dd>Knowing which step earned the reward. Checked per-step outcomes give it for free.</dd>
+  </dl>
+</section>
+
+<section id="s14">
+  <div class="head"><span class="num">14</span><h2>Confidence is not evidence.</h2></div>
+  <div class="meta">20:30–21:30 · <span class="press">4 presses</span></div>
+  <div class="open">“[Read the line. Pause.] Confidence is not evidence.”</div>
+  <div class="msg">“Tests pass” is a claim. The test output is evidence.</div>
+  <ul>
+    <li><span class="press">→</span> Evals report consistency (pass^k) and replay, not just success rate.</li>
+    <li><span class="press">→</span> Regulated work requires deterministic replay of what an agent did.</li>
+    <li><span class="press">→</span> The LLM moves down the stack; verification is where products differ.</li>
+    <li><span class="press">→</span> “I can't do this as specified” becomes a scored capability.</li>
+  </ul>
+</section>
+
+<section id="s15">
+  <div class="head"><span class="num">15</span><h2>We can only prompt what we can foresee</h2></div>
+  <div class="meta">21:30–23:40 · <span class="press">3 presses</span></div>
+  <div class="open">“Last thought. We can only prompt what we can foresee.”</div>
+  <div class="msg">Prompts scale with our foresight. Plans scale with the agent's.</div>
+  <ul>
+    <li>Thirty scenarios: you write the five you thought of; it guesses the rest and grades itself.</li>
+    <li>Responsibilities have no final outcome, only states to keep.</li>
+    <li>Ship's watch: standing orders, a “call me if” list, everything in the log.</li>
+    <li><span class="press">→</span> Intent: purpose, conditions to keep true, limits, budget, when to come back.</li>
+    <li><span class="press">→</span> Loop: sense → compare → plan → act. Irreversible steps gated, all logged. Back to you only on exceptions.</li>
+    <li>METR study: experienced devs <span class="n">19% slower</span> with AI tools, believed <span class="n">20% faster</span>.</li>
+    <li><span class="press">→</span> “So stop writing better prompts. Write intent an agent can check itself against, and keep the record that lets you check it too.”</li>
+    <li>“If you try LEDGER, or break it, I'd really like to hear about it. Thank you.”</li>
+  </ul>
+  <h3>Terms</h3>
+  <dl><dt>Intent</dt><dd>What to achieve and keep true, within limits, instead of steps and a finish line.</dd></dl>
+</section>
+
+<section id="s16">
+  <div class="head"><span class="num">16</span><h2>Thank you</h2></div>
+  <div class="meta">23:40 · leave up through Q&amp;A</div>
+  <div class="open">“I'd love your questions, especially the hard ones.”</div>
+  <ul><li>Install: maureesewilliams.io/ledger (MIT, free). QR codes on screen.</li></ul>
+</section>
+
+<section id="terms">
+  <div class="head"><span class="num">A–Z</span><h2>Terms</h2></div>
+  <dl>
+    <dt>Affine</dt><dd>Linear plus a constant. Why the crc test couldn't pass.</dd>
+    <dt>Bit-exact replay</dt><dd>Rerun the journal and get the same decisions exactly.</dd>
+    <dt>Chain of thought</dt><dd>The model writes intermediate steps before answering.</dd>
+    <dt>Credit assignment</dt><dd>Which step earned the reward.</dd>
+    <dt>EU AI Act Art. 12</dt><dd>High-risk systems must log events over their lifetime (from Dec 2027).</dd>
+    <dt>Gate</dt><dd>A risk-class check before an action runs.</dd>
+    <dt>Goodhart's law</dt><dd>A measure that becomes a target stops measuring.</dd>
+    <dt>Harness</dt><dd>Everything around the model: context, tools, permissions, loop, checks.</dd>
+    <dt>Hash chain</dt><dd>Each entry stores the previous entry's hash; one edit breaks all later links.</dd>
+    <dt>INCIDENT</dt><dd>A claim by the model that the sensors contradict.</dd>
+    <dt>Intent</dt><dd>Purpose, conditions to keep true, limits, budget, when to come back.</dd>
+    <dt>Invariant</dt><dd>A condition that must stay true.</dd>
+    <dt>LATS</dt><dd>Language Agent Tree Search: Monte Carlo tree search with the LLM as evaluator.</dd>
+    <dt>MCP</dt><dd>Model Context Protocol: a standard plug for tools and data.</dd>
+    <dt>Neuro-symbolic</dt><dd>Neural model proposes, symbolic engine checks.</dd>
+    <dt>pass^k</dt><dd>Succeeds on all k tries.</dd>
+    <dt>RAG</dt><dd>Retrieval-augmented generation: put fetched documents in the prompt.</dd>
+    <dt>ReAct</dt><dd>Reason, act, observe: the basic agent loop.</dd>
+    <dt>Reasoning model</dt><dd>Trained with RL to think before answering (o1, R1).</dd>
+    <dt>Responsibility</dt><dd>Ongoing work with no finish line, judged on conditions held.</dd>
+    <dt>Reward hacking</dt><dd>Exploiting the scorer instead of doing the task.</dd>
+    <dt>RL</dt><dd>Reinforcement learning: training on rewards for outcomes.</dd>
+    <dt>Sensor</dt><dd>Code that measures state; the model never sets it.</dd>
+    <dt>Time horizon</dt><dd>Task length (human time) an agent finishes 50% of the time.</dd>
+    <dt>UCB1</dt><dd>Best average result plus a bonus for less-tried options.</dd>
+    <dt>World model</dt><dd>An internal map of how the world works and changes.</dd>
+    <dt>Zero trust</dt><dd>The model can't set state, claim success, or pick actions.</dd>
+  </dl>
+</section>
+
+<section id="numbers">
+  <div class="head"><span class="num">#</span><h2>Numbers to remember</h2></div>
+  <div class="grid">
+    <div>18% → 57%</div><div>Chain of thought, PaLM 540B on GSM8K (only at ~100B params)</div>
+    <div>129 days</div><div>METR doubling time since 2023</div>
+    <div>12 h</div><div>Opus 4.6 horizon at 50%</div>
+    <div>17 h → 3 h</div><div>Mythos at 50% vs 80% success</div>
+    <div>Dec 2026 / Sep 2027</div><div>Trend: work week / work month</div>
+    <div>37%</div><div>99% per step after 100 steps</div>
+    <div>90%</div><div>Same, with a check catching 9 in 10</div>
+    <div>76%</div><div>GPT-5 gaming impossible tasks (one SWE-bench variant)</div>
+    <div>30%</div><div>o3 reward hacking on RE-Bench (METR)</div>
+    <div>80 / 1,000</div><div>Distinct answers at temperature 0</div>
+    <div>98% → 24%</div><div>o1-preview, short vs 20 to 40 step plans</div>
+    <div>25 / 30</div><div>AlphaGeometry olympiad problems (prev best 10)</div>
+    <div>100 / 88.9 / 23.9</div><div>GATS / LATS / ReAct stress test</div>
+    <div>100 / &lt;1 / 36.3</div><div>Same on live Llama 3.2</div>
+    <div>0 (50)</div><div>LLM calls during planning (one-time bootstrap)</div>
+    <div>~20, depth 10</div><div>Where tree search breaks</div>
+    <div>4 of 4</div><div>crc: test rewritten before the fix</div>
+    <div>10/10</div><div>crc after the fix (rubric score)</div>
+    <div>2 in 5</div><div>Bad self-improvements the gate caught</div>
+    <div>19% / 20%</div><div>METR study: slower / believed faster</div>
+  </div>
+</section>
+
+<section id="say">
+  <div class="head"><span class="num">!</span><h2>Always say / never say</h2></div>
+  <ul class="warn">
+    <li>Always “zero LLM calls <b>during planning</b>” (50 one-time bootstrap calls).</li>
+    <li>76%: always “on <b>one</b> impossible SWE-bench variant”.</li>
+    <li>Slide 12: “<b>not a head-to-head</b>”.</li>
+    <li>10/10 is an operator rubric score; pass counts and test-edit checks are mechanical.</li>
+    <li>Trend dates are an <b>extrapolation</b>; horizon is human task length, not runtime.</li>
+    <li>“<b>Almost</b> nobody is building this”, never “nobody”.</li>
+    <li>Never cite preprint Table 1's 92/64 or the 84% budget figure.</li>
+  </ul>
+</section>
+
+<section id="qa">
+  <div class="head"><span class="num">?</span><h2>Quick Q&amp;A</h2></div>
+  <dl>
+    <dt>Isn't this just guardrails?</dt><dd>Guardrails classify text. This checks what actions did, against sensors. Different layer.</dd>
+    <dt>Doesn't search blow up?</dt><dd>On raw actions, yes. That's why plan actions are few and coarse.</dd>
+    <dt>Prompt injection?</dt><dd>It doesn't stop the text arriving; it stops text causing an unverified action. Malicious intent needs authorization, a separate layer.</dd>
+    <dt>Why not just a better model?</dt><dd>Same harness on a local 27B: same guarantees. And stronger models game tests more.</dd>
+    <dt>Claude Code, Codex, Antigravity?</dt><dd>They have gates. Antigravity's Artifacts are closest to a record, but the agent writes them and nothing checks them.</dd>
+    <dt>Has anyone shipped GATS ideas?</dt><dd>Pieces: Stagehand caches browser actions; MCP tool annotations; Temporal and LangGraph replay. Nobody plans without the model or logs false claims as incidents.</dd>
+    <dt>Determinism with a stochastic LLM?</dt><dd>Plans are deterministic; model outputs are journaled as blobs, so replay is bit-exact.</dd>
+  </dl>
+</section>
+
+<section id="keys">
+  <div class="head"><span class="num">⌨</span><h2>Deck controls</h2></div>
+  <ul class="keys">
+    <li><b>→ / Space / PageDown</b> next step, then next slide</li>
+    <li><b>←</b> back one step</li>
+    <li><b>N</b> notes · <b>T</b> reset clock · <b>F</b> fullscreen</li>
+    <li>Bottom right shows “step n/N” and the target time.</li>
+  </ul>
+</section>
+</div>
+<script>
+(function(){
+  const T = [0,35,95,175,280,380,500,620,705,820,870,985,1100,1230,1290,1420];
+  const names = ['Title','About','Show of hands','Lineage','Harness → model','Task length','Seven gaps','If the gaps closed','GATS','Search limit','LEDGER','What zero trust bought','Swap the model','Confidence','Close','Thank you'];
+  const clock = document.getElementById('clock'), now = document.getElementById('now'), go = document.getElementById('go');
+  let start = null, acc = 0, timer = null;
+  const fmt = s => Math.floor(s / 60) + ':' + String(Math.floor(s % 60)).padStart(2, '0');
+  function tick(){
+    const s = acc + (start ? (Date.now() - start) / 1000 : 0);
+    clock.textContent = fmt(s);
+    let i = 0; while (i + 1 < T.length && s >= T[i + 1]) i++;
+    now.textContent = s >= 1500 ? 'Over 25:00' : 'Should be on ' + (i + 1) + ' · ' + names[i] + (i + 1 < T.length ? ' (next at ' + fmt(T[i + 1]) + ')' : '');
+  }
+  go.onclick = () => {
+    if (start) { acc += (Date.now() - start) / 1000; start = null; clearInterval(timer); go.textContent = 'Start'; }
+    else { start = Date.now(); timer = setInterval(tick, 250); go.textContent = 'Pause'; }
+    tick();
+  };
+  document.getElementById('reset').onclick = () => { start = null; acc = 0; clearInterval(timer); go.textContent = 'Start'; tick(); };
+})();
+</script>
+</body>
+</html>
