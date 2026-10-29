@@ -34,20 +34,20 @@ The deck shows each main slide's target start time and a running clock
 | # | Slide | Starts at |
 | --- | --- | --- |
 | 1 | Title + claim, real run output on screen | 0:00 |
-| 2 | About me + three lessons + agenda | 1:15 |
-| 3 | Harnesses grow, then models absorb them (swimlane timeline 2020-now) | 2:30 |
-| 4 | Today's harness is tomorrow's model (absorbed, next to go, the check stays) | 4:00 |
-| 5 | Task length doubles about every 4 months (METR horizons, projection, responsibilities) | 5:15 |
-| 6 | Seven gaps that limit long-horizon agents (7 gaps, one cited number each) | 6:45 |
-| 7 | If the gaps closed + the GATS piece | 8:45 |
-| 8 | GATS: layers + stress test (sailor framing in notes) | 10:00 |
-| 9 | The limit: keep the search space small | 11:15 |
-| 10 | LEDGER, a zero-trust experiment: pipeline, sensors/incidents/gates, and the record (why, replay, tamper) | 12:00 |
-| 11 | What zero trust bought: LEDGER vs most coding agents + crc before/after | 14:30 |
-| 12 | Where harnesses go + the four Monday-morning habits | 16:30 |
-| 13 | Confidence is not evidence + four predictions | 19:30 |
-| 14 | CLOSE: We can only prompt what we can foresee (control loop; prompt vs intent) | 21:00, done by 23:00 |
-| 15 | Thank you + QR codes + install lines (up through Q&A) | 23:00 |
+| 2 | About me + three lessons + agenda | 0:45 |
+| 3 | Harnesses grow, then models absorb them (swimlane timeline 2020-now) | 1:45 |
+| 4 | Today's harness is tomorrow's model (absorbed, next to go, the check stays) | 3:45 |
+| 5 | Task length doubles about every 4 months (METR horizons, projection, responsibilities) | 5:30 |
+| 6 | Seven gaps that limit long-horizon agents (7 gaps, one cited number each) | 7:45 |
+| 7 | If the gaps closed + the GATS piece | 10:00 |
+| 8 | GATS: layers + stress test (sailor framing in notes) | 11:30 |
+| 9 | The limit: keep the search space small | 13:30 |
+| 10 | LEDGER, a zero-trust experiment: pipeline, sensors/incidents/gates, and the record (why, replay, tamper) | 14:30 |
+| 11 | What zero trust bought: LEDGER vs most coding agents + crc before/after | 16:30 |
+| 12 | Where harnesses go + the four Monday-morning habits | 18:30 |
+| 13 | Confidence is not evidence + four predictions | 20:45 |
+| 14 | CLOSE: We can only prompt what we can foresee (control loop; prompt vs intent) | 22:00, done by 24:15 |
+| 15 | Thank you + QR codes + install lines (up through Q&A) | 24:15 |
 
 The old problem slide (0.99^n, confidence is not evidence) is now the first
 backup slide; its numbers live on slides 6 and 7.
