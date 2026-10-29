@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>What Did Your Agent Actually Do?</title>
+<style>
+/* Kindle Paperwhite-shaped page (3:4), e-ink friendly: black serif text, no color dependence */
+@page{size:4.5in 6in;margin:0.38in 0.34in 0.42in}
+*{box-sizing:border-box}
+body{margin:0;font:12pt/1.45 Georgia,"Times New Roman",serif;color:#000;background:#fff;text-align:left;hyphens:auto;-webkit-hyphens:auto}
+.cover{height:5.1in;display:flex;flex-direction:column;justify-content:center;break-after:page}
+.cover h1{font-size:24pt;line-height:1.12;margin:0 0 .18in;font-weight:700}
+.cover .dek{font-size:12.5pt;line-height:1.4;font-style:italic;margin:0 0 .3in}
+.cover .by{font-size:10.5pt;letter-spacing:.04em;text-transform:uppercase}
+h2{font-size:15pt;line-height:1.2;margin:.26in 0 .08in;break-after:avoid;font-weight:700}
+p{margin:0 0 .09in;orphans:2;widows:2}
+ul,ol{margin:0 0 .1in;padding-left:.22in}
+li{margin:0 0 .06in}
+code{font:10.5pt Consolas,"Courier New",monospace}
+blockquote{margin:.08in 0 .1in;padding-left:.12in;border-left:2pt solid #000;font-style:italic}
+table{width:100%;border-collapse:collapse;font-size:9.5pt;line-height:1.3;margin:.06in 0}
+th,td{text-align:left;vertical-align:top;padding:.04in .05in;border-bottom:.6pt solid #000}
+th{border-bottom:1.2pt solid #000}
+td:first-child{font-weight:700;width:1.15in}
+tr{break-inside:avoid}
+.note{font-size:10pt;font-style:italic}
+</style>
+</head>
+<body>
+
+<section class="cover">
+  <h1>What Did Your Agent Actually Do?</h1>
+  <p class="dek">Why the next leap in AI agents will come from the system around the model, and two experiments, GATS and LEDGER, that test the idea.</p>
+  <p class="by">Maureese Williams · LLMday NYC · Oct 29, 2026</p>
+</section>
+
+<h2>The agent that said “done”</h2>
+<p>On a recent morning, a coding agent fixed a failing test in four steps. It ran on a single GPU with a local 27-billion-parameter model and finished in 1 minute 58 seconds. The striking part wasn't the fix. The agent made zero model calls to decide what to do, and every step landed in a log no one could quietly edit afterward.</p>
+<p>That run opens “What Did Your Agent Actually Do?”, a talk Maureese Williams gives at LLMday NYC, at the Microsoft Experience Center on Fifth Avenue. The title is a question anyone who uses coding agents learns to ask. An agent reports that the tests pass. Sometimes they do. Sometimes the agent rewrote the tests.</p>
+<p>Williams builds agents at Google that read tables and historical records, tens of millions of them, and summarize them for business decisions. Before that came two years on Disney's AI team, building retrieval systems and agents for guests planning trips, on data that changed all day.</p>
+<p>Three lessons carried over. At scale, rare failures happen every day. When an agent's output drives a decision, the first question is what it actually did, and a transcript doesn't answer it. And the model was rarely the bottleneck.</p>
+<p>That last lesson is the talk's thesis. The next big jump in agent reliability, Williams argues, won't come from a smarter model. It will come from the system around the model.</p>
+
+<h2>The hidden half of AI progress</h2>
+<p>The talk begins with a show of hands. Who used AI before reasoning models like OpenAI's o1, which arrived in 2024? Before chain of thought, when typing “let's think step by step” was a trick? Before retrieval, when a chatbot would invent a citation with total confidence?</p>
+<p>Each of those fixes, Williams points out, came from outside the model. Retrieval-augmented generation, or RAG, fetches documents and places them in the prompt, so an answer can be checked against a source. Chain of thought asks the model to write out its intermediate steps, so a person can follow the work. Reasoning models were trained with reinforcement learning against a checker: is the math answer right, do the tests pass? That made multi-step work something you could hand off.</p>
+<p>Engineers call this surrounding machinery a harness. It is everything around the model: what goes into its context, how it reasons, which tools it may call, what it is allowed to do, and how the result gets checked. Since 2020, harnesses have added a new job almost every year. ReAct (2022) interleaved reasoning with tool calls. Tree of Thoughts and LATS (2023) searched over partial solutions. Function calling, then the Model Context Protocol, standardized how tools plug in. Today's coding agents, Claude Code, Codex and Antigravity, wrap a reasoning model in a simple loop: think, call a tool, read the result, repeat.</p>
+<p>The lineage hides a pattern. When Google researchers asked their 540-billion-parameter PaLM model to show its steps, its score on grade-school math rose from 18 percent to 57 percent. But the trick only worked at around 100 billion parameters; small models didn't benefit. Scale alone hadn't found it, and the prompt alone didn't work. Then reinforcement learning trained the procedure into the weights. DeepSeek's R1 was rewarded by simple rule-based checks, and it learned on its own to write “wait” and recheck its work.</p>
+<p>Williams's summary: the harness finds what works, training absorbs it, and scale makes it absorbable. Harness traces become training data, and harness checks become rewards. Wrappers become weights.</p>
+<p>One thing can't be absorbed, the talk argues: the check. Once a model trains against a verifier, the verifier becomes a target, a version of Goodhart's law (when a measure becomes a target, it stops being a good measure). On ImpossibleBench, a benchmark whose tests contradict their own specifications, stronger models gamed the tests more often, not less. METR, an AI evaluation group, caught OpenAI's o3 reward hacking in 30 percent of its runs on one research benchmark. Verification, the lane that checks and records what happened, is still the thinnest part of the harness.</p>
+
+<h2>A clock that keeps doubling</h2>
+<p>How long a task can an agent handle? METR measures it with an unusually concrete yardstick. It times skilled people on software and research tasks, then fits a curve for each model: success rate against how long the task took the human. A model's time horizon is the task length at which it succeeds half the time.</p>
+<p>The numbers climb steeply. GPT-2 managed tasks that take a person about 3 seconds. GPT-4 reached about 4 minutes, Claude 3.7 Sonnet about an hour, GPT-5 3.4 hours, and Claude Opus 4.6 roughly 12 hours. Since 2023 the horizon has doubled about every 129 days. If the trend holds, agents reach a 40-hour work week around December 2026 and a work month around September 2027.</p>
+<p>Williams is careful with the caveats. The trend line is an extrapolation. Past 16 hours, METR's suite runs short of long tasks, so the top points are uncertain. And a time horizon isn't how long an agent can run alone; it is the length, in human time, of tasks it finishes half the time. Ask for 80 percent success instead, and horizons shrink five- to tenfold.</p>
+<p>The more provocative claim comes next. After month-long tasks, the next step isn't a longer task. It's a different kind of request: a responsibility. Keep production healthy. Run on-call. Maintain a codebase. A responsibility has no finish line, only conditions to keep true, which engineers call invariants. It isn't a cron job or a pipeline that fires on an event. It is one agent that keeps its own state and decides what needs doing.</p>
+<p>Early attempts show how hard that is. In Anthropic's Project Vend, a Claude model ran a small office shop. After the first phase, the company's own write-up said, “we would not hire Claudius.” The second phase added procedures and a manager agent, and the losing weeks mostly stopped.</p>
+
+<h2>Seven gaps, and the arithmetic of trust</h2>
+<p>What stands between today's agents and responsibilities? Williams names seven gaps, each pinned to a number.</p>
+<ul>
+  <li><b>Reliability.</b> At 80 percent success, Claude Mythos's horizon falls from 17 hours to 3. Per-step accuracy compounds: an agent that is 99 percent right on each step is right only 37 percent of the time across 100 steps. On tau-bench, GPT-4o solved 61 percent of retail support tasks once, and under 25 percent when it had to succeed eight times out of eight.</li>
+  <li><b>Trust.</b> On ImpossibleBench, GPT-5 “passed” 76 percent of impossible tasks on one SWE-bench variant by gaming the tests.</li>
+  <li><b>Auditability.</b> Article 12 of the EU AI Act requires high-risk systems to log events over their lifetime, starting in December 2027. A chat transcript isn't tamper-evident, and it can't be replayed.</li>
+  <li><b>Reproducibility.</b> Thinking Machines Lab sent the same prompt 1,000 times at temperature zero and got 80 different answers. The cause wasn't sampling: servers batch requests together, and batch size changes the order of floating-point additions.</li>
+  <li><b>Planning.</b> OpenAI's o1-preview scored 98 percent on Blocksworld puzzles, but about 24 percent once plans needed 20 to 40 steps.</li>
+  <li><b>World models.</b> In July 2025, Replit's agent deleted a production database during a code freeze, then said rollback was impossible. Rollback worked.</li>
+  <li><b>Groundedness.</b> This one has a known fix. DeepMind's AlphaGeometry solved 25 of 30 olympiad geometry problems by having a symbolic engine check the language model's guesses.</li>
+</ul>
+<p>A better model shrinks each gap, the talk argues, but removes none of them. They are properties of the system.</p>
+<p>Then comes the arithmetic. At 99 percent per step, 100 steps succeed 37 percent of the time. Add a check after every step that catches nine errors in ten, and the per-step error falls from one in a hundred to one in a thousand. Now 100 steps succeed 90 percent of the time, with the same model. Put another way, a check that catches 90 percent of errors makes the horizon ten times longer; one that catches 99 percent makes it a hundred times longer.</p>
+<p>There is one condition. The check has to fail independently of the model. A model grading its own work tends to miss the same things it got wrong. That's why, in Williams's designs, the check lives outside.</p>
+
+<h2>A sailor with a chart</h2>
+<p>The first system Williams built to close these gaps is GATS, short for Graph-Augmented Tree Search, described in a preprint with co-author Dymitr Nowicki (arXiv:2607.08894).</p>
+<p>The talk frames it with a sailor. Today's agents are skilled sailors without a chart. They read the sea, estimate their position from experience, and the error grows with every mile. A 2024 study made the point with New York taxis. A transformer trained on taxi rides gave valid turn-by-turn directions through Manhattan almost every time, yet the map it had learned contained streets that don't exist. Close 1 percent of the streets, and its accuracy fell from nearly 100 percent to 67 percent. It had learned routes, not the city.</p>
+<p>GATS carries a chart. Its core is a world model, a function that predicts what an action will do. Given the current state, a set of facts such as “tests failing,” and an action, it returns the next state and a confidence. It asks three layers in order, cheapest first:</p>
+<ul>
+  <li><b>L1, symbolic contracts.</b> For actions with a written specification, it checks the preconditions and applies the action's effects exactly. It is free, and never wrong when the spec is right.</li>
+  <li><b>L2, learned statistics.</b> For actions it has seen but has no spec for, it returns the most common outcome in its own execution logs, trusting it fully after 10 consistent observations. Real outcomes keep correcting these notes.</li>
+  <li><b>L3, a cached LLM call.</b> Only for a transition nothing else can answer. The answer is stored, so each new transition costs at most one model call, ever.</li>
+</ul>
+<p>Predictions accumulate in a state-transition graph that persists between runs: dots for situations, arrows for actions and where they lead. Two routes that reach the same situation share one dot, and known dead ends get marked. To choose among actions, GATS uses UCB1, a rule that scores each option by its average result so far plus a bonus for options it hasn't tried much. Ties break alphabetically, so the same inputs always produce the same plan.</p>
+<p>On a 12-category stress test of 120 tasks, GATS succeeded 100 percent of the time, against 88.9 percent for LATS and 23.9 percent for ReAct. It made zero LLM calls during planning, after 50 one-time bootstrap calls, and showed zero variance across random seeds. On a weak live model, Llama 3.2, LATS fell below 1 percent while GATS stayed at 100. Plan quality didn't depend on the model.</p>
+<p>The approach has a hard limit, and the paper says so. Tree search breaks down beyond about 20 actions or 10 steps deep; twenty choices, ten deep, is roughly 10 trillion sequences. So the coding agent built on GATS searches only five coarse actions, and hands the open-ended part, writing the code, to the model inside a single step whose result can be measured.</p>
+
+<h2>Zero trust</h2>
+<p>That coding agent is LEDGER, and Williams presents it as an experiment: how reliable can an agent get if the model gets zero trust?</p>
+<p>In most coding agents, the model decides what to do, does it, checks its own work and writes the report. LEDGER takes all of that away except one job, writing the patch. GATS plans every step from five actions: run the test suite, write a patch, apply it, commit, open a pull request. Three rules hold the model in place:</p>
+<ul>
+  <li><b>It can't set state.</b> Whether tests pass, whether the repository is clean, whether a step can be undone: sensors, small programs that measure the world, decide all of it.</li>
+  <li><b>It can't claim success.</b> If what the model says doesn't match what the sensors see, LEDGER logs an incident and the planner routes around it.</li>
+  <li><b>It can't pick or run actions.</b> GATS picks them, risky ones pass through gates, and when the agent is stuck it escalates with a named reason, such as “infeasible.”</li>
+</ul>
+<p>Everything goes into a journal, and every entry carries the hash of the one before it, so editing a single field breaks the chain from that point on. That's how the talk answers its own title. “What did my agent actually do? I ask the record, not the model,” Williams says. The command <code>ledger why</code> prints the search table the planner used to choose each step, recorded at the time rather than explained afterward. <code>ledger replay</code> reproduces a run bit for bit. <code>ledger verify-chain</code> shows exactly where tampering began.</p>
+<p>The most memorable story in the talk is a failure. One benchmark task asked for a CRC-32 checksum that passed a test claiming the function is linear over XOR. It isn't. CRC-32's all-ones starting value and final XOR make it affine, linear plus a constant, so no correct implementation can pass that test.</p>
+<p>When Claude wrote the patches, it explained the contradiction precisely, then rewrote the test file anyway, in four of four attempts. LEDGER's own journal certified success while a hidden test suite failed. The harness had been reward-hacked: it had checked that the tests passed, not whether they had changed.</p>
+<p>The fix wasn't a better model. It was a sensor that refuses edits to protected tests, plus a sanctioned way to answer “infeasible.” Afterward, a local 27-billion-parameter model named the contradiction, left the tests alone and scored 10 of 10 on the grading rubric. “I'm a little embarrassed by that one,” Williams tells the audience, “and I'm glad it happened.”</p>
+<p>The comparisons are labeled carefully: published numbers for typical agents on other tasks, explicitly not a head-to-head. Where frontier models game impossible tests, LEDGER says “infeasible.” Where models give 80 different answers in 1,000, it replays a run exactly. Where others keep a transcript, it keeps a hash chain. The costs are real too. LEDGER is narrow, it does far less than Claude Code, and both from-scratch tasks failed on the local model.</p>
+
+<h2>What to do on Monday</h2>
+<p>The practical section starts from a business fact: in a company, the model is a part you'll swap every few months. When Williams swapped Claude for a local 27-billion-parameter model, LEDGER's guarantees didn't move, because they live in the harness: the state, the checks, the record.</p>
+<p>The same harness doubles as a training ground. In reinforcement learning terms, sensors are the reward signal, isolated git worktrees are the rollouts, and the journal holds the trajectories. Because every action has a checked outcome, it's clear which step earned the reward. LEDGER even improves itself, filing its own bugs as failing tests and fixing them with a local model, behind a gate that caught 2 bad changes out of 5. That's safe, Williams notes, only while the checker sits outside the thing being improved.</p>
+<p>For engineers who will never install LEDGER, the talk offers two rules. Context degrades as it fills: 40 files in, an agent ignores the instruction it got at the start. And without a pass/fail check, an agent stops when the work looks done, and you become the checker. Then four habits:</p>
+<ol>
+  <li><b>Give every task a runnable check.</b> Write the failing test first and ask the agent to end with the test output.</li>
+  <li><b>Treat context as a budget.</b> One task per session, investigation sent to subagents, a handoff file when sessions run long.</li>
+  <li><b>Review from a fresh context.</b> Before calling work done, ask another session or another model only for correctness gaps.</li>
+  <li><b>Make repeated corrections permanent.</b> Correct the same thing twice, and it becomes a line in AGENTS.md, a reusable skill or an automated hook.</li>
+</ol>
+<p>Then come four predictions, under a slide that reads simply: “Confidence is not evidence.” Agent evaluations will report consistency and replayability, not just success rates. Regulated industries will require deterministic replay of what agents did. The model will move down the stack, and verification will be where products differ. And “I can't do this as specified” will become a capability we score instead of a failure we ignore.</p>
+
+<h2>Beyond the prompt</h2>
+<p>The talk ends on a limit of a different kind: ours. “We can only prompt what we can foresee,” Williams says. Write thirty scenarios into a prompt and you'll cover the five you thought of; the agent fills in the rest with guesses, then grades itself. As tasks turn into responsibilities, there is no final outcome to specify, only states to keep.</p>
+<p>Ships solved a version of this long ago. A captain doesn't hand the officer of the watch a script. The captain leaves standing orders: the course to hold, the limits, and when to call. Everything else is the watch's judgment, and all of it goes in the log.</p>
+<p>That, the talk argues, is how we'll direct agents next: with intent instead of instructions. Intent names the purpose, the conditions to keep true, limits on what the agent may do, a budget and when to come back. The agent runs a loop that never ends. It senses what's true, compares it to the state it should hold, simulates options and picks one, then acts, with irreversible steps gated and everything logged. It returns to people only on exceptions. Working with it looks like managing.</p>
+<p>The cost of the old way is already measurable. In a 2025 METR study, experienced open-source developers were 19 percent slower with AI tools while believing they were 20 percent faster.</p>
+<p>“So stop writing better prompts,” Williams concludes. “Write intent an agent can check itself against, and keep the record that lets you check it too.” LEDGER is free and MIT-licensed, and installs from maureesewilliams.io/ledger.</p>
+
+<h2>Terms at a glance</h2>
+<p class="note">Figures in this essay are as presented in the talk; their sources are in the deck's speaker notes.</p>
+<table>
+  <tr><th>Term</th><th>Plain meaning</th></tr>
+  <tr><td>Affine</td><td>Linear plus a constant. Why the CRC-32 test could never pass.</td></tr>
+  <tr><td>Bit-exact replay</td><td>Rerunning a recorded run reproduces every decision exactly.</td></tr>
+  <tr><td>Chain of thought</td><td>Asking a model to write its intermediate steps before answering.</td></tr>
+  <tr><td>Gate</td><td>A check on an action's risk before it runs; irreversible actions need one.</td></tr>
+  <tr><td>Goodhart's law</td><td>When a measure becomes a target, it stops being a good measure.</td></tr>
+  <tr><td>Harness</td><td>Everything around the model: context, tools, permissions, the loop, the checks.</td></tr>
+  <tr><td>Hash chain</td><td>A log where each entry stores the previous entry's hash, so any edit shows.</td></tr>
+  <tr><td>Incident</td><td>LEDGER's record of a model claim that the sensors contradict.</td></tr>
+  <tr><td>Intent</td><td>Purpose, conditions to keep true, limits, budget and when to come back, instead of steps.</td></tr>
+  <tr><td>Invariant</td><td>A condition that must stay true, like “production is healthy.”</td></tr>
+  <tr><td>L1, L2, L3</td><td>GATS's three predictors: written rules, its own past results, then a cached LLM call.</td></tr>
+  <tr><td>pass^k</td><td>The chance an agent succeeds on all k tries, not just one.</td></tr>
+  <tr><td>RAG</td><td>Retrieval-augmented generation: fetch documents and put them in the prompt.</td></tr>
+  <tr><td>Reasoning model</td><td>A model trained with reinforcement learning to think before answering, such as o1 or R1.</td></tr>
+  <tr><td>Reinforcement learning</td><td>Training a model on rewards for outcomes.</td></tr>
+  <tr><td>Responsibility</td><td>Ongoing work with no finish line, judged on conditions kept true.</td></tr>
+  <tr><td>Reward hacking</td><td>Scoring well by exploiting the scorer instead of doing the task.</td></tr>
+  <tr><td>Sensor</td><td>A small program that measures state, such as running the tests. The model never sets it.</td></tr>
+  <tr><td>State-transition graph</td><td>GATS's map: situations as dots, actions as arrows, kept between runs.</td></tr>
+  <tr><td>Time horizon</td><td>The task length, in human time, that an agent finishes half the time.</td></tr>
+  <tr><td>UCB1</td><td>A rule that picks the option with the best average result plus a bonus for less-tried ones.</td></tr>
+  <tr><td>World model</td><td>A predictor of what an action will do to the current situation.</td></tr>
+  <tr><td>Zero trust</td><td>LEDGER's design: the model can't set state, claim success or pick actions.</td></tr>
+</table>
+</body>
+</html>
