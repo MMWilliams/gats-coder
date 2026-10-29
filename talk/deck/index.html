@@ -106,17 +106,43 @@ table.t.tight td{padding:8px 16px}
 .frag.on{opacity:1;transform:none}
 span.frag{display:inline-block}
 @keyframes rise{from{opacity:0;transform:translateY(18px)}}
-@keyframes wipe{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
 .slide.active>:not(aside):not(.frag){animation:rise .6s cubic-bezier(.2,.7,.3,1) both}
 .slide.active>:nth-child(2){animation-delay:.08s} .slide.active>:nth-child(3){animation-delay:.16s}
 .slide.active>:nth-child(4){animation-delay:.24s} .slide.active>:nth-child(n+5){animation-delay:.32s}
-.slide.active svg.tl{animation:wipe 2s .35s cubic-bezier(.45,0,.25,1) both}
-.slide.active svg.hz{animation:wipe 2.6s .35s cubic-bezier(.45,0,.25,1) both}
 .slide.active ol.big li:not(.frag){animation:rise .5s cubic-bezier(.2,.7,.3,1) both}
 .slide.active ol.big li:nth-child(1){animation-delay:.3s} .slide.active ol.big li:nth-child(2){animation-delay:.45s}
 .slide.active ol.big li:nth-child(3){animation-delay:.6s} .slide.active ol.big li:nth-child(4){animation-delay:.75s}
 .frag.on .ab{animation:rise .45s cubic-bezier(.2,.7,.3,1) both}
 .frag.on .ab:nth-child(3){animation-delay:.1s} .frag.on .ab:nth-child(4){animation-delay:.2s} .frag.on .ab:nth-child(5){animation-delay:.3s}
+/* charts: native animation (a-* classes from timeline.py/horizon.py; delay --d, duration --t) */
+@keyframes pop{0%{opacity:0;transform:scale(0)}65%{opacity:1;transform:scale(1.3)}100%{opacity:1;transform:scale(1)}}
+@keyframes fadein{from{opacity:0}}
+@keyframes growx{from{transform:scaleX(0)}}
+@keyframes grow{from{transform:scale(0)}}
+@keyframes growy{from{transform:scaleY(0)}}
+svg .a-pop,svg .a-grow,svg .a-grow-up,svg .a-drop{transform-box:fill-box}
+svg .a-pop{transform-origin:center} svg .a-grow{transform-origin:left center}
+svg .a-grow-up{transform-origin:left bottom} svg .a-drop{transform-origin:center top}
+.slide.active svg .a-fade{animation:fadein .5s var(--d,0s) both}
+.slide.active svg .a-pop{animation:pop .55s var(--d,0s) cubic-bezier(.2,.7,.3,1) both}
+.slide.active svg .a-grow{animation:growx var(--t,.8s) var(--d,0s) linear both}
+.slide.active svg .a-grow-up{animation:grow var(--t,.8s) var(--d,0s) linear both}
+.slide.active svg .a-drop{animation:growy .7s var(--d,0s) ease-out both}
+/* charts: interaction */
+[data-tip]{cursor:help}
+.tl .lane{transition:opacity .25s} .tl:has(.lane:hover) .lane:not(:hover){opacity:.28}
+.tl .ms:hover circle,.hzc .pt:hover circle{stroke-width:6}
+.hzc{position:relative} .hzc .seg{position:absolute;left:150px;top:118px}
+.hzc .pt{transition:transform .9s cubic-bezier(.3,.7,.2,1)} .hzc.p80 .pt{transform:translateY(var(--dy))}
+.hzc .m50{transition:opacity .45s} .hzc.p80 .m50{opacity:0}
+.hzc .m80{opacity:0;transition:opacity .45s} .hzc.p80 .m80{opacity:1;transition-delay:.5s}
+.seg{display:inline-flex;gap:2px;padding:3px;border:1px solid #e5e5e7;border-radius:999px;background:#fff}
+.seg button{font:600 15px var(--sans);border:0;background:none;color:var(--ink-3);padding:7px 15px;border-radius:999px;cursor:pointer}
+.seg button.on{background:var(--ink);color:#fff}
+.gatsc .bar[data-tip]:hover .fill{filter:brightness(1.12)}
+#tip{position:fixed;z-index:9;pointer-events:none;max-width:440px;background:#141518;color:#fff;font:15px/1.45 var(--sans);
+  padding:10px 14px;border-radius:8px;box-shadow:0 6px 24px rgba(0,0,0,.18);opacity:0;transform:translateY(4px);transition:opacity .15s,transform .15s}
+#tip.show{opacity:1;transform:none}
 body.all .frag{opacity:1;transform:none;transition:none}
 body.all *{animation:none!important}
 
@@ -200,77 +226,122 @@ body.all *{animation:none!important}
   <div class="eyebrow">What's happening · agent harnesses, 2020 to now</div>
   <h2>Harnesses grow, then models absorb them</h2>
   <svg class="tl" viewBox="0 0 1376 460" style="width:100%;font-family:var(--sans)">
+    <g class="lane">
+    <rect x="0" y="27" width="1376" height="76" fill="transparent"/>
+    <text class="a-fade" style="--d:0.0s" x="0" y="63" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#2b6cd4">KNOW</text>
+    <text class="a-fade" style="--d:0.0s" x="0" y="84" font-size="15" fill="#8a8b90">context</text>
+    <rect class="a-grow" style="--d:0.45s;--t:3.3s" x="199.7" y="60" width="980.3" height="10" rx="5" fill="#2b6cd4"/>
+    <g class="ms" data-tip="2020 · Few-shot prompts and retrieval (RAG): put the right text in the context">
+    <circle class="a-pop" style="--d:0.55s" cx="229.4" cy="65" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text class="a-fade" style="--d:0.65s" x="229.4" y="49" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">prompt, RAG</text>
+    </g>
+    <g class="ms" data-tip="2023 · MemGPT: the model pages its own memory in and out">
+    <circle class="a-pop" style="--d:2.25s" cx="734.4" cy="65" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text class="a-fade" style="--d:2.35s" x="734.4" y="49" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">MemGPT</text>
+    </g>
+    <g class="ms" data-tip="2025 · Memory files (CLAUDE.md, AGENTS.md) and context compaction">
+    <circle class="a-pop" style="--d:3.05s" cx="972.1" cy="65" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text class="a-fade" style="--d:3.15s" x="878.1" y="49" text-anchor="start" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">memory files, compaction</text>
+    </g>
+    <text class="a-fade" style="--d:3.95s" x="1206" y="71" font-size="17" font-weight="700" fill="#2b6cd4">in the harness</text>
+    </g>
+    <g class="lane">
     <rect x="0" y="103" width="1376" height="76" fill="#f7f7f8"/>
+    <text class="a-fade" style="--d:0.05s" x="0" y="139" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#a8690c">THINK</text>
+    <text class="a-fade" style="--d:0.05s" x="0" y="160" font-size="15" fill="#8a8b90">reasoning</text>
+    <rect class="a-grow" style="--d:1.35s;--t:1.35s" x="467.1" y="136" width="401.0" height="10" rx="5" fill="#a8690c"/>
+    <rect class="a-grow" style="--d:2.7s;--t:1.05s" x="868.1" y="136" width="311.9" height="10" rx="5" fill="#a8690c" opacity=".28"/>
+    <text class="a-fade" style="--d:3.1s" x="1024" y="169" text-anchor="middle" font-size="16" font-style="italic" fill="#a8690c">inside the model now</text>
+    <g class="ms" data-tip="2022 · Chain of thought: PaLM 540B on GSM8K, 18% to 57%. Self-consistency voting: +18 points">
+    <circle class="a-pop" style="--d:1.4s" cx="481.9" cy="141" r="8" fill="#fff" stroke="#a8690c" stroke-width="4"/>
+    <text class="a-fade" style="--d:1.5s" x="481.9" y="125" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">chain of thought, voting</text>
+    </g>
+    <g class="ms" data-tip="2023 · Reflexion: critique the failed attempt, retry. 91% on HumanEval">
+    <circle class="a-pop" style="--d:1.95s" cx="645.3" cy="141" r="8" fill="#fff" stroke="#a8690c" stroke-width="4"/>
+    <text class="a-fade" style="--d:2.05s" x="645.3" y="169" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">Reflexion</text>
+    </g>
+    <g class="ms" data-tip="2023 · Search over partial solutions. Game of 24: 4% to 74%. LATS: 92.7% HumanEval">
+    <circle class="a-pop" style="--d:2.2s" cx="719.6" cy="141" r="8" fill="#fff" stroke="#a8690c" stroke-width="4"/>
+    <text class="a-fade" style="--d:2.3000000000000003s" x="719.6" y="125" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">Tree of Thoughts, LATS</text>
+    </g>
+    <text class="a-fade" style="--d:4.05s" x="1206" y="147" font-size="17" font-weight="700" fill="#a8690c">in the model</text>
+    </g>
+    <g class="lane">
+    <rect x="0" y="179" width="1376" height="76" fill="transparent"/>
+    <text class="a-fade" style="--d:0.1s" x="0" y="215" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#2b6cd4">ACT</text>
+    <text class="a-fade" style="--d:0.1s" x="0" y="236" font-size="15" fill="#8a8b90">tools</text>
+    <rect class="a-grow" style="--d:1.7s;--t:2.05s" x="571.0" y="212" width="609.0" height="10" rx="5" fill="#2b6cd4"/>
+    <g class="ms" data-tip="2022 · ReAct: interleave reasoning and tool calls. +34 points on ALFWorld">
+    <circle class="a-pop" style="--d:1.75s" cx="585.9" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text class="a-fade" style="--d:1.85s" x="585.9" y="201" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">ReAct loop</text>
+    </g>
+    <g class="ms" data-tip="2023 · Native function calling: tools as structured calls, not parsed text">
+    <circle class="a-pop" style="--d:2.08s" cx="682.4" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text class="a-fade" style="--d:2.18s" x="682.4" y="245" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">function calling</text>
+    </g>
+    <g class="ms" data-tip="2024 · Agent-computer interfaces for code: edit, run, test in a loop">
+    <circle class="a-pop" style="--d:2.5s" cx="808.7" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text class="a-fade" style="--d:2.6s" x="858.1" y="201" text-anchor="end" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">SWE-agent, CodeAct</text>
+    </g>
+    <g class="ms" data-tip="Nov 2024 · Model Context Protocol: one standard plug for tools and data">
+    <circle class="a-pop" style="--d:2.8s" cx="897.8" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text class="a-fade" style="--d:2.9s" x="897.8" y="245" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">MCP</text>
+    </g>
+    <g class="ms" data-tip="2025 · Frontier coding agents: a simple loop around a reasoning model">
+    <circle class="a-pop" style="--d:3.15s" cx="1001.8" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text class="a-fade" style="--d:3.25s" x="878.1" y="201" text-anchor="start" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">Claude Code, Codex, Antigravity</text>
+    </g>
+    <text class="a-fade" style="--d:4.15s" x="1206" y="223" font-size="17" font-weight="700" fill="#2b6cd4">in the harness</text>
+    </g>
+    <g class="lane">
     <rect x="0" y="255" width="1376" height="76" fill="#f7f7f8"/>
-    <line x1="868.1" y1="22" x2="868.1" y2="407" stroke="#a8690c" stroke-width="2" stroke-dasharray="5 5"/>
-    <text x="0" y="63" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#2b6cd4">KNOW</text>
-    <text x="0" y="84" font-size="15" fill="#8a8b90">context</text>
-    <rect x="199.7" y="60" width="980.3" height="10" rx="5" fill="#2b6cd4"/>
-    <circle cx="229.4" cy="65" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
-    <text x="229.4" y="49" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">prompt, RAG</text>
-    <circle cx="734.4" cy="65" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
-    <text x="734.4" y="49" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">MemGPT</text>
-    <circle cx="972.1" cy="65" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
-    <text x="878.1" y="49" text-anchor="start" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">memory files, compaction</text>
-    <text x="1206" y="71" font-size="17" font-weight="700" fill="#2b6cd4">in the harness</text>
-    <text x="0" y="139" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#a8690c">THINK</text>
-    <text x="0" y="160" font-size="15" fill="#8a8b90">reasoning</text>
-    <rect x="467.1" y="136" width="401.0" height="10" rx="5" fill="#a8690c"/>
-    <rect x="868.1" y="136" width="311.9" height="10" rx="5" fill="#a8690c" opacity=".28"/>
-    <text x="1024" y="169" text-anchor="middle" font-size="16" font-style="italic" fill="#a8690c">inside the model now</text>
-    <circle cx="481.9" cy="141" r="8" fill="#fff" stroke="#a8690c" stroke-width="4"/>
-    <text x="481.9" y="125" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">chain of thought, voting</text>
-    <circle cx="645.3" cy="141" r="8" fill="#fff" stroke="#a8690c" stroke-width="4"/>
-    <text x="645.3" y="169" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">Reflexion</text>
-    <circle cx="719.6" cy="141" r="8" fill="#fff" stroke="#a8690c" stroke-width="4"/>
-    <text x="719.6" y="125" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">Tree of Thoughts, LATS</text>
-    <text x="1206" y="147" font-size="17" font-weight="700" fill="#a8690c">in the model</text>
-    <text x="0" y="215" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#2b6cd4">ACT</text>
-    <text x="0" y="236" font-size="15" fill="#8a8b90">tools</text>
-    <rect x="571.0" y="212" width="609.0" height="10" rx="5" fill="#2b6cd4"/>
-    <circle cx="585.9" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
-    <text x="585.9" y="201" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">ReAct loop</text>
-    <circle cx="682.4" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
-    <text x="682.4" y="245" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">function calling</text>
-    <circle cx="808.7" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
-    <text x="858.1" y="201" text-anchor="end" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">SWE-agent, CodeAct</text>
-    <circle cx="897.8" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
-    <text x="897.8" y="245" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">MCP</text>
-    <circle cx="1001.8" cy="217" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
-    <text x="878.1" y="201" text-anchor="start" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">Claude Code, Codex, Antigravity</text>
-    <text x="1206" y="223" font-size="17" font-weight="700" fill="#2b6cd4">in the harness</text>
-    <text x="0" y="291" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#2b6cd4">CONTROL</text>
-    <text x="0" y="312" font-size="15" fill="#8a8b90">permission</text>
-    <rect x="660.1" y="288" width="519.9" height="10" rx="5" fill="#2b6cd4"/>
-    <circle cx="660.1" cy="293" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
-    <text x="660.1" y="277" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">AutoGPT asks y/n</text>
-    <circle cx="972.1" cy="293" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
-    <text x="878.1" y="277" text-anchor="start" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">permission modes, sandboxes, hooks</text>
-    <text x="1206" y="299" font-size="17" font-weight="700" fill="#2b6cd4">in the harness</text>
-    <text x="0" y="367" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#c72d26">PROVE</text>
-    <text x="0" y="388" font-size="15" fill="#8a8b90">verify, record</text>
-    <line x1="734.4" y1="369" x2="1180" y2="369" stroke="#c72d26" stroke-width="6" stroke-dasharray="14 10" stroke-linecap="round"/>
-    <circle cx="734.4" cy="369" r="8" fill="#fff" stroke="#c72d26" stroke-width="4"/>
-    <text x="734.4" y="353" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">SWE-bench: tests as judge</text>
-    <circle cx="1135.4" cy="369" r="8" fill="#fff" stroke="#c72d26" stroke-width="4"/>
-    <text x="1180" y="397" text-anchor="end" font-size="16" font-weight="600" fill="#c72d26" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">GATS, LEDGER: sensors, replayable journal</text>
-    <text x="1206" y="375" font-size="17" font-weight="700" fill="#c72d26">barely built</text>
-    <text x="868.1" y="15" text-anchor="middle" font-size="16" font-weight="600" fill="#a8690c">o1, R1 (2024-25): reasoning trained into the model</text>
-    <line x1="170" y1="419" x2="1180" y2="419" stroke="#8a8b90" stroke-width="1.5"/>
-    <line x1="170.0" y1="413" x2="170.0" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
-    <text x="170.0" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2020</text>
-    <line x1="318.5" y1="413" x2="318.5" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
-    <text x="318.5" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2021</text>
-    <line x1="467.1" y1="413" x2="467.1" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
-    <text x="467.1" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2022</text>
-    <line x1="615.6" y1="413" x2="615.6" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
-    <text x="615.6" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2023</text>
-    <line x1="764.1" y1="413" x2="764.1" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
-    <text x="764.1" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2024</text>
-    <line x1="912.6" y1="413" x2="912.6" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
-    <text x="912.6" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2025</text>
-    <line x1="1061.2" y1="413" x2="1061.2" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
-    <text x="1061.2" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2026</text>
+    <text class="a-fade" style="--d:0.15000000000000002s" x="0" y="291" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#2b6cd4">CONTROL</text>
+    <text class="a-fade" style="--d:0.15000000000000002s" x="0" y="312" font-size="15" fill="#8a8b90">permission</text>
+    <rect class="a-grow" style="--d:2.0s;--t:1.75s" x="660.1" y="288" width="519.9" height="10" rx="5" fill="#2b6cd4"/>
+    <g class="ms" data-tip="2023 · AutoGPT: a human approves every step">
+    <circle class="a-pop" style="--d:2.0s" cx="660.1" cy="293" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text class="a-fade" style="--d:2.1s" x="660.1" y="277" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">AutoGPT asks y/n</text>
+    </g>
+    <g class="ms" data-tip="2025 · Permission modes, sandboxes and hooks around coding agents">
+    <circle class="a-pop" style="--d:3.05s" cx="972.1" cy="293" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="4"/>
+    <text class="a-fade" style="--d:3.15s" x="878.1" y="277" text-anchor="start" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">permission modes, sandboxes, hooks</text>
+    </g>
+    <text class="a-fade" style="--d:4.25s" x="1206" y="299" font-size="17" font-weight="700" fill="#2b6cd4">in the harness</text>
+    </g>
+    <g class="lane">
+    <rect x="0" y="331" width="1376" height="76" fill="transparent"/>
+    <text class="a-fade" style="--d:0.2s" x="0" y="367" font-family="var(--mono)" font-weight="600" font-size="17" letter-spacing="2" fill="#c72d26">PROVE</text>
+    <text class="a-fade" style="--d:0.2s" x="0" y="388" font-size="15" fill="#8a8b90">verify, record</text>
+    <line class="a-grow" style="--d:2.25s;--t:1.5s" x1="734.4" y1="369" x2="1180.0" y2="369" stroke="#c72d26" stroke-width="6" stroke-dasharray="14 10" stroke-linecap="round"/>
+    <g class="ms" data-tip="2023 · SWE-bench: real GitHub issues, judged by the repo&#x27;s own tests">
+    <circle class="a-pop" style="--d:2.25s" cx="734.4" cy="369" r="8" fill="#fff" stroke="#c72d26" stroke-width="4"/>
+    <text class="a-fade" style="--d:2.35s" x="734.4" y="353" text-anchor="middle" font-size="16" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">SWE-bench: tests as judge</text>
+    </g>
+    <g class="ms" data-tip="2026 · GATS and LEDGER: sensors decide state; a hash-chained journal you can replay">
+    <circle class="a-pop" style="--d:3.6s" cx="1135.4" cy="369" r="8" fill="#fff" stroke="#c72d26" stroke-width="4"/>
+    <text class="a-fade" style="--d:3.7s" x="1180" y="397" text-anchor="end" font-size="16" font-weight="600" fill="#c72d26" paint-order="stroke" stroke="#fff" stroke-width="5" stroke-linejoin="round">GATS, LEDGER: sensors, replayable journal</text>
+    </g>
+    <text class="a-fade" style="--d:4.3500000000000005s" x="1206" y="375" font-size="17" font-weight="700" fill="#c72d26">barely built</text>
+    </g>
+    <g class="ms" data-tip="Sep 2024 to Jan 2025 · o1 and DeepSeek R1: RL trained the reasoning lane into the weights">
+    <line class="a-drop" style="--d:2.7s" x1="868.1" y1="22" x2="868.1" y2="407" stroke="#a8690c" stroke-width="2" stroke-dasharray="5 5"/>
+    <text class="a-fade" style="--d:2.7s" x="868.1" y="15" text-anchor="middle" font-size="16" font-weight="600" fill="#a8690c">o1, R1 (2024-25): reasoning trained into the model</text>
+    </g>
+    <line class="a-grow" style="--d:0.35s;--t:3.4s" x1="170" y1="419" x2="1180" y2="419" stroke="#8a8b90" stroke-width="1.5"/>
+    <line class="a-fade" style="--d:0.35s" x1="170.0" y1="413" x2="170.0" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text class="a-fade" style="--d:0.35s" x="170.0" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2020</text>
+    <line class="a-fade" style="--d:0.85s" x1="318.5" y1="413" x2="318.5" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text class="a-fade" style="--d:0.85s" x="318.5" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2021</text>
+    <line class="a-fade" style="--d:1.35s" x1="467.1" y1="413" x2="467.1" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text class="a-fade" style="--d:1.35s" x="467.1" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2022</text>
+    <line class="a-fade" style="--d:1.85s" x1="615.6" y1="413" x2="615.6" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text class="a-fade" style="--d:1.85s" x="615.6" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2023</text>
+    <line class="a-fade" style="--d:2.35s" x1="764.1" y1="413" x2="764.1" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text class="a-fade" style="--d:2.35s" x="764.1" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2024</text>
+    <line class="a-fade" style="--d:2.85s" x1="912.6" y1="413" x2="912.6" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text class="a-fade" style="--d:2.85s" x="912.6" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2025</text>
+    <line class="a-fade" style="--d:3.35s" x1="1061.2" y1="413" x2="1061.2" y2="425" stroke="#8a8b90" stroke-width="1.5"/>
+    <text class="a-fade" style="--d:3.35s" x="1061.2" y="445" text-anchor="middle" font-family="var(--mono)" font-size="16" fill="#8a8b90">2026</text>
     </svg>
   <p class="frag" style="margin-top:14px;font-size:30px">Models absorb procedures. <b>They can't absorb the check.</b></p>
   <aside class="notes">2:55-4:40. <ul class="beats"><li>Harness = everything around the model: context, reasoning, tools, permission, check (the five lanes)</li><li>Every lane grew the same way: something outside the model worked, then training pulled it in</li><li>Chain of thought: PaLM 540B on GSM8K, 18% to 57%, only at ~100B parameters (Wei et al.). Not scale alone, not the prompt alone.</li><li>RL trained it into the weights against a checker: R1's rewards were rule-based (right answer, tests pass)</li><li>The coupling: the harness finds what works, training absorbs it, scale makes it absorbable</li><li>If asked: self-consistency +18 on GSM8K, ReAct +34 on ALFWorld, Tree of Thoughts 4% to 74%, Reflexion 91%, LATS 92.7%</li><li>Tools went the same way: ReAct, function calling, MCP; Claude Code, Codex, Antigravity run a simple loop</li><li>Can't absorb: what's true now, what it may touch, what happened. Bottom lane is the thinnest.</li></ul><p>[Read the lanes top to bottom.] Here's the full lineage. A harness is everything around the model: context, reasoning, tools, permission, and the check. Every lane grew the same way: something outside the model worked, and then training pulled it in. Chain of thought is the clearest case. Asking PaLM to show its steps took grade-school math from 18% to 57%, but only at around 100 billion parameters. On small models it didn't help. Scale alone didn't find it, and the prompt alone didn't work. Then reinforcement learning trained the procedure into the weights, against a checker: DeepSeek's R1 was rewarded by rule-based checks, is the math answer right, do the tests pass. So the pattern isn't scaling, or RL, or harnesses. It's the coupling: the harness finds what works, training absorbs it, and scale makes it absorbable. Tools went the same way: ReAct, function calling, MCP, and now Claude Code, Codex and Antigravity running a simple loop. [→] What a model can't absorb is contact with the world: what's true right now, what it's allowed to touch, and what actually happened. [Point at the bottom lane.] Checking and recording is the thinnest lane. That's this talk.</p></aside>
@@ -296,6 +367,7 @@ body.all *{animation:none!important}
 <section data-t="6:20" class="slide" data-sec="How we got here">
   <div class="eyebrow">Why now · METR: task length an agent finishes half the time</div>
   <h2>Task length doubles about every 4 months</h2>
+  <div class="chart hzc"><div class="seg"><button class="on" data-mode="p50">50% success</button><button data-mode="p80">80% success</button></div>
   <svg class="hz" viewBox="0 0 1376 490" style="width:100%;font-family:var(--sans)">
     <g class="frag">
     <rect x="130" y="6" width="1200" height="86" rx="12" fill="#fbeceb" stroke="#c72d26" stroke-dasharray="6 6" stroke-opacity=".55"/>
@@ -304,85 +376,135 @@ body.all *{animation:none!important}
     <text x="150" y="82" font-size="15" fill="#8a8b90">Not a cron job or a pipeline (triggered, stateless): one agent that owns its state, runs continuously, and is judged on invariants held, not goals reached.</text>
     <text x="118" y="54" text-anchor="end" font-size="15" font-weight="700" fill="#c72d26">no end</text>
     </g>
-    <line x1="130" y1="417.2" x2="1330" y2="417.2" stroke="#e5e5e7" stroke-width="1"/>
-    <text x="118" y="422.2" text-anchor="end" font-size="15" fill="#8a8b90">seconds</text>
-    <line x1="130" y1="342.3" x2="1330" y2="342.3" stroke="#e5e5e7" stroke-width="1"/>
-    <text x="118" y="347.3" text-anchor="end" font-size="15" fill="#8a8b90">1 min</text>
-    <line x1="130" y1="284.8" x2="1330" y2="284.8" stroke="#e5e5e7" stroke-width="1"/>
-    <text x="118" y="289.8" text-anchor="end" font-size="15" fill="#8a8b90">10 min</text>
-    <line x1="130" y1="240.0" x2="1330" y2="240.0" stroke="#e5e5e7" stroke-width="1"/>
-    <text x="118" y="245.0" text-anchor="end" font-size="15" fill="#8a8b90">1 hour</text>
-    <line x1="130" y1="188.0" x2="1330" y2="188.0" stroke="#e5e5e7" stroke-width="1"/>
-    <text x="118" y="193.0" text-anchor="end" font-size="15" fill="#8a8b90">1 workday</text>
-    <line x1="130" y1="147.7" x2="1330" y2="147.7" stroke="#e5e5e7" stroke-width="1"/>
-    <text x="118" y="152.7" text-anchor="end" font-size="15" fill="#8a8b90">1 work week</text>
-    <line x1="130" y1="112.0" x2="1330" y2="112.0" stroke="#e5e5e7" stroke-width="1"/>
-    <text x="118" y="117.0" text-anchor="end" font-size="15" fill="#8a8b90">1 work month</text>
-    <polygon points="1047.4,183.3 1196.0,112.0 1272.2,112.0 1272.2,112.0 1047.4,183.3" fill="#2b6cd4" opacity=".08"/>
-    <line x1="635.3" y1="343.7" x2="1047.4" y2="183.3" stroke="#2b6cd4" stroke-width="3" stroke-opacity=".5"/>
-    <line x1="1047.4" y1="183.3" x2="1230.6" y2="112.0" stroke="#2b6cd4" stroke-width="3" stroke-dasharray="8 7"/>
-    <circle cx="145.2" cy="415.4" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <text x="157.2" y="401.4" text-anchor="start" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-2</text>
-    <text x="157.2" y="419.4" text-anchor="start" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">answer a lookup</text>
-    <circle cx="307.5" cy="390.8" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <text x="317.5" y="376.8" text-anchor="start" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-3</text>
-    <circle cx="534.2" cy="355.1" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <text x="522.2" y="329.1" text-anchor="end" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-3.5</text>
-    <text x="522.2" y="347.1" text-anchor="end" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">write a function</text>
-    <circle cx="660.2" cy="307.7" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <text x="648.2" y="281.7" text-anchor="end" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-4</text>
-    <text x="648.2" y="299.7" text-anchor="end" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">fix a small bug</text>
-    <circle cx="742.1" cy="307.4" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <circle cx="807.6" cy="293.7" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <circle cx="820.7" cy="281.5" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <circle cx="849.8" cy="267.0" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <circle cx="863.6" cy="266.8" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <circle cx="878.8" cy="250.8" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <text x="864.8" y="226.8" text-anchor="end" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">o1</text>
-    <text x="864.8" y="244.8" text-anchor="end" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">debug across files</text>
-    <circle cx="906.6" cy="239.8" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <circle cx="924.2" cy="222.7" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <circle cx="963.3" cy="209.5" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <text x="949.3" y="179.5" text-anchor="end" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-5</text>
-    <text x="949.3" y="197.5" text-anchor="end" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">build a feature</text>
-    <circle cx="998.9" cy="207.0" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <circle cx="1001.0" cy="200.3" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <circle cx="1006.9" cy="195.7" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <circle cx="1026.3" cy="177.9" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
-    <text x="1042.3" y="211.9" text-anchor="start" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">Claude Opus 4.6, Mythos</text>
-    <text x="1042.3" y="229.9" text-anchor="start" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">a day's project</text>
-    <circle cx="1047.4" cy="168.5" r="7" fill="#fff" stroke="#2b6cd4" stroke-width="3"/>
-    <circle cx="1138.8" cy="147.7" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="3" stroke-dasharray="4 3"/>
-    <text x="1152.8" y="169.7" text-anchor="start" font-size="16" font-weight="700" fill="#2b6cd4" paint-order="stroke" stroke="#fff" stroke-width="5">a week's project</text>
-    <text x="1152.8" y="187.7" text-anchor="start" font-size="15" fill="#8a8b90" paint-order="stroke" stroke="#fff" stroke-width="5">trend: Dec 2026</text>
-    <circle cx="1230.6" cy="112.0" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="3" stroke-dasharray="4 3"/>
-    <text x="1216.6" y="134.0" text-anchor="end" font-size="16" font-weight="700" fill="#2b6cd4" paint-order="stroke" stroke="#fff" stroke-width="5">a month's project</text>
-    <text x="1216.6" y="152.0" text-anchor="end" font-size="15" fill="#8a8b90" paint-order="stroke" stroke="#fff" stroke-width="5">trend: Sep 2027 (CI Jun 2027 – Jan 2028)</text>
-    <line x1="1230.6" y1="102.0" x2="1230.6" y2="96" stroke="#c72d26" stroke-width="2.5" stroke-dasharray="4 4"/>
-    <text x="1240.6" y="106.0" font-size="20" font-weight="800" fill="#c72d26">?</text>
-    <rect x="132.0" y="440" width="463.4" height="24" rx="6" fill="#eeeef0"/>
-    <text x="363.7" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#45464a">prompts</text>
-    <rect x="599.4" y="440" width="248.60000000000002" height="24" rx="6" fill="#eaf1fc"/>
-    <text x="723.7" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#2b6cd4">tool loops</text>
-    <rect x="852.0" y="440" width="261.29999999999995" height="24" rx="6" fill="#f8f0e2"/>
-    <text x="982.65" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#a8690c">reasoning + harnesses</text>
-    <rect x="1117.3" y="440" width="128.60000000000014" height="24" rx="6" fill="#e8f4ef" stroke="#0f7a5a" stroke-dasharray="5 4" stroke-opacity=".6"/>
-    <text x="1181.6" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#0f7a5a">planning + checks</text>
-    <rect x="1249.9" y="440" width="78.09999999999991" height="24" rx="6" fill="#fbeceb" stroke="#c72d26" stroke-dasharray="5 4" stroke-opacity=".6"/>
-    <text x="1288.95" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#c72d26">always-on</text>
-    <text x="130.0" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2019</text>
-    <text x="256.3" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2020</text>
-    <text x="382.6" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2021</text>
-    <text x="508.9" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2022</text>
-    <text x="635.3" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2023</text>
-    <text x="761.6" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2024</text>
-    <text x="887.9" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2025</text>
-    <text x="1014.2" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2026</text>
-    <text x="1140.5" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2027</text>
-    <text x="1266.8" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2028</text>
-    </svg>
+    <line class="a-fade" style="--d:0.1s" x1="130" y1="417.2" x2="1330" y2="417.2" stroke="#e5e5e7" stroke-width="1"/>
+    <text class="a-fade" style="--d:0.1s" x="118" y="422.2" text-anchor="end" font-size="15" fill="#8a8b90">seconds</text>
+    <line class="a-fade" style="--d:0.1s" x1="130" y1="342.3" x2="1330" y2="342.3" stroke="#e5e5e7" stroke-width="1"/>
+    <text class="a-fade" style="--d:0.1s" x="118" y="347.3" text-anchor="end" font-size="15" fill="#8a8b90">1 min</text>
+    <line class="a-fade" style="--d:0.1s" x1="130" y1="284.8" x2="1330" y2="284.8" stroke="#e5e5e7" stroke-width="1"/>
+    <text class="a-fade" style="--d:0.1s" x="118" y="289.8" text-anchor="end" font-size="15" fill="#8a8b90">10 min</text>
+    <line class="a-fade" style="--d:0.1s" x1="130" y1="240.0" x2="1330" y2="240.0" stroke="#e5e5e7" stroke-width="1"/>
+    <text class="a-fade" style="--d:0.1s" x="118" y="245.0" text-anchor="end" font-size="15" fill="#8a8b90">1 hour</text>
+    <line class="a-fade" style="--d:0.1s" x1="130" y1="188.0" x2="1330" y2="188.0" stroke="#e5e5e7" stroke-width="1"/>
+    <text class="a-fade" style="--d:0.1s" x="118" y="193.0" text-anchor="end" font-size="15" fill="#8a8b90">1 workday</text>
+    <line class="a-fade" style="--d:0.1s" x1="130" y1="147.7" x2="1330" y2="147.7" stroke="#e5e5e7" stroke-width="1"/>
+    <text class="a-fade" style="--d:0.1s" x="118" y="152.7" text-anchor="end" font-size="15" fill="#8a8b90">1 work week</text>
+    <line class="a-fade" style="--d:0.1s" x1="130" y1="112.0" x2="1330" y2="112.0" stroke="#e5e5e7" stroke-width="1"/>
+    <text class="a-fade" style="--d:0.1s" x="118" y="117.0" text-anchor="end" font-size="15" fill="#8a8b90">1 work month</text>
+    <g class="m50">
+    <g data-tip="95% interval on the doubling time: 104 to 158 days">
+    <polygon class="a-fade" style="--d:3.7199999999999998s" points="1047.4,183.3 1196.0,112.0 1272.2,112.0 1272.2,112.0 1047.4,183.3" fill="#2b6cd4" opacity=".08"/>
+    </g>
+    <g data-tip="Doubling every 129 days since 2023 (fit on measured points under 16 h)">
+    <line class="a-grow-up" style="--d:1.71s;--t:1.11s" x1="635.3" y1="343.7" x2="1047.4" y2="183.3" stroke="#2b6cd4" stroke-width="3" stroke-opacity=".5"/>
+    <line class="a-grow-up" style="--d:2.82s;--t:1.0s" x1="1047.4" y1="183.3" x2="1230.6" y2="112.0" stroke="#2b6cd4" stroke-width="3" stroke-dasharray="8 7"/>
+    </g>
+    <g data-tip="Trend reaches a week's project: Dec 2026. An extrapolation, not a measurement.">
+    <circle class="a-pop" style="--d:3.42s" cx="1138.8" cy="147.7" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="3" stroke-dasharray="4 3"/>
+    <text class="a-fade" style="--d:3.52s" x="1152.8" y="169.7" text-anchor="start" font-size="16" font-weight="700" fill="#2b6cd4" paint-order="stroke" stroke="#fff" stroke-width="5">a week's project</text>
+    <text class="a-fade" style="--d:3.52s" x="1152.8" y="187.7" text-anchor="start" font-size="15" fill="#8a8b90" paint-order="stroke" stroke="#fff" stroke-width="5">trend: Dec 2026</text>
+    </g>
+    <g data-tip="Trend reaches a month's project: Sep 2027 (CI Jun 2027 – Jan 2028). An extrapolation, not a measurement.">
+    <circle class="a-pop" style="--d:3.82s" cx="1230.6" cy="112.0" r="8" fill="#fff" stroke="#2b6cd4" stroke-width="3" stroke-dasharray="4 3"/>
+    <text class="a-fade" style="--d:3.92s" x="1216.6" y="134.0" text-anchor="end" font-size="16" font-weight="700" fill="#2b6cd4" paint-order="stroke" stroke="#fff" stroke-width="5">a month's project</text>
+    <text class="a-fade" style="--d:3.92s" x="1216.6" y="152.0" text-anchor="end" font-size="15" fill="#8a8b90" paint-order="stroke" stroke="#fff" stroke-width="5">trend: Sep 2027 (CI Jun 2027 – Jan 2028)</text>
+    </g>
+    <line class="a-fade" style="--d:4.22s" x1="1230.6" y1="102.0" x2="1230.6" y2="96" stroke="#c72d26" stroke-width="2.5" stroke-dasharray="4 4"/>
+    <text class="a-fade" style="--d:4.22s" x="1240.6" y="106.0" font-size="20" font-weight="800" fill="#c72d26">?</text>
+    </g>
+    <g class="m80">
+    <text x="150" y="218" font-size="19" font-weight="800" fill="#c72d26">At 80% success, every horizon is 5 to 10x shorter</text>
+    <text x="150" y="242" font-size="16" fill="#45464a">Mythos: 17.4 h at 50%, 3.1 h at 80%</text>
+    </g>
+    <g class="pt" style="--dy:14.6px" data-tip="GPT-2 · Feb 2019 · 50% success: 3 s · 80% success: 1 s">
+    <circle class="a-pop" style="--d:0.39s" cx="145.2" cy="415.4" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text class="a-fade" style="--d:0.54s" x="157.2" y="401.4" text-anchor="start" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-2</text>
+    <text class="a-fade" style="--d:0.54s" x="157.2" y="419.4" text-anchor="start" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">answer a lookup</text>
+    </g>
+    <g class="pt" style="--dy:23.5px" data-tip="GPT-3 (davinci-002) · May 2020 · 50% success: 9 s · 80% success: 3 s">
+    <circle class="a-pop" style="--d:0.83s" cx="307.5" cy="390.8" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text class="a-fade" style="--d:0.98s" x="317.5" y="376.8" text-anchor="start" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-3</text>
+    </g>
+    <g class="pt" style="--dy:21.4px" data-tip="GPT-3.5 · Mar 2022 · 50% success: 36 s · 80% success: 15 s">
+    <circle class="a-pop" style="--d:1.44s" cx="534.2" cy="355.1" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text class="a-fade" style="--d:1.5899999999999999s" x="522.2" y="329.1" text-anchor="end" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-3.5</text>
+    <text class="a-fade" style="--d:1.5899999999999999s" x="522.2" y="347.1" text-anchor="end" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">write a function</text>
+    </g>
+    <g class="pt" style="--dy:37.6px" data-tip="GPT-4 · Mar 2023 · 50% success: 4 min · 80% success: 53 s">
+    <circle class="a-pop" style="--d:1.78s" cx="660.2" cy="307.7" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text class="a-fade" style="--d:1.93s" x="648.2" y="281.7" text-anchor="end" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-4</text>
+    <text class="a-fade" style="--d:1.93s" x="648.2" y="299.7" text-anchor="end" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">fix a small bug</text>
+    </g>
+    <g class="pt" style="--dy:41.0px" data-tip="GPT-4 Turbo · Nov 2023 · 50% success: 4 min · 80% success: 47 s">
+    <circle class="a-pop" style="--d:2.0s" cx="742.1" cy="307.4" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    </g>
+    <g class="pt" style="--dy:42.7px" data-tip="GPT-4o · May 2024 · 50% success: 7 min · 80% success: 1 min">
+    <circle class="a-pop" style="--d:2.17s" cx="807.6" cy="293.7" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    </g>
+    <g class="pt" style="--dy:48.0px" data-tip="Claude 3.5 Sonnet · Jun 2024 · 50% success: 11 min · 80% success: 2 min">
+    <circle class="a-pop" style="--d:2.21s" cx="820.7" cy="281.5" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    </g>
+    <g class="pt" style="--dy:38.2px" data-tip="o1-preview · Sep 2024 · 50% success: 20 min · 80% success: 4 min">
+    <circle class="a-pop" style="--d:2.29s" cx="849.8" cy="267.0" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    </g>
+    <g class="pt" style="--dy:51.7px" data-tip="Claude 3.5 Sonnet (new) · Oct 2024 · 50% success: 21 min · 80% success: 3 min">
+    <circle class="a-pop" style="--d:2.32s" cx="863.6" cy="266.8" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    </g>
+    <g class="pt" style="--dy:42.6px" data-tip="o1 · Dec 2024 · 50% success: 39 min · 80% success: 7 min">
+    <circle class="a-pop" style="--d:2.37s" cx="878.8" cy="250.8" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text class="a-fade" style="--d:2.52s" x="864.8" y="226.8" text-anchor="end" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">o1</text>
+    <text class="a-fade" style="--d:2.52s" x="864.8" y="244.8" text-anchor="end" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">debug across files</text>
+    </g>
+    <g class="pt" style="--dy:40.2px" data-tip="Claude 3.7 Sonnet · Feb 2025 · 50% success: 1.0 h · 80% success: 12 min">
+    <circle class="a-pop" style="--d:2.44s" cx="906.6" cy="239.8" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    </g>
+    <g class="pt" style="--dy:34.6px" data-tip="o3 · Apr 2025 · 50% success: 2.0 h · 80% success: 30 min">
+    <circle class="a-pop" style="--d:2.49s" cx="924.2" cy="222.7" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    </g>
+    <g class="pt" style="--dy:41.7px" data-tip="GPT-5 · Aug 2025 · 50% success: 3.4 h · 80% success: 38 min">
+    <circle class="a-pop" style="--d:2.59s" cx="963.3" cy="209.5" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text class="a-fade" style="--d:2.7399999999999998s" x="949.3" y="179.5" text-anchor="end" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">GPT-5</text>
+    <text class="a-fade" style="--d:2.7399999999999998s" x="949.3" y="197.5" text-anchor="end" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">build a feature</text>
+    </g>
+    <g class="pt" style="--dy:35.5px" data-tip="Gemini 3 Pro · Nov 2025 · 50% success: 3.7 h · 80% success: 54 min">
+    <circle class="a-pop" style="--d:2.69s" cx="998.9" cy="207.0" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    </g>
+    <g class="pt" style="--dy:44.5px" data-tip="Claude Opus 4.5 · Nov 2025 · 50% success: 4.9 h · 80% success: 49 min">
+    <circle class="a-pop" style="--d:2.69s" cx="1001.0" cy="200.3" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    </g>
+    <g class="pt" style="--dy:41.9px" data-tip="GPT-5.2 · Dec 2025 · 50% success: 5.9 h · 80% success: 1.1 h">
+    <circle class="a-pop" style="--d:2.71s" cx="1006.9" cy="195.7" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    </g>
+    <g class="pt" style="--dy:58.3px" data-tip="Claude Opus 4.6 · Feb 2026 · 50% success: 12.0 h · 80% success: 1.2 h">
+    <circle class="a-pop" style="--d:2.76s" cx="1026.3" cy="177.9" r="7" fill="#2b6cd4" stroke="#2b6cd4" stroke-width="3"/>
+    <text class="a-fade" style="--d:2.9099999999999997s" x="1042.3" y="211.9" text-anchor="start" font-size="16" font-weight="700" fill="#141518" paint-order="stroke" stroke="#fff" stroke-width="5">Claude Opus 4.6, Mythos</text>
+    <text class="a-fade" style="--d:2.9099999999999997s" x="1042.3" y="229.9" text-anchor="start" font-size="15" fill="#45464a" paint-order="stroke" stroke="#fff" stroke-width="5">a day's project</text>
+    </g>
+    <g class="pt" style="--dy:43.2px" data-tip="Claude Mythos (preview) · Apr 2026 · 50% success: 17.4 h · 80% success: 3.1 h · past 16 h, less certain">
+    <circle class="a-pop" style="--d:2.82s" cx="1047.4" cy="168.5" r="7" fill="#fff" stroke="#2b6cd4" stroke-width="3"/>
+    </g>
+    <rect class="a-grow" style="--d:0.35s;--t:1.26s" x="132.0" y="440" width="463.4" height="24" rx="6" fill="#eeeef0"/>
+    <text class="a-fade" style="--d:0.98s" x="363.7" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#45464a">prompts</text>
+    <rect class="a-grow" style="--d:1.61s;--t:0.68s" x="599.4" y="440" width="248.60000000000002" height="24" rx="6" fill="#eaf1fc"/>
+    <text class="a-fade" style="--d:1.95s" x="723.7" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#2b6cd4">tool loops</text>
+    <rect class="a-grow" style="--d:2.29s;--t:0.71s" x="852.0" y="440" width="261.29999999999995" height="24" rx="6" fill="#f8f0e2"/>
+    <text class="a-fade" style="--d:2.65s" x="982.65" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#a8690c">reasoning + harnesses</text>
+    <rect class="a-grow" style="--d:3.0s;--t:0.36s" x="1117.3" y="440" width="128.60000000000014" height="24" rx="6" fill="#e8f4ef" stroke="#0f7a5a" stroke-dasharray="5 4" stroke-opacity=".6"/>
+    <text class="a-fade" style="--d:3.18s" x="1181.6" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#0f7a5a">planning + checks</text>
+    <rect class="a-grow" style="--d:3.36s;--t:0.22s" x="1249.9" y="440" width="78.09999999999991" height="24" rx="6" fill="#fbeceb" stroke="#c72d26" stroke-dasharray="5 4" stroke-opacity=".6"/>
+    <text class="a-fade" style="--d:3.47s" x="1288.95" y="457" text-anchor="middle" font-size="14" font-weight="700" fill="#c72d26">always-on</text>
+    <text class="a-fade" style="--d:0.35s" x="130.0" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2019</text>
+    <text class="a-fade" style="--d:0.69s" x="256.3" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2020</text>
+    <text class="a-fade" style="--d:1.03s" x="382.6" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2021</text>
+    <text class="a-fade" style="--d:1.37s" x="508.9" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2022</text>
+    <text class="a-fade" style="--d:1.71s" x="635.3" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2023</text>
+    <text class="a-fade" style="--d:2.05s" x="761.6" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2024</text>
+    <text class="a-fade" style="--d:2.39s" x="887.9" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2025</text>
+    <text class="a-fade" style="--d:2.73s" x="1014.2" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2026</text>
+    <text class="a-fade" style="--d:3.07s" x="1140.5" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2027</text>
+    <text class="a-fade" style="--d:3.41s" x="1266.8" y="482" text-anchor="middle" font-family="var(--mono)" font-size="15" fill="#8a8b90">2028</text>
+    </svg></div>
   <p class="small" style="margin-top:6px;font-size:17px">METR Time Horizon 1.1 &middot; 50% success, in human time &middot; the trend line is extended past the data</p>
-  <aside class="notes">6:20-8:20. <ul class="beats"><li>METR method: time skilled people on software and research tasks; fit success vs human time per model; 50% crossing = horizon</li><li>GPT-2 3 s, GPT-4 4 min, Claude 3.7 Sonnet 1 h, GPT-5 3.4 h, Opus 4.6 12 h</li><li>Doubles every 129 days since 2023, about 4 months; each jump came with a harness change</li><li>Trend: work week around Dec 2026, work month around Sep 2027 (CI Jun 2027 to Jan 2028)</li><li>Caveats: past 16 h the suite is thin; METR: horizon isn't how long an agent can work alone</li><li>After a month: responsibilities, not longer tasks. No finish line, only conditions to keep true. Not cron, not a pipeline.</li><li>Project Vend (Anthropic, 2025): Claude ran an office shop; 'we would not hire Claudius'; phase 2 added procedures and a manager agent</li></ul><p>[Walk the dots left to right.] METR did careful work here, and they publish their data. They time skilled people on a suite of software and research tasks. Then for each model they fit a curve: success rate against how long the task took the human. The time horizon is where that curve crosses 50%. GPT-2: 3 seconds. GPT-4: 4 minutes. Claude 3.7 Sonnet: an hour. GPT-5: 3.4 hours. Opus 4.6: 12 hours. Since 2023 it doubles about every 129 days, a little over four months, and each jump came with a harness change: tool loops got us to minutes, reasoning models plus agent harnesses got us to hours. [Dashed line.] If the trend holds, a 40-hour work week lands around December, and a work month around September 2027. Two caveats. Past 16 hours their suite runs short of long tasks, so the top dots are shaky. And METR says it plainly: time horizon isn't how long an agent can work on its own. [→ responsibilities band] My prediction: after a month, the next step isn't a longer task. It's a different kind of request. Tasks end. Responsibilities don't: keep prod healthy, run on-call, keep a codebase maintained. There's no finish line, only conditions you keep true. That's not a cron job or a pipeline that fires on an event. It's one agent that keeps its own state and decides what needs doing. Anthropic tried one: Claude ran a small office shop. After phase one, their write-up said 'we would not hire Claudius.' Phase two added procedures and a manager agent, and the losing weeks mostly stopped.</p></aside>
+  <aside class="notes">6:20-8:20. <ul class="beats"><li>METR method: time skilled people on software and research tasks; fit success vs human time per model; 50% crossing = horizon</li><li>GPT-2 3 s, GPT-4 4 min, Claude 3.7 Sonnet 1 h, GPT-5 3.4 h, Opus 4.6 12 h</li><li>Doubles every 129 days since 2023, about 4 months; each jump came with a harness change</li><li>Trend: work week around Dec 2026, work month around Sep 2027 (CI Jun 2027 to Jan 2028)</li><li>Caveats: past 16 h the suite is thin; METR: horizon isn't how long an agent can work alone</li><li>After a month: responsibilities, not longer tasks. No finish line, only conditions to keep true. Not cron, not a pipeline.</li><li>Project Vend (Anthropic, 2025): Claude ran an office shop; 'we would not hire Claudius'; phase 2 added procedures and a manager agent</li><li>Optional: click '80% success' and every point drops 5 to 10x; hover any point for its numbers</li></ul><p>[Walk the dots left to right.] METR did careful work here, and they publish their data. They time skilled people on a suite of software and research tasks. Then for each model they fit a curve: success rate against how long the task took the human. The time horizon is where that curve crosses 50%. GPT-2: 3 seconds. GPT-4: 4 minutes. Claude 3.7 Sonnet: an hour. GPT-5: 3.4 hours. Opus 4.6: 12 hours. Since 2023 it doubles about every 129 days, a little over four months, and each jump came with a harness change: tool loops got us to minutes, reasoning models plus agent harnesses got us to hours. [Dashed line.] If the trend holds, a 40-hour work week lands around December, and a work month around September 2027. Two caveats. Past 16 hours their suite runs short of long tasks, so the top dots are shaky. And METR says it plainly: time horizon isn't how long an agent can work on its own. [→ responsibilities band] My prediction: after a month, the next step isn't a longer task. It's a different kind of request. Tasks end. Responsibilities don't: keep prod healthy, run on-call, keep a codebase maintained. There's no finish line, only conditions you keep true. That's not a cron job or a pipeline that fires on an event. It's one agent that keeps its own state and decides what needs doing. Anthropic tried one: Claude ran a small office shop. After phase one, their write-up said 'we would not hire Claudius.' Phase two added procedures and a manager agent, and the losing weeks mostly stopped.</p></aside>
 </section>
 
 <section data-t="8:20" class="slide" data-sec="What's missing">
@@ -431,17 +553,19 @@ body.all *{animation:none!important}
         <div class="layer frag" style="background:var(--amber-bg)"><span><b>L3</b> LLM prediction, cached</span><span class="tag am">novel only</span></div>
       </div>
     </div>
-    <div class="frag">
-      <p class="small" style="margin-bottom:10px">12-category stress test, 120 tasks (reproduces exactly)</p>
+    <div class="frag chart gatsc" data-cap="12-category stress test, 120 tasks (reproduces exactly)" data-cap-live="Live Llama 3.2: the same planners on a weak model (addendum suite)">
+      <div class="seg" style="margin-bottom:12px"><button class="on" data-mode="stress">Stress test</button><button data-mode="live">Live Llama 3.2</button></div>
+      <p class="small cap" style="margin-bottom:10px">12-category stress test, 120 tasks (reproduces exactly)</p>
       <div class="bars" style="gap:16px">
-        <div class="bar" data-v="100"><span class="ink">GATS</span><div class="track"><div class="fill" style="background:var(--green)"></div></div><span class="v g">100%</span></div>
-        <div class="bar" data-v="88.9"><span class="ink">LATS</span><div class="track"><div class="fill" style="background:var(--blue)"></div></div><span class="v">88.9%</span></div>
-        <div class="bar" data-v="23.9"><span class="ink">ReAct</span><div class="track"><div class="fill" style="background:var(--ink-3)"></div></div><span class="v">23.9%</span></div>
+        <div class="bar" data-v="100" data-label="100%" data-live="100" data-live-label="100%" data-tip="GATS: 100% on both. Plan quality does not depend on the model; 0 LLM calls during planning"><span class="ink">GATS</span><div class="track"><div class="fill" style="background:var(--green)"></div></div><span class="v g">100%</span></div>
+        <div class="bar" data-v="88.9" data-label="88.9%" data-live="0.7" data-live-label="&lt;1%" data-tip="LATS (Monte Carlo tree search with the LLM as evaluator): 88.9% on the stress test, 0.3 to 0.7% on live Llama 3.2"><span class="ink">LATS</span><div class="track"><div class="fill" style="background:var(--blue)"></div></div><span class="v">88.9%</span></div>
+        <div class="bar" data-v="23.9" data-label="23.9%" data-live="36.3" data-live-label="36.3%" data-tip="ReAct (reason, act, observe loop): 23.9% on the stress test, 36.3% on live Llama 3.2"><span class="ink">ReAct</span><div class="track"><div class="fill" style="background:var(--ink-3)"></div></div><span class="v">23.9%</span></div>
       </div>
       <p style="margin-top:28px"><b class="g">0</b> LLM calls during planning · <b>0%</b> variance across seeds · <b class="g">100%</b> on live Llama 3.2, where LATS fell below 1%</p>
     </div>
   </div>
-  <aside class="notes">11:45-13:40. <ul class="beats"><li>NYC taxi transformer (Vafa et al., NeurIPS 2024): near-perfect directions, impossible map; close 1% of streets, ~100% to 67%</li><li>Local: some of those rides probably passed this building</li><li>Today's agents: skilled sailors without a chart. GATS has a chart.</li><li>UCB1 tree search over a persistent state graph picks every action; score = average result + bonus for rarely tried options</li><li>Predictions from the cheapest layer: symbolic contracts, then its own statistics, then a cached LLM for new transitions only</li><li>Fixes the chart when the sea disagrees; a repeat trip makes no LLM calls</li><li>Stress test, 12 categories: GATS 100%, LATS 89%, ReAct 24%; 0 LLM calls during planning (50 one-time bootstrap); 0 variance</li></ul><p>GATS is the planner, from my paper with my co-author, Dymitr Nowicki. Here's the problem it's built for. A NeurIPS 2024 paper trained a transformer on New York taxi rides; some of them probably drove past this building. It gave valid turn-by-turn directions through Manhattan almost every time. Then the authors pulled out the map it had learned: streets that don't exist, overpasses across the grid. Close 1% of the streets, and accuracy fell from nearly 100% to 67%. It learned routes, not the city. Today's agents are skilled sailors without a chart. They read the sea and estimate where they are, and the error grows every mile. GATS has a chart. [Point at the layers.] Tree search picks every action, over a graph of states that persists between runs. It uses UCB1, which scores each option by its average result plus a bonus for options it hasn't tried much. To predict what an action will do, it asks the cheapest layer that can answer. [→] Symbolic contracts first: exact and free. [→] Then statistics from its own past runs. [→] Only for a transition it's never seen, a cached LLM call. It plans the route before leaving, checks its position at every waypoint, and fixes the chart when the sea disagrees, so it doesn't hit the same rock twice. A repeat trip makes no LLM calls at all. [→] On a 12-category stress test it scores 100%, against 89% for LATS and 24% for ReAct, with zero LLM calls during planning and zero variance across seeds. [Say 'during planning' every time you say zero: 50 one-time bootstrap calls.]</p></aside>
+  <i class="frag" data-act="gats-live"></i>
+  <aside class="notes">11:45-13:40. <ul class="beats"><li>NYC taxi transformer (Vafa et al., NeurIPS 2024): near-perfect directions, impossible map; close 1% of streets, ~100% to 67%</li><li>Local: some of those rides probably passed this building</li><li>Today's agents: skilled sailors without a chart. GATS has a chart.</li><li>UCB1 tree search over a persistent state graph picks every action; score = average result + bonus for rarely tried options</li><li>Predictions from the cheapest layer: symbolic contracts, then its own statistics, then a cached LLM for new transitions only</li><li>Fixes the chart when the sea disagrees; a repeat trip makes no LLM calls</li><li>Stress test, 12 categories: GATS 100%, LATS 89%, ReAct 24%; 0 LLM calls during planning (50 one-time bootstrap); 0 variance</li></ul><p>GATS is the planner, from my paper with my co-author, Dymitr Nowicki. Here's the problem it's built for. A NeurIPS 2024 paper trained a transformer on New York taxi rides; some of them probably drove past this building. It gave valid turn-by-turn directions through Manhattan almost every time. Then the authors pulled out the map it had learned: streets that don't exist, overpasses across the grid. Close 1% of the streets, and accuracy fell from nearly 100% to 67%. It learned routes, not the city. Today's agents are skilled sailors without a chart. They read the sea and estimate where they are, and the error grows every mile. GATS has a chart. [Point at the layers.] Tree search picks every action, over a graph of states that persists between runs. It uses UCB1, which scores each option by its average result plus a bonus for options it hasn't tried much. To predict what an action will do, it asks the cheapest layer that can answer. [→] Symbolic contracts first: exact and free. [→] Then statistics from its own past runs. [→] Only for a transition it's never seen, a cached LLM call. It plans the route before leaving, checks its position at every waypoint, and fixes the chart when the sea disagrees, so it doesn't hit the same rock twice. A repeat trip makes no LLM calls at all. [→] On a 12-category stress test it scores 100%, against 89% for LATS and 24% for ReAct, with zero LLM calls during planning. [→ live Llama 3.2] On a weak live model, LATS falls below 1%; GATS stays at 100%. [Say 'during planning' every time you say zero: 50 one-time bootstrap calls.]</p></aside>
 </section>
 
 <section data-t="13:40" class="slide" data-sec="GATS">
@@ -536,11 +660,11 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
         <marker id="lp-ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#45464a"/></marker>
         <marker id="lp-ahr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#c72d26"/></marker>
       </defs>
-      <rect x="0" y="0" width="210" height="70" rx="12" fill="#eaf1fc" stroke="#c8dbf7"/><text x="18" y="29" font-family="var(--mono)" font-size="15" font-weight="700" letter-spacing="2" fill="#2b6cd4">YOU</text><text x="18" y="54" font-size="15" fill="#45464a">set intent, take exceptions</text>
-      <rect x="215" y="120" width="230" height="70" rx="12" fill="#f7f7f8" stroke="#e5e5e7"/><text x="233" y="149" font-family="var(--mono)" font-size="15" font-weight="700" letter-spacing="2" fill="#45464a">COMPARE</text><text x="233" y="174" font-size="15" fill="#45464a">now vs the defined state</text>
-      <rect x="400" y="225" width="220" height="70" rx="12" fill="#f8f0e2" stroke="#ecd6b0"/><text x="418" y="254" font-family="var(--mono)" font-size="15" font-weight="700" letter-spacing="2" fill="#a8690c">PLAN</text><text x="418" y="279" font-size="15" fill="#45464a">simulate, then pick a path</text>
-      <rect x="215" y="330" width="230" height="70" rx="12" fill="#f7f7f8" stroke="#e5e5e7"/><text x="233" y="359" font-family="var(--mono)" font-size="15" font-weight="700" letter-spacing="2" fill="#45464a">ACT</text><text x="233" y="384" font-size="15" fill="#45464a">skills; irreversible = gated</text>
-      <rect x="0" y="225" width="200" height="70" rx="12" fill="#e8f4ef" stroke="#bfe0d2"/><text x="18" y="254" font-family="var(--mono)" font-size="15" font-weight="700" letter-spacing="2" fill="#0f7a5a">SENSE</text><text x="18" y="279" font-size="15" fill="#45464a">what's true now</text>
+      <g data-tip="You: set the intent (purpose, conditions, limits, budget) and handle exceptions, not every step"><rect x="0" y="0" width="210" height="70" rx="12" fill="#eaf1fc" stroke="#c8dbf7"/><text x="18" y="29" font-family="var(--mono)" font-size="15" font-weight="700" letter-spacing="2" fill="#2b6cd4">YOU</text><text x="18" y="54" font-size="15" fill="#45464a">set intent, take exceptions</text></g>
+      <g data-tip="Compare: what's true now vs the state the intent says to hold"><rect x="215" y="120" width="230" height="70" rx="12" fill="#f7f7f8" stroke="#e5e5e7"/><text x="233" y="149" font-family="var(--mono)" font-size="15" font-weight="700" letter-spacing="2" fill="#45464a">COMPARE</text><text x="233" y="174" font-size="15" fill="#45464a">now vs the defined state</text></g>
+      <g data-tip="Plan: simulate options on its own map and pick one (GATS)"><rect x="400" y="225" width="220" height="70" rx="12" fill="#f8f0e2" stroke="#ecd6b0"/><text x="418" y="254" font-family="var(--mono)" font-size="15" font-weight="700" letter-spacing="2" fill="#a8690c">PLAN</text><text x="418" y="279" font-size="15" fill="#45464a">simulate, then pick a path</text></g>
+      <g data-tip="Act: run the step; irreversible actions go through gates"><rect x="215" y="330" width="230" height="70" rx="12" fill="#f7f7f8" stroke="#e5e5e7"/><text x="233" y="359" font-family="var(--mono)" font-size="15" font-weight="700" letter-spacing="2" fill="#45464a">ACT</text><text x="233" y="384" font-size="15" fill="#45464a">skills; irreversible = gated</text></g>
+      <g data-tip="Sense: tests, health checks, metrics decide what's true. The model never sets state"><rect x="0" y="225" width="200" height="70" rx="12" fill="#e8f4ef" stroke="#bfe0d2"/><text x="18" y="254" font-family="var(--mono)" font-size="15" font-weight="700" letter-spacing="2" fill="#0f7a5a">SENSE</text><text x="18" y="279" font-size="15" fill="#45464a">what's true now</text></g>
       <path d="M100,225 Q100,155 213,155" stroke="#45464a" stroke-width="2.5" fill="none" marker-end="url(#lp-ah)"/>
       <path d="M447,155 Q510,155 510,223" stroke="#45464a" stroke-width="2.5" fill="none" marker-end="url(#lp-ah)"/>
       <path d="M510,297 Q510,365 447,365" stroke="#45464a" stroke-width="2.5" fill="none" marker-end="url(#lp-ah)"/>
@@ -553,6 +677,7 @@ step 1 @ 87b650f27839: chose AuthorPatch:a
       <text x="300" y="274" text-anchor="middle" font-size="16" font-style="italic" fill="#8a8b90">it holds states over time</text>
       <rect x="0" y="410" width="620" height="30" rx="8" fill="#141518"/>
       <text x="14" y="430" font-family="var(--mono)" font-size="13" fill="#d6d7db">JOURNAL · every sense, plan and act: hash-chained, replayable</text>
+      <circle r="8" fill="#2b6cd4" stroke="#fff" stroke-width="3"><animateMotion dur="6s" repeatCount="indefinite" path="M100,225 Q100,155 213,155 L447,155 Q510,155 510,223 L510,297 Q510,365 447,365 L213,365 Q100,365 100,297 Z"/></circle>
     </svg>
     <table class="t txt frag" data-step="1" style="font-size:25px;white-space:nowrap">
       <tr><th></th><th>A prompt</th><th>Intent</th></tr>
@@ -1026,7 +1151,36 @@ AGENTS.md change that would have prevented it, as a diff.</div>
     s.querySelectorAll('.frag').forEach((e, k) => { const n = +(e.dataset.step || k + 1); if (!m.has(n)) m.set(n, []); m.get(n).push(e); });
     return [...m.keys()].sort((a, b) => a - b).map(n => m.get(n));
   }
-  function grow(b){ const f = b.querySelector('.fill'); f.style.width = '0'; requestAnimationFrame(() => requestAnimationFrame(() => f.style.width = b.dataset.v + '%')); }
+  function grow(b){ const f = b.querySelector('.fill'), v = b.closest('.live') ? b.dataset.live : b.dataset.v; f.style.width = '0'; requestAnimationFrame(() => requestAnimationFrame(() => f.style.width = v + '%')); }
+
+  // charts: hover tooltips from data-tip
+  const tip = document.createElement('div'); tip.id = 'tip'; document.body.appendChild(tip);
+  addEventListener('pointermove', e => {
+    const t = e.target.closest && e.target.closest('[data-tip]');
+    if (!t) { tip.classList.remove('show'); return; }
+    if (tip.textContent !== t.dataset.tip) tip.textContent = t.dataset.tip;
+    tip.classList.add('show');
+    tip.style.left = Math.min(e.clientX + 16, innerWidth - tip.offsetWidth - 8) + 'px';
+    tip.style.top = (e.clientY + 22 + tip.offsetHeight > innerHeight ? e.clientY - tip.offsetHeight - 12 : e.clientY + 22) + 'px';
+  });
+  // charts: toggles; numbers count to their new value
+  function countTo(el, to, final){
+    const from = parseFloat(el.textContent) || 0, t0 = performance.now();
+    (function f(now){ const k = Math.min(1, (now - t0) / 1000), e = 1 - Math.pow(1 - k, 3), v = from + (to - from) * e;
+      el.textContent = k < 1 ? (Math.abs(v) < 10 ? v.toFixed(1) : v.toFixed(Math.round(to) === to ? 0 : 1)) + '%' : final;
+      if (k < 1) requestAnimationFrame(f); })(t0);
+  }
+  function seg(c, mode){ c.querySelectorAll('.seg button').forEach(b => b.classList.toggle('on', b.dataset.mode === mode)); }
+  function gatsMode(c, live){
+    if (c.classList.contains('live') === live) return;
+    c.classList.toggle('live', live); seg(c, live ? 'live' : 'stress');
+    c.querySelector('.cap').textContent = live ? c.dataset.capLive : c.dataset.cap;
+    c.querySelectorAll('.bar').forEach(b => { b.querySelector('.fill').style.width = (live ? b.dataset.live : b.dataset.v) + '%';
+      countTo(b.querySelector('.v'), +(live ? b.dataset.live : b.dataset.v), live ? b.dataset.liveLabel : b.dataset.label); });
+  }
+  function hzMode(c, p80){ c.classList.toggle('p80', p80); seg(c, p80 ? 'p80' : 'p50'); }
+  const ACTS = { 'gats-live': on => document.querySelectorAll('.gatsc').forEach(c => gatsMode(c, on)) };
+  function act(els, on){ els.forEach(e => e.dataset.act && ACTS[e.dataset.act](on)); }
   function label(){
     const s = slides[idx], total = groups(s).length, mainCount = slides.filter(x => x.dataset.t).length;
     document.getElementById('num').dataset.label = (s.dataset.t
@@ -1039,7 +1193,8 @@ AGENTS.md change that would have prevented it, as a diff.</div>
     slides.forEach((s, n) => s.classList.toggle('active', n === idx));
     const s = slides[idx], g = groups(s);
     step = ALL || atEnd ? g.length : 0;
-    g.forEach((els, k) => els.forEach(e => e.classList.toggle('on', k < step)));
+    g.forEach((els, k) => { els.forEach(e => e.classList.toggle('on', k < step)); act(els, !ALL && k < step); });
+    s.querySelectorAll('.hzc').forEach(c => hzMode(c, false)); tip.classList.remove('show');
     s.querySelectorAll('.bar').forEach(b => b.closest('.frag:not(.on)') ? b.querySelector('.fill').style.width = '0' : grow(b));
     document.getElementById('bar').style.width = (100 * (idx + 1) / slides.length) + '%';
     label();
@@ -1048,12 +1203,12 @@ AGENTS.md change that would have prevented it, as a diff.</div>
   }
   function next(){
     const g = groups(slides[idx]);
-    if (step < g.length) { g[step].forEach(e => { e.classList.add('on'); e.querySelectorAll('.bar').forEach(grow); }); step++; label(); }
+    if (step < g.length) { g[step].forEach(e => { e.classList.add('on'); e.querySelectorAll('.bar').forEach(grow); }); act(g[step], true); step++; label(); }
     else if (idx < slides.length - 1) show(idx + 1);
   }
   function prev(){
     const g = groups(slides[idx]);
-    if (step > 0) { step--; g[step].forEach(e => e.classList.remove('on')); label(); }
+    if (step > 0) { step--; g[step].forEach(e => e.classList.remove('on')); act(g[step], false); label(); }
     else if (idx > 0) show(idx - 1, true);
   }
   addEventListener('keydown', e => {
@@ -1065,7 +1220,12 @@ AGENTS.md change that would have prevented it, as a diff.</div>
     else if (e.key === 't' || e.key === 'T') { t0 = Date.now(); tick(); }
     else if (e.key === 'f' || e.key === 'F') document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
   });
-  addEventListener('click', e => { if (!notes.contains(e.target)) e.clientX > innerWidth / 3 ? next() : prev(); });
+  addEventListener('click', e => {
+    const b = e.target.closest('.seg button');
+    if (b) { const c = b.closest('.chart'); c.classList.contains('hzc') ? hzMode(c, b.dataset.mode === 'p80') : gatsMode(c, b.dataset.mode === 'live'); return; }
+    if (notes.contains(e.target) || e.target.closest('.chart, [data-tip]')) return;
+    e.clientX > innerWidth / 3 ? next() : prev();
+  });
   addEventListener('beforeprint', () => slides.forEach(s => s.querySelectorAll('.bar').forEach(b => b.querySelector('.fill').style.width = b.dataset.v + '%')));
   show((parseInt(location.hash.slice(1), 10) || 1) - 1);
 })();
