@@ -42,8 +42,10 @@ tr{break-inside:avoid}
 <p>That last lesson is the talk's thesis. The next big jump in agent reliability, Williams argues, won't come from a smarter model. It will come from the system around the model.</p>
 
 <h2>The hidden half of AI progress</h2>
-<p>The talk begins with a show of hands. Who used AI before reasoning models like OpenAI's o1, which arrived in 2024? Before chain of thought, when typing “let's think step by step” was a trick? Before retrieval, when a chatbot would invent a citation with total confidence?</p>
+<p>The talk begins with a show of hands. Who used AI before reasoning models like OpenAI's o1, which arrived in 2024? Before chain of thought, when typing “let's think step by step” was a trick? Before retrieval, when a chatbot would invent a citation with total confidence? And before ChatGPT itself, when using a language model meant BERT, GPT-2, T5 or GPT-3, all descendants of the transformer that Google researchers introduced in 2017 in “Attention Is All You Need”?</p>
 <p>Each of those fixes, Williams points out, came from outside the model. Retrieval-augmented generation, or RAG, fetches documents and places them in the prompt, so an answer can be checked against a source. Chain of thought asks the model to write out its intermediate steps, so a person can follow the work. Reasoning models were trained with reinforcement learning against a checker: is the math answer right, do the tests pass? That made multi-step work something you could hand off.</p>
+<p>The next slide is a reenactment of those dark ages, complete with an animated caveman trying to start a fire. In a Jupyter notebook, BERT fills in a blank: asked to complete “The capital of France is [MASK],” it answers “paris,” with 42 percent confidence. A BERT model tuned for questions can only point at words in a paragraph you paste in; asked the talk's own title, “What did my agent actually do?”, it answers “Microsoft.” GPT-2, asked the capital of France, answers correctly, then writes the next question itself, and the next answer, until it runs out of tokens. The outputs are real, recorded on the morning of the talk.</p>
+<p>What ChatGPT added, alongside a model tuned on human feedback, was a harness: turns for the user and the assistant, a stop at the end of its own turn, the whole conversation re-sent every time, and a hidden system prompt. The chat window is itself a harness.</p>
 <p>Engineers call this surrounding machinery a harness. It is everything around the model: what goes into its context, how it reasons, which tools it may call, what it is allowed to do, and how the result gets checked. Since 2020, harnesses have added a new job almost every year. ReAct (2022) interleaved reasoning with tool calls. Tree of Thoughts and LATS (2023) searched over partial solutions. Function calling, then the Model Context Protocol, standardized how tools plug in. Today's coding agents, Claude Code, Codex and Antigravity, wrap a reasoning model in a simple loop: think, call a tool, read the result, repeat.</p>
 <p>The lineage hides a pattern. When Google researchers asked their 540-billion-parameter PaLM model to show its steps, its score on grade-school math rose from 18 percent to 57 percent. But the trick only worked at around 100 billion parameters; small models didn't benefit. Scale alone hadn't found it, and the prompt alone didn't work. Then reinforcement learning trained the procedure into the weights. DeepSeek's R1 was rewarded by simple rule-based checks, and it learned on its own to write “wait” and recheck its work.</p>
 <p>Williams's summary: the harness finds what works, training absorbs it, and scale makes it absorbable. Harness traces become training data, and harness checks become rewards. Wrappers become weights.</p>
@@ -81,6 +83,7 @@ tr{break-inside:avoid}
   <li><b>L3, a cached LLM call.</b> Only for a transition nothing else can answer. The answer is stored, so each new transition costs at most one model call, ever.</li>
 </ul>
 <p>Predictions accumulate in a state-transition graph that persists between runs: dots for situations, arrows for actions and where they lead. Two routes that reach the same situation share one dot, and known dead ends get marked. To choose among actions, GATS uses UCB1, a rule that scores each option by its average result so far plus a bonus for options it hasn't tried much. Ties break alphabetically, so the same inputs always produce the same plan.</p>
+<p>On stage, an animated web makes this concrete. Search fans out from “tests failing” as UCB1 tries branches. Two paths that reach the same state collapse into one node and share what they learned. Dead ends, a refused test edit or a merge conflict, get a red X and are never searched again. Finally a green path reaches “tests pass, PR open,” and the whole map is kept, which is why a repeat run makes no LLM calls.</p>
 <p>On a 12-category stress test of 120 tasks, GATS succeeded 100 percent of the time, against 88.9 percent for LATS and 23.9 percent for ReAct. It made zero LLM calls during planning, after 50 one-time bootstrap calls, and showed zero variance across random seeds. On a weak live model, Llama 3.2, LATS fell below 1 percent while GATS stayed at 100. Plan quality didn't depend on the model.</p>
 <p>The approach has a hard limit, and the paper says so. Tree search breaks down beyond about 20 actions or 10 steps deep; twenty choices, ten deep, is roughly 10 trillion sequences. So the coding agent built on GATS searches only five coarse actions, and hands the open-ended part, writing the code, to the model inside a single step whose result can be measured.</p>
 
@@ -117,16 +120,23 @@ tr{break-inside:avoid}
 <p>The cost of the old way is already measurable. In a 2025 METR study, experienced open-source developers were 19 percent slower with AI tools while believing they were 20 percent faster.</p>
 <p>“So stop writing better prompts,” Williams concludes. “Write intent an agent can check itself against, and keep the record that lets you check it too.” LEDGER is free and MIT-licensed, and installs from maureesewilliams.io/ledger.</p>
 
+<h2>A habit to take home</h2>
+<p>Before questions, the talk turns lighter, with a quick show of hands. Has your agent ever forgotten the plan halfway through? Was that context rot or context bloat? Usually both: old output piles up in the context window, and the model loses the thread. And what's a handoff file?</p>
+<p>Williams's answer is a short note the agent writes after every task: what it's doing, what changed, what failed and what's next. Then you clear the context and start a fresh session that reads the note first. The context window is working memory; the handoff file is the record. Write it down, clear the context, start fresh.</p>
+
 <h2>Terms at a glance</h2>
 <p class="note">Figures in this essay are as presented in the talk; their sources are in the deck's speaker notes.</p>
 <table>
   <tr><th>Term</th><th>Plain meaning</th></tr>
   <tr><td>Affine</td><td>Linear plus a constant. Why the CRC-32 test could never pass.</td></tr>
   <tr><td>Bit-exact replay</td><td>Rerunning a recorded run reproduces every decision exactly.</td></tr>
+  <tr><td>Context bloat</td><td>Old tool output and dead ends piling up in the context window.</td></tr>
+  <tr><td>Context rot</td><td>Answers getting worse as the context window fills.</td></tr>
   <tr><td>Chain of thought</td><td>Asking a model to write its intermediate steps before answering.</td></tr>
   <tr><td>Gate</td><td>A check on an action's risk before it runs; irreversible actions need one.</td></tr>
   <tr><td>Goodhart's law</td><td>When a measure becomes a target, it stops being a good measure.</td></tr>
   <tr><td>Harness</td><td>Everything around the model: context, tools, permissions, the loop, the checks.</td></tr>
+  <tr><td>Handoff file</td><td>A short note written after each task so a fresh session can pick up where the last one stopped.</td></tr>
   <tr><td>Hash chain</td><td>A log where each entry stores the previous entry's hash, so any edit shows.</td></tr>
   <tr><td>Incident</td><td>LEDGER's record of a model claim that the sensors contradict.</td></tr>
   <tr><td>Intent</td><td>Purpose, conditions to keep true, limits, budget and when to come back, instead of steps.</td></tr>
@@ -141,6 +151,7 @@ tr{break-inside:avoid}
   <tr><td>Sensor</td><td>A small program that measures state, such as running the tests. The model never sets it.</td></tr>
   <tr><td>State-transition graph</td><td>GATS's map: situations as dots, actions as arrows, kept between runs.</td></tr>
   <tr><td>Time horizon</td><td>The task length, in human time, that an agent finishes half the time.</td></tr>
+  <tr><td>Transformer</td><td>The architecture behind every modern LLM, from Google's 2017 paper “Attention Is All You Need.”</td></tr>
   <tr><td>UCB1</td><td>A rule that picks the option with the best average result plus a bonus for less-tried ones.</td></tr>
   <tr><td>World model</td><td>A predictor of what an action will do to the current situation.</td></tr>
   <tr><td>Zero trust</td><td>LEDGER's design: the model can't set state, claim success or pick actions.</td></tr>
