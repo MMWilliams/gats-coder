@@ -14,7 +14,8 @@ Message: at scale, rare failures are daily; the first question about any agent o
 Concepts: three fixes, each from outside the model. Retrieval puts the source in the context (answers you can check). Chain of thought asks for intermediate steps (work you can follow). Reasoning models came from RL (reinforcement learning) against a checker: right answer, tests pass (work you can hand off). Last question: who used LLMs before ChatGPT (BERT, GPT-2, T5, GPT-3), all built on the transformer from Google's 2017 paper Attention Is All You Need (Vaswani et al.).
 Message: each jump in usability and trust started outside the model.
 
-## 4. Before chat, there was the notebook
+## 4. The dark ages (pre-ChatGPT)
+An animated caveman rubbing sticks ("Running GPT-2, circa 2019") sets a light tone.
 Concepts: real outputs from a notebook (Hugging Face transformers, run 10-29). BERT (2018) fills a blank: "The capital of France is [MASK]." gives paris, 42%. A BERT tuned for questions (SQuAD) can only point at words you paste in; asked "What did my agent actually do?" it answers "Microsoft". GPT-2 (2019) answers a question, then writes the next question itself. Alongside a tuned model, ChatGPT added a harness: turns, a stop at the end of its turn, the conversation re-sent every turn, a hidden system prompt.
 Message: the chat window is a harness.
 

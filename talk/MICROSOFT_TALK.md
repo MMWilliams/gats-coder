@@ -36,7 +36,7 @@ The deck shows each main slide's target start time and a running clock
 | 1 | Title + claim, real run output on screen | 0:00 |
 | 2 | About me + three lessons + agenda | 0:35 |
 | 3 | Who remembers AI before... (show of hands: reasoning, CoT, retrieval, LLMs before ChatGPT (Attention Is All You Need); fixes from outside the model unlocked usability and trust) | 1:35 |
-| 4 | Before chat, there was the notebook (real BERT, DistilBERT-SQuAD, GPT-2 outputs; the chat window is a harness) | 3:00 |
+| 4 | The dark ages (pre-ChatGPT): caveman + notebook (real BERT, DistilBERT-SQuAD, GPT-2 outputs; the chat window is a harness) | 3:00 |
 | 5 | Harnesses grow, then models absorb them (swimlane timeline 2020-now; harness + scale + RL coupling) | 3:45 |
 | 6 | Today's harness is tomorrow's model (absorbed, next to go, the check stays) | 5:10 |
 | 7 | Task length doubles about every 4 months (METR horizons, projection, responsibilities) | 6:35 |
